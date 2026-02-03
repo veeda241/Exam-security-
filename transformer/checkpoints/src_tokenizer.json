@@ -1,0 +1,20 @@
+{
+  "vocab_size": 32000,
+  "min_freq": 1,
+  "lowercase": true,
+  "token_to_id": {
+    "<pad>": 0,
+    "<unk>": 1,
+    "<bos>": 2,
+    "<eos>": 3,
+    "hello": 4,
+    "world": 5,
+    "how": 6,
+    "are": 7,
+    "you": 8,
+    "machine": 9,
+    "learning": 10,
+    "is": 11,
+    "powerful": 12
+  }
+}

@@ -1,0 +1,68 @@
+{
+  "manifest_version": 3,
+  "name": "ExamGuard Pro",
+  "version": "2.0.0",
+  "description": "AI-powered secure exam proctoring with real-time behavioral monitoring and identity verification.",
+  "permissions": [
+    "tabs",
+    "activeTab",
+    "storage",
+    "unlimitedStorage",
+    "notifications",
+    "clipboardRead",
+    "alarms",
+    "scripting"
+  ],
+  "host_permissions": [
+    "http://localhost:8005/*",
+    "https://*/*",
+    "http://*/*"
+  ],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "http://*/*",
+        "https://*/*"
+      ],
+      "js": [
+        "utils.js",
+        "eventLogger.js",
+        "content.js"
+      ],
+      "run_at": "document_start",
+      "all_frames": true
+    }
+  ],
+  "action": {
+    "default_popup": "popup/popup.html",
+    "default_icon": {
+      "16": "icons/icon16.svg",
+      "48": "icons/icon48.svg",
+      "128": "icons/icon128.svg"
+    },
+    "default_title": "ExamGuard Pro Session Control"
+  },
+  "icons": {
+    "16": "icons/icon16.svg",
+    "48": "icons/icon48.svg",
+    "128": "icons/icon128.svg"
+  },
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "webcam.js",
+        "capture.js",
+        "capture-page.html",
+        "capture-page.css",
+        "utils.js"
+      ],
+      "matches": [
+        "<all_urls>"
+      ]
+    }
+  ]
+}

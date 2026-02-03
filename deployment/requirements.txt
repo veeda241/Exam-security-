@@ -1,0 +1,28 @@
+# Backend Requirements
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+sqlalchemy[asyncio]==2.0.23
+asyncpg==0.29.0
+psycopg2-binary==2.9.9
+aiosqlite==0.19.0
+python-multipart==0.0.6
+pydantic[email]==2.5.2
+
+# AI/ML Dependencies
+opencv-python==4.8.1.78
+mediapipe==0.10.8
+ultralytics==8.0.220
+pytesseract==0.3.10
+Pillow==10.1.0
+sentence-transformers==2.2.2
+numpy==1.26.2
+scikit-learn==1.3.2
+torch==2.1.1
+
+# Task Queue
+celery==5.3.4
+redis==5.0.1
+
+# Utilities
+python-dotenv==1.0.0
+httpx==0.25.2

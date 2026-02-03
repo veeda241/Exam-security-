@@ -1,0 +1,21 @@
+{
+  "vocab_size": 32000,
+  "min_freq": 1,
+  "lowercase": true,
+  "token_to_id": {
+    "<pad>": 0,
+    "<unk>": 1,
+    "<bos>": 2,
+    "<eos>": 3,
+    "bonjour": 4,
+    "monde": 5,
+    "comment": 6,
+    "allez": 7,
+    "vous": 8,
+    "l": 9,
+    "apprentissage": 10,
+    "automatique": 11,
+    "est": 12,
+    "puissant": 13
+  }
+}

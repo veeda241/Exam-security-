@@ -1,0 +1,202 @@
+/* ExamGuard Pro - Premium Capture Page Styles */
+
+:root {
+    --primary: #7c3aed;
+    --primary-dark: #5b21b6;
+    --primary-light: #a78bfa;
+    --primary-glow: rgba(124, 58, 237, 0.4);
+
+    --accent: #06b6d4;
+    --danger: #ef4444;
+    --success: #10b981;
+
+    --bg-primary: #0a0a0f;
+    --bg-secondary: #12121a;
+    --bg-card: linear-gradient(145deg, rgba(30, 30, 45, 0.8), rgba(20, 20, 30, 0.9));
+    --bg-glass: rgba(255, 255, 255, 0.03);
+
+    --text-primary: #f8fafc;
+    --text-secondary: #94a3b8;
+    --text-muted: #64748b;
+
+    --border: rgba(255, 255, 255, 0.08);
+
+    --radius-md: 12px;
+    --radius-lg: 16px;
+    --radius-xl: 24px;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Inter', sans-serif;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    overflow: hidden;
+}
+
+.container {
+    width: 550px;
+    padding: 40px;
+    background: var(--bg-glass);
+    backdrop-filter: blur(20px);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-xl);
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+    position: relative;
+    z-index: 10;
+    background:
+        radial-gradient(ellipse at top left, rgba(124, 58, 237, 0.1), transparent 50%),
+        var(--bg-secondary);
+}
+
+h1 {
+    font-size: 28px;
+    font-weight: 800;
+    margin-bottom: 12px;
+    background: linear-gradient(135deg, #fff, var(--primary-light));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+p {
+    color: var(--text-secondary);
+    font-size: 15px;
+    margin-bottom: 30px;
+    line-height: 1.6;
+}
+
+.permissions {
+    display: grid;
+    gap: 16px;
+    margin-bottom: 30px;
+}
+
+.permission-card {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    padding: 20px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    text-align: left;
+    width: 100%;
+}
+
+.permission-card:hover:not(:disabled) {
+    transform: translateY(-4px);
+    border-color: var(--primary-light);
+    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
+}
+
+.permission-card.granted {
+    border-color: var(--success);
+    background: rgba(16, 185, 129, 0.05);
+    cursor: default;
+}
+
+.permission-card.denied {
+    border-color: var(--danger);
+    background: rgba(239, 68, 68, 0.05);
+}
+
+.permission-icon {
+    font-size: 32px;
+    filter: drop-shadow(0 0 10px rgba(255, 255, 255, 0.1));
+}
+
+.permission-info {
+    flex: 1;
+}
+
+.permission-info h3 {
+    font-size: 16px;
+    font-weight: 700;
+    margin-bottom: 4px;
+}
+
+.permission-info span {
+    font-size: 13px;
+    color: var(--text-muted);
+}
+
+.permission-status {
+    font-size: 20px;
+}
+
+.btn-primary {
+    width: 100%;
+    padding: 16px;
+    background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+    color: white;
+    border: none;
+    border-radius: var(--radius-lg);
+    font-size: 15px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 8px 20px var(--primary-glow);
+}
+
+.btn-primary:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 25px var(--primary-glow);
+}
+
+.btn-primary:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    filter: grayscale(0.5);
+}
+
+.loading {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    margin-top: 20px;
+    font-size: 14px;
+    color: var(--text-muted);
+}
+
+.spinner {
+    width: 18px;
+    height: 18px;
+    border: 2px solid var(--text-muted);
+    border-top-color: var(--primary-light);
+    border-radius: 50%;
+    animation: rotate 1s linear infinite;
+}
+
+@keyframes rotate {
+    from {
+        transform: rotate(0deg);
+    }
+
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+@keyframes slideDown {
+    from {
+        transform: translateY(-20px);
+        opacity: 0;
+    }
+
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}

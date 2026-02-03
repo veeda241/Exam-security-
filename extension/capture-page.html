@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ExamGuard Pro - Setup</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="capture-page.css">
+</head>
+
+<body>
+    <div class="container">
+        <h1>🛡️ Permission Setup</h1>
+        <p>ExamGuard Pro needs your permission to monitor the session. Please enable both Screen Sharing and Webcam
+            access to proceed.</p>
+
+        <div class="permissions">
+            <button class="permission-card" id="screen-card">
+                <span class="permission-icon">🖥️</span>
+                <div class="permission-info">
+                    <h3>Screen Monitoring</h3>
+                    <span>Required to detect plagiarism and tab switching</span>
+                </div>
+                <span class="permission-status" id="screen-status-icon">⬜</span>
+            </button>
+
+            <button class="permission-card" id="webcam-card">
+                <span class="permission-icon">📹</span>
+                <div class="permission-info">
+                    <h3>Identity Verification</h3>
+                    <span>Required for face detection and gaze tracking</span>
+                </div>
+                <span class="permission-status" id="webcam-status-icon">⬜</span>
+            </button>
+        </div>
+
+        <button id="final-btn" class="btn-primary" disabled>
+            🚀 Launch Secure Session
+        </button>
+
+        <div class="loading" id="sync-loader">
+            <span class="spinner"></span>
+            <span>Finalizing setup with server...</span>
+        </div>
+    </div>
+
+    <!-- Load scripts in order -->
+    <script src="capture.js"></script>
+    <script src="capture-page.js"></script>
+</body>
+
+</html>
