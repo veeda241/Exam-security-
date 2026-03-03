@@ -1,27 +1,49 @@
 import cv2
 import numpy as np
 import time
+import os
 
 # YOLO logic moved to object_detection.py
 
-# Try to import MediaPipe
+# ---- Face Detection Backend Selection ----
+# Priority: MediaPipe (if available) > OpenCV DNN > OpenCV Haar Cascade
+FACE_BACKEND = None
+
+# 1) Try MediaPipe
 try:
     import mediapipe as mp
-    # Verify solutions module is accessible
     if hasattr(mp, 'solutions') and hasattr(mp.solutions, 'face_mesh'):
-        MP_AVAILABLE = True
+        FACE_BACKEND = 'mediapipe'
+        print("[OK] MediaPipe face mesh available.")
     else:
-        MP_AVAILABLE = False
-        print("[WARN] MediaPipe solutions not available. Face mesh disabled.")
+        print("[INFO] MediaPipe installed but mp.solutions.face_mesh not found, trying OpenCV DNN...")
 except ImportError:
     mp = None
-    MP_AVAILABLE = False
-    print("[WARN] MediaPipe not installed. Face tracking disabled.")
+    print("[INFO] MediaPipe not installed, trying OpenCV DNN...")
+
+# 2) Try OpenCV DNN face detector (ships with opencv-python >=4.5.4)
+if FACE_BACKEND is None:
+    try:
+        _test_net = cv2.FaceDetectorYN.create("", "", (320, 320))
+        # FaceDetectorYN exists but needs a model file; we'll use Haar as reliable fallback
+        raise RuntimeError("skip")
+    except Exception:
+        pass
+
+    # Use Haar Cascade – always available with OpenCV
+    _haar_path = cv2.data.haarcascades + "haarcascade_frontalface_default.xml"
+    if os.path.isfile(_haar_path):
+        FACE_BACKEND = 'haar'
+        print(f"[OK] OpenCV Haar Cascade face detector available.")
+    else:
+        FACE_BACKEND = 'none'
+        print("[WARN] No face detection backend available.")
+
 
 class SecureVision:
     def __init__(self):
         # MediaPipe Face Mesh for Gaze Detection
-        if MP_AVAILABLE:
+        if FACE_BACKEND == 'mediapipe':
             self.mp_face_mesh = mp.solutions.face_mesh
             self.face_mesh = self.mp_face_mesh.FaceMesh(
                 max_num_faces=1,
@@ -32,16 +54,31 @@ class SecureVision:
         else:
             self.mp_face_mesh = None
             self.face_mesh = None
+
+        # OpenCV Haar Cascade (fallback)
+        if FACE_BACKEND == 'haar':
+            self.haar_cascade = cv2.CascadeClassifier(
+                cv2.data.haarcascades + "haarcascade_frontalface_default.xml"
+            )
+            self.profile_cascade = cv2.CascadeClassifier(
+                cv2.data.haarcascades + "haarcascade_profileface.xml"
+            )
+        else:
+            self.haar_cascade = None
+            self.profile_cascade = None
         
         # State tracking
         self.gaze_away_start_time = None
         self.GAZE_THRESHOLD_SEC = 2.0
+        self._last_face_time = time.time()
+        self.FACE_ABSENT_THRESHOLD_SEC = 3.0
         
     def analyze_frame(self, frame):
         """
         Analyzes a single frame for:
         1. Face Presence
-        2. Head Pose (Looking Away/Down)
+        2. Head Pose (Looking Away/Down)  – MediaPipe only
+        3. Multiple faces                – both backends
         """
         results = {
             'violations': [],
@@ -50,18 +87,28 @@ class SecureVision:
             'pose': None
         }
         
-        if frame is None or not MP_AVAILABLE:
-            if not MP_AVAILABLE:
-                results['violations'].append('AI_MODULE_ERROR')
+        if frame is None:
             return results
 
+        if FACE_BACKEND == 'none':
+            results['violations'].append('AI_MODULE_ERROR')
+            return results
+
+        if FACE_BACKEND == 'mediapipe':
+            return self._analyze_mediapipe(frame, results)
+        else:
+            return self._analyze_haar(frame, results)
+
+    # -----------------------------------------------------------------
+    #  MediaPipe backend  (full gaze / head-pose support)
+    # -----------------------------------------------------------------
+    def _analyze_mediapipe(self, frame, results):
         h, w, c = frame.shape
-        
-        # Gaze Tracking (MediaPipe)
         rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         mesh_results = self.face_mesh.process(rgb_frame)
         
         if mesh_results.multi_face_landmarks:
+            self._last_face_time = time.time()
             landmarks = mesh_results.multi_face_landmarks[0]
             
             # Head Pose Estimation
@@ -70,14 +117,10 @@ class SecureVision:
             
             is_looking_away = False
             
-            # Check Pitch (Looking Down/Up)
-            if pose['pitch'] < -15: # Looking down
+            if pose['pitch'] < -15:
                 results['violations'].append('LOOKING_DOWN')
                 is_looking_away = True
-            elif pose['pitch'] > 20: # Looking up
-                 pass # Less severe?
                  
-            # Check Yaw (Looking Side)
             if abs(pose['yaw']) > 20:
                 results['violations'].append('LOOKING_SIDE')
                 is_looking_away = True
@@ -90,10 +133,62 @@ class SecureVision:
                     results['integrity_score_impact'] += 20
             else:
                 self.gaze_away_start_time = None
+
+            # Multiple faces
+            if len(mesh_results.multi_face_landmarks) > 1:
+                results['violations'].append('MULTIPLE_FACES')
+                results['integrity_score_impact'] += 25
         else:
-            # Face not detected
             results['violations'].append('FACE_NOT_FOUND')
             results['integrity_score_impact'] += 15
+
+        return results
+
+    # -----------------------------------------------------------------
+    #  OpenCV Haar Cascade backend  (face presence + multiple faces)
+    # -----------------------------------------------------------------
+    def _analyze_haar(self, frame, results):
+        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        gray = cv2.equalizeHist(gray)
+
+        faces = self.haar_cascade.detectMultiScale(
+            gray,
+            scaleFactor=1.1,
+            minNeighbors=5,
+            minSize=(80, 80),
+            flags=cv2.CASCADE_SCALE_IMAGE,
+        )
+
+        num_faces = len(faces)
+
+        if num_faces == 0:
+            # Try profile face as well
+            profiles = self.profile_cascade.detectMultiScale(
+                gray, scaleFactor=1.1, minNeighbors=5, minSize=(80, 80)
+            )
+            if len(profiles) > 0:
+                num_faces = len(profiles)
+                faces = profiles
+                # Profile detected → student looking away
+                results['violations'].append('LOOKING_SIDE')
+
+        if num_faces == 0:
+            elapsed = time.time() - self._last_face_time
+            results['violations'].append('FACE_NOT_FOUND')
+            if elapsed > self.FACE_ABSENT_THRESHOLD_SEC:
+                results['integrity_score_impact'] += 15
+        else:
+            self._last_face_time = time.time()
+            # Record detection boxes
+            for (x, y, w, h) in faces:
+                results['detections'].append({
+                    'x': int(x), 'y': int(y),
+                    'w': int(w), 'h': int(h),
+                })
+
+        if num_faces > 1:
+            results['violations'].append('MULTIPLE_FACES')
+            results['integrity_score_impact'] += 25
 
         return results
 

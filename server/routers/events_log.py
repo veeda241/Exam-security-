@@ -148,6 +148,20 @@ async def log_events_batch(
     
     await db.commit()
     
+    # Submit events to the real-time analysis pipeline for transformer processing
+    try:
+        from services.pipeline import get_pipeline
+        pipeline = get_pipeline()
+        for event_data in batch.events:
+            await pipeline.submit({
+                "type": event_data.type,
+                "session_id": batch.session_id,
+                "data": event_data.data or {},
+                "timestamp": event_data.timestamp,
+            })
+    except Exception as e:
+        print(f"[WARN] Pipeline submission failed: {e}")
+    
     # Trigger score update in background
     background_tasks.add_task(ScoringEngine.update_session_scores, batch.session_id, db)
     

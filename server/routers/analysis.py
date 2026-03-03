@@ -24,6 +24,7 @@ from config import SCREENSHOTS_DIR, WEBCAM_DIR
 from services.ocr import analyze_screenshot_ocr
 from services.similarity import check_text_similarity
 from services.llm import get_llm_service
+from services.realtime import get_realtime_manager, EventType, AlertLevel
 from scoring.engine import ScoringEngine
 
 router = APIRouter()
@@ -102,14 +103,26 @@ async def process_analysis_data(
         result_data={}
     )
     
+    # Initialize phone detection variables
+    phone_detected = False
+    detected_objects = []
+    
+    print(f"📥 Processing analysis for session: {analysis_request.session_id}")
+    
+    # Initialize Realtime Manager
+    realtime = get_realtime_manager()
+    session_id = str(session.id)
+    student_id = str(session.student_id)
+    
     # 1. Webcam Analysis (MediaPipe / YOLO)
     webcam_frame = decode_image(analysis_request.webcam_image)
     if webcam_frame is not None:
+        print(f"📹 Webcam frame received, size: {webcam_frame.shape}")
         # Save image (optional, maybe subsample)
         fname, fpath = save_image(webcam_frame, WEBCAM_DIR, "webcam")
         analysis_record.source_file = f"/uploads/webcam/{fname}"
         
-        # Analyze
+        # 1.1 Vision Engine Analysis (MediaPipe - optional)
         if vision_engine:
             vision_results = vision_engine.analyze_frame(webcam_frame)
             analysis_record.face_detected = "FACE_NOT_FOUND" not in vision_results['violations']
@@ -120,9 +133,20 @@ async def process_analysis_data(
             # Update session engagement score
             if "GAZE_AWAY_LONG" in vision_results['violations']:
                 session.engagement_score = max(0, session.engagement_score - 5)
+                await realtime.notify_suspicious_activity(
+                    student_id=student_id,
+                    session_id=session_id,
+                    activity_type="gaze_aversion",
+                    details="Student looking away for extended period"
+                )
             elif "FACE_NOT_FOUND" in vision_results['violations']:
                 session.face_absence_count += 1
                 session.engagement_score = max(0, session.engagement_score - 10)
+                await realtime.notify_face_missing(
+                    student_id=student_id,
+                    session_id=session_id,
+                    duration_seconds=5 # Estimating duration
+                )
             else:
                  session.engagement_score = min(100, session.engagement_score + 1)
 
@@ -130,10 +154,14 @@ async def process_analysis_data(
             
             # Risk calculation
             analysis_record.risk_score_added += vision_results['integrity_score_impact']
+        else:
+            # Default values when vision engine not available
+            analysis_record.face_detected = True
+            analysis_record.face_confidence = 0.5
 
-            # 1.5 Object Detection (YOLO)
-            # Run on every 5th frame or specific request to save compute? 
-            # For MVP, run on every processed frame request (since requests are periodic)
+        # 1.2 Object Detection (YOLO) - ALWAYS runs for phone detection
+        # This is critical for exam security, runs independently of vision engine
+        try:
             from services.object_detection import get_object_detector
             yolo = get_object_detector()
             obj_result = yolo.detect(webcam_frame)
@@ -142,6 +170,29 @@ async def process_analysis_data(
                 analysis_record.result_data["objects"] = obj_result["objects"]
                 analysis_record.risk_score_added += obj_result["risk_score"]
                 session.risk_score = min(100, session.risk_score + obj_result["risk_score"])
+                detected_objects = obj_result["objects"]
+                
+                # Check specifically for phone
+                for obj in obj_result["objects"]:
+                    if obj.get("object") == "cell phone":
+                        phone_detected = True
+                        # Log critical violation
+                        analysis_record.analysis_type = "PHONE_VIOLATION"
+                        session.risk_level = "suspicious"
+                        session.risk_score = 100  # Max risk for phone detection
+                        print(f"🚨 PHONE DETECTED in session {session.id}!")
+                        
+                        await realtime.send_alert(
+                            alert_type="phone_detected",
+                            message="Cell phone detected in student feed!",
+                            student_id=student_id,
+                            session_id=session_id,
+                            severity=AlertLevel.CRITICAL,
+                            data={"confidence": obj.get("confidence", 0.9)}
+                        )
+                        break
+        except Exception as e:
+            print(f"[WARN] YOLO detection failed: {e}")
 
     # 2. Screen Analysis (OCR)
     screen_frame = decode_image(analysis_request.screen_image)
@@ -197,7 +248,29 @@ async def process_analysis_data(
         
     await db.commit()
     
-    return {"status": "processed", "risk_score": session.risk_score}
+    # Broadcast Risk Score Update
+    await realtime.notify_risk_update(
+        student_id=student_id,
+        session_id=session_id,
+        risk_score=session.risk_score,
+        risk_level=session.risk_level,
+        factors=analysis_record.result_data.keys()
+    )
+    
+    # Build response with phone detection flag
+    response = {
+        "status": "processed", 
+        "risk_score": session.risk_score,
+        "face_detected": analysis_record.face_detected if hasattr(analysis_record, 'face_detected') else True,
+        "confidence": analysis_record.face_confidence if hasattr(analysis_record, 'face_confidence') else 1.0,
+    }
+    
+    # Add phone detection info if webcam was processed
+    if webcam_frame is not None:
+        response["phone_detected"] = phone_detected if 'phone_detected' in locals() else False
+        response["detected_objects"] = detected_objects if 'detected_objects' in locals() else []
+    
+    return response
 
 @router.get("/dashboard", response_model=List[StudentSummary])
 async def get_dashboard_data(db: AsyncSession = Depends(get_db)):

@@ -5,6 +5,7 @@ Application settings and environment variables
 
 import os
 from pathlib import Path
+from urllib.parse import quote_plus
 
 # Base paths
 BASE_DIR = Path(__file__).parent
@@ -12,21 +13,25 @@ UPLOAD_DIR = BASE_DIR / "uploads"
 SCREENSHOTS_DIR = UPLOAD_DIR / "screenshots"
 WEBCAM_DIR = UPLOAD_DIR / "webcam"
 
-# Database configuration
-# The user requested PostgreSQL support
+# Database configuration - Supabase PostgreSQL
+SUPABASE_URL = os.getenv("SUPABASE_URL", "https://fpnopsvzvfqwvyqmhgei.supabase.co")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY", "sb_publishable_qUw5vPnm8pRAlAZCc5pm5w_kKUzfCw6")
+SUPABASE_DB_PASSWORD = os.getenv("SUPABASE_DB_PASSWORD", "Vyasxdxd@17")
+
+# Supabase PostgreSQL connection (Direct connection - port 5432)
 PG_USER = os.getenv("PG_USER", "postgres")
-PG_PASSWORD = os.getenv("PG_PASSWORD", "password")
-PG_HOST = os.getenv("PG_HOST", "localhost")
+PG_PASSWORD = os.getenv("PG_PASSWORD", SUPABASE_DB_PASSWORD)
+PG_HOST = os.getenv("PG_HOST", "db.fpnopsvzvfqwvyqmhgei.supabase.co")
 PG_PORT = os.getenv("PG_PORT", "5432")
-PG_DB = os.getenv("PG_DB", "examguard")
+PG_DB = os.getenv("PG_DB", "postgres")
 
 DATABASE_URL = os.getenv(
-    "DATABASE_URL", 
-    f"postgresql+asyncpg://{PG_USER}:{PG_PASSWORD}@{PG_HOST}:{PG_PORT}/{PG_DB}"
+    "DATABASE_URL",
+    f"postgresql+asyncpg://{PG_USER}:{quote_plus(PG_PASSWORD)}@{PG_HOST}:{PG_PORT}/{PG_DB}"
 )
 
-# Fallback for local development if PostgreSQL is not available
-if os.getenv("USE_SQLITE", "true").lower() == "true":
+# Set USE_SQLITE=true to fall back to local SQLite for offline development
+if os.getenv("USE_SQLITE", "false").lower() == "true":
     DATABASE_URL = f"sqlite+aiosqlite:///{BASE_DIR}/examguard.db"
 
 # API Configuration

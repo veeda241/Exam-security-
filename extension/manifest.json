@@ -14,7 +14,7 @@
     "scripting"
   ],
   "host_permissions": [
-    "http://localhost:8005/*",
+    "http://localhost:8000/*",
     "https://*/*",
     "http://*/*"
   ],

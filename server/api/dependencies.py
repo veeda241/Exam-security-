@@ -10,7 +10,8 @@ from sqlalchemy import select
 from typing import Optional
 
 from database import get_db
-from api.models import ExamSession, Student
+from models.session import ExamSession
+from models.student import Student
 
 
 # API Key authentication (optional)

@@ -10,7 +10,8 @@ from datetime import datetime
 from typing import List
 
 from database import get_db
-from api.models import ExamSession, Event
+from models.session import ExamSession
+from models.event import Event
 from api.schemas import EventData, EventBatch, EventResponse
 from config import RISK_WEIGHTS
 from scoring.engine import ScoringEngine

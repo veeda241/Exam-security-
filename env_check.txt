@@ -1,0 +1,2 @@
+It works!
+CWD: C:\hackathon\Gemini_CLI\Exam-security-

@@ -1,0 +1,22 @@
+Starting ExamGuard training script - Direct File Logging...
+Imported torch
+Setting up path...
+Imports complete.
+Initializing ExamGuard Training...
+Generated 45 training pairs.
+Vocabulary built: 193 tokens
+Device: cpu
+
+Starting Training Loop...
+Epoch 1/10 - Loss: 0.1924
+Epoch 2/10 - Loss: 0.1168
+Epoch 3/10 - Loss: 0.0568
+Epoch 4/10 - Loss: 0.0625
+Epoch 5/10 - Loss: 0.0354
+Epoch 6/10 - Loss: 0.0328
+Epoch 7/10 - Loss: 0.0299
+Epoch 8/10 - Loss: 0.0235
+Epoch 9/10 - Loss: 0.0239
+Epoch 10/10 - Loss: 0.0227
+
+Model saved to transformer\checkpoints\similarity

@@ -9,7 +9,7 @@ from sqlalchemy import select
 from typing import List
 
 from database import get_db
-from api.models import Student
+from models.student import Student
 from api.schemas import StudentCreate, StudentUpdate, StudentResponse
 
 router = APIRouter()

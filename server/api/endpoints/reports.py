@@ -12,7 +12,9 @@ from typing import List
 import os
 
 from database import get_db
-from api.models import ExamSession, Event, AnalysisResult
+from models.session import ExamSession
+from models.event import Event
+from models.analysis import AnalysisResult
 from api.schemas import ReportRequest, ReportSummary
 from scoring.calculator import calculate_risk_score
 from reports.generator import generate_pdf_report

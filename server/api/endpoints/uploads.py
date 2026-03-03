@@ -12,7 +12,8 @@ import os
 import uuid
 
 from database import get_db
-from api.models import ExamSession, AnalysisResult
+from models.session import ExamSession
+from models.analysis import AnalysisResult
 from api.schemas import ImageUpload, UploadResponse
 from config import SCREENSHOTS_DIR, WEBCAM_DIR, FORBIDDEN_KEYWORDS
 from scoring.engine import ScoringEngine

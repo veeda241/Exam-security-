@@ -9,16 +9,17 @@ from typing import Dict, Any, List, Optional
 from pathlib import Path
 
 import torch
+import torch.nn as nn
 import torch.nn.functional as F
 
 # Transformer imports - done dynamically to avoid path conflicts
 TRANSFORMER_AVAILABLE = False
-TransformerEncoderOnly = None
+Transformer = None
 SimpleTokenizer = None
 
 def _load_transformer_modules():
     """Load transformer modules dynamically to avoid import conflicts."""
-    global TRANSFORMER_AVAILABLE, TransformerEncoderOnly, SimpleTokenizer
+    global TRANSFORMER_AVAILABLE, Transformer, SimpleTokenizer
     
     try:
         # Add transformer module to path temporarily
@@ -26,10 +27,10 @@ def _load_transformer_modules():
         if str(transformer_path) not in sys.path:
             sys.path.insert(0, str(transformer_path))
         
-        from model.transformer import TransformerEncoderOnly as TEnc
+        from model.transformer import Transformer as Trans
         from data.tokenizer import SimpleTokenizer as STok
         
-        TransformerEncoderOnly = TEnc
+        Transformer = Trans
         SimpleTokenizer = STok
         TRANSFORMER_AVAILABLE = True
         
@@ -40,6 +41,46 @@ def _load_transformer_modules():
     except ImportError as e:
         print(f"[WARN] Transformer module not available: {e}")
         TRANSFORMER_AVAILABLE = False
+
+
+class SimilarityEncoder(nn.Module):
+    """Wrapper that uses Transformer encoder for text similarity."""
+    
+    def __init__(self, transformer, d_model: int = 256, pooling: str = 'mean'):
+        super().__init__()
+        self.transformer = transformer
+        self.pooling = pooling
+        self.d_model = d_model
+        
+        # Projection head for better similarity learning
+        self.projection = nn.Sequential(
+            nn.Linear(d_model, d_model),
+            nn.ReLU(),
+            nn.Linear(d_model, d_model // 2),
+        )
+    
+    def encode(self, input_ids: torch.Tensor) -> torch.Tensor:
+        """Encode text to embedding vector."""
+        # Get encoder output
+        encoder_output = self.transformer.encode(input_ids)  # [batch, seq, dim]
+        
+        # Create mask for pooling
+        mask = (input_ids != self.transformer.pad_token).float()
+        
+        # Mean pooling (excluding padding)
+        mask_expanded = mask.unsqueeze(-1).expand(encoder_output.size())
+        sum_embeddings = (encoder_output * mask_expanded).sum(dim=1)
+        sum_mask = mask_expanded.sum(dim=1).clamp(min=1e-9)
+        pooled = sum_embeddings / sum_mask
+        
+        # Project
+        return self.projection(pooled)
+    
+    def forward(self, text1_ids: torch.Tensor, text2_ids: torch.Tensor):
+        """Encode both texts and return embeddings."""
+        emb1 = self.encode(text1_ids)
+        emb2 = self.encode(text2_ids)
+        return emb1, emb2
 
 
 class TransformerAnalyzer:
@@ -63,6 +104,7 @@ class TransformerAnalyzer:
         self.model = None
         self.tokenizer = None
         self._initialized = False
+        self.max_length = 128
         
         # Load transformer modules dynamically
         _load_transformer_modules()
@@ -73,43 +115,93 @@ class TransformerAnalyzer:
     def _initialize_model(self, model_path: Optional[str] = None):
         """Initialize the Transformer model."""
         try:
-            # Create encoder-only model for text encoding
-            self.model = TransformerEncoderOnly(
-                vocab_size=10000,
-                d_model=256,
-                n_heads=4,
-                n_layers=4,
-                d_ff=512,
-                max_seq_len=256,
-                dropout=0.0,  # No dropout for inference
-                num_classes=None,  # No classification head - use embeddings
-                pooling="mean"
-            ).to(self.device)
+            # Default to trained similarity model
+            if model_path is None:
+                model_path = str(Path(__file__).parent.parent.parent / 
+                               "transformer" / "checkpoints" / "similarity")
             
-            # Load pre-trained weights if available
-            if model_path and os.path.exists(model_path):
-                checkpoint = torch.load(model_path, map_location=self.device)
-                self.model.load_state_dict(checkpoint['model_state_dict'])
-                print(f"[INFO] Loaded Transformer from {model_path}")
-            else:
-                print("[INFO] Using untrained Transformer (for encoding only)")
+            checkpoint_file = Path(model_path) / "best_model.pt"
+            tokenizer_file = Path(model_path) / "tokenizer.json"
             
-            self.model.eval()
-            
-            # Initialize tokenizer
+            # Load tokenizer
             self.tokenizer = SimpleTokenizer(vocab_size=10000, min_freq=1)
             
-            # Build basic vocabulary
-            sample_texts = [
-                "the a an is are was were be been being",
-                "student exam test answer question",
-                "copy paste switch tab window",
-                "face detection person present absent",
-            ]
-            self.tokenizer.build_vocab(sample_texts)
+            if tokenizer_file.exists():
+                self.tokenizer.load(str(tokenizer_file))
+                print(f"[INFO] Loaded tokenizer from {tokenizer_file}")
+            else:
+                # Build basic vocabulary as fallback
+                sample_texts = [
+                    "the a an is are was were be been being",
+                    "student exam test answer question",
+                    "copy paste switch tab window",
+                    "photosynthesis mitochondria energy cells",
+                ]
+                self.tokenizer.build_vocab(sample_texts)
+                print("[INFO] Using basic tokenizer vocabulary")
+            
+            # Load or create model
+            if checkpoint_file.exists():
+                checkpoint = torch.load(checkpoint_file, map_location=self.device)
+                config = checkpoint['config']
+                
+                # Create Transformer with saved config
+                transformer = Transformer(
+                    src_vocab_size=config['vocab_size'],
+                    tgt_vocab_size=config['vocab_size'],
+                    d_model=config['d_model'],
+                    n_heads=config['n_heads'],
+                    n_encoder_layers=config['n_layers'],
+                    n_decoder_layers=config['n_layers'],
+                    d_ff=config['d_ff'],
+                    max_seq_len=self.max_length,
+                    dropout=0.0,  # No dropout for inference
+                    pad_token=self.tokenizer.pad_token_id
+                )
+                
+                # Create similarity encoder
+                self.model = SimilarityEncoder(
+                    transformer, 
+                    d_model=config['d_model'],
+                    pooling='mean'
+                )
+                
+                # Load trained weights
+                self.model.load_state_dict(checkpoint['model_state_dict'])
+                self.model = self.model.to(self.device)
+                self.model.eval()
+                
+                print(f"[INFO] Loaded trained Transformer from {checkpoint_file}")
+                print(f"[INFO] Model config: d_model={config['d_model']}, "
+                      f"layers={config['n_layers']}, vocab={config['vocab_size']}")
+            else:
+                # Create untrained model for basic encoding
+                print("[INFO] No trained model found, using untrained encoder")
+                transformer = Transformer(
+                    src_vocab_size=len(self.tokenizer),
+                    tgt_vocab_size=len(self.tokenizer),
+                    d_model=256,
+                    n_heads=4,
+                    n_encoder_layers=4,
+                    n_decoder_layers=4,
+                    d_ff=512,
+                    max_seq_len=self.max_length,
+                    dropout=0.0,
+                    pad_token=self.tokenizer.pad_token_id
+                )
+                
+                self.model = SimilarityEncoder(transformer, d_model=256, pooling='mean')
+                self.model = self.model.to(self.device)
+                self.model.eval()
             
             self._initialized = True
             print(f"[INFO] Transformer Analyzer initialized on {self.device}")
+            
+        except Exception as e:
+            print(f"[ERROR] Failed to initialize Transformer: {e}")
+            import traceback
+            traceback.print_exc()
+            self._initialized = False
             
         except Exception as e:
             print(f"[ERROR] Failed to initialize Transformer: {e}")
@@ -130,19 +222,16 @@ class TransformerAnalyzer:
         
         try:
             # Tokenize
-            tokens = self.tokenizer.encode(text, max_length=256, padding=True)
-            input_ids = torch.tensor([tokens]).to(self.device)
+            tokens = self.tokenizer.encode(text)[:self.max_length]
+            # Pad
+            tokens = tokens + [self.tokenizer.pad_token_id] * (self.max_length - len(tokens))
+            input_ids = torch.tensor([tokens], dtype=torch.long).to(self.device)
             
             # Get embeddings
             with torch.no_grad():
-                # Get encoder output
-                embeddings = self.model.embedding(input_ids)
-                mask = (input_ids != 0).float().unsqueeze(-1)
+                embedding = self.model.encode(input_ids)
                 
-                # Mean pooling
-                embeddings = (embeddings * mask).sum(dim=1) / mask.sum(dim=1)
-                
-            return embeddings.squeeze(0)
+            return embedding.squeeze(0)
             
         except Exception as e:
             print(f"[ERROR] Encoding failed: {e}")

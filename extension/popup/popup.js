@@ -5,7 +5,7 @@
 
 // ==================== CONFIGURATION ====================
 const CONFIG = {
-    API_BASE: 'http://localhost:8005/api',
+    API_BASE: 'http://localhost:8000/api',
     HEALTH_CHECK_INTERVAL: 5000,
 };
 

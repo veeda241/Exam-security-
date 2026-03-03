@@ -15,7 +15,9 @@ import numpy as np
 import uuid
 
 from database import get_db
-from api.models import ExamSession, AnalysisResult, Student
+from models.session import ExamSession
+from models.analysis import AnalysisResult
+from models.student import Student
 from api.schemas import (
     AnalysisRequest, 
     AnalysisResponse, 

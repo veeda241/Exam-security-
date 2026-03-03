@@ -9,7 +9,7 @@ from sqlalchemy import select
 from typing import List
 
 from database import get_db
-from api.models import ResearchJourney, SearchStrategy
+from models.research import ResearchJourney, SearchStrategy
 from services.research_analysis import analyze_research_journey
 
 router = APIRouter()

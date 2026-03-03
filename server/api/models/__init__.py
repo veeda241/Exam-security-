@@ -1,13 +1,20 @@
 """
 ExamGuard Pro - API Models Package
-SQLAlchemy database models for all entities
+Re-exports SQLAlchemy models from the main models package
 """
 
-from .student import Student
-from .session import ExamSession
-from .event import Event
-from .analysis import AnalysisResult
-from .research import ResearchJourney, SearchStrategy
+# Import from the existing models package to avoid duplication
+from models.student import Student
+from models.session import ExamSession
+from models.event import Event
+from models.analysis import AnalysisResult
+
+# Try to import research models (may not exist in original)
+try:
+    from models.research import ResearchJourney, SearchStrategy
+except ImportError:
+    ResearchJourney = None
+    SearchStrategy = None
 
 __all__ = [
     "Student",

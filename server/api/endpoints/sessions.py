@@ -10,7 +10,7 @@ from datetime import datetime
 from typing import List
 
 from database import get_db
-from api.models import ExamSession
+from models.session import ExamSession
 from api.schemas import SessionCreate, SessionResponse, SessionSummary
 from scoring.calculator import calculate_risk_score
 
