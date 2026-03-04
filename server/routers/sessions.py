@@ -39,13 +39,17 @@ async def create_session(
     result = await db.execute(select(Student).where(Student.id == session_data.student_id))
     student = result.scalar_one_or_none()
     
-    # If student doesn't exist, maybe create/update? 
-    # For now, if provided name, maybe we should respect it?
-    # But legacy model relies on student_id.
+    # Auto-create student if not found
+    if not student:
+        student = Student(
+            id=session_data.student_id,
+            name=session_data.student_name,
+        )
+        db.add(student)
+        await db.flush()
     
     new_session = ExamSession(
         student_id=session_data.student_id,
-        # student_name=session_data.student_name, # Not in legacy model
         exam_id=session_data.exam_id,
     )
     
@@ -53,7 +57,6 @@ async def create_session(
     await db.commit()
     await db.refresh(new_session)
     
-    # For response, we need student name.
     student_name = student.name if student else session_data.student_name
     
     return SessionResponse(

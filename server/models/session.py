@@ -53,10 +53,11 @@ class ExamSession(Base):
     
     def to_dict(self):
         """Convert to dictionary for API response"""
+        student_name = self.student.name if self.student else "Unknown"
         return {
             "id": self.id,
             "student_id": self.student_id,
-            "student_name": self.student_name,
+            "student_name": student_name,
             "exam_id": self.exam_id,
             "started_at": self.started_at.isoformat() if self.started_at else None,
             "ended_at": self.ended_at.isoformat() if self.ended_at else None,

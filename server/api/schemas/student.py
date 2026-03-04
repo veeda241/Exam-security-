@@ -43,7 +43,7 @@ class StudentSummary(BaseModel):
     """Schema for student dashboard summary"""
     student_id: str
     name: str
-    email: str
+    email: Optional[str] = None
     latest_session_id: Optional[str] = None
     risk_score: float = 0.0
     engagement_score: float = 0.0

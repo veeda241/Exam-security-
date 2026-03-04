@@ -25,13 +25,14 @@ PG_HOST = os.getenv("PG_HOST", "db.fpnopsvzvfqwvyqmhgei.supabase.co")
 PG_PORT = os.getenv("PG_PORT", "5432")
 PG_DB = os.getenv("PG_DB", "postgres")
 
-DATABASE_URL = os.getenv(
-    "DATABASE_URL",
-    f"postgresql+asyncpg://{PG_USER}:{quote_plus(PG_PASSWORD)}@{PG_HOST}:{PG_PORT}/{PG_DB}"
-)
-
-# Set USE_SQLITE=true to fall back to local SQLite for offline development
-if os.getenv("USE_SQLITE", "false").lower() == "true":
+# Database mode: default to SQLite for local development
+# Set USE_SUPABASE=true to use remote Supabase PostgreSQL instead
+if os.getenv("USE_SUPABASE", "false").lower() == "true":
+    DATABASE_URL = os.getenv(
+        "DATABASE_URL",
+        f"postgresql+asyncpg://{PG_USER}:{quote_plus(PG_PASSWORD)}@{PG_HOST}:{PG_PORT}/{PG_DB}"
+    )
+else:
     DATABASE_URL = f"sqlite+aiosqlite:///{BASE_DIR}/examguard.db"
 
 # API Configuration

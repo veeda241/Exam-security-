@@ -11,6 +11,7 @@ from typing import List
 
 from database import get_db
 from models.session import ExamSession
+from models.student import Student
 from api.schemas import SessionCreate, SessionResponse, SessionSummary
 from scoring.calculator import calculate_risk_score
 
@@ -24,9 +25,16 @@ async def create_session(
 ):
     """Create a new exam session"""
     
+    # Auto-create student if doesn't exist
+    result = await db.execute(select(Student).where(Student.id == session_data.student_id))
+    student = result.scalar_one_or_none()
+    if not student:
+        student = Student(id=session_data.student_id, name=session_data.student_name)
+        db.add(student)
+        await db.flush()
+    
     new_session = ExamSession(
         student_id=session_data.student_id,
-        student_name=session_data.student_name,
         exam_id=session_data.exam_id,
     )
     
@@ -37,7 +45,7 @@ async def create_session(
     return SessionResponse(
         session_id=new_session.id,
         student_id=new_session.student_id,
-        student_name=new_session.student_name,
+        student_name=session_data.student_name,
         exam_id=new_session.exam_id,
         started_at=new_session.started_at.isoformat(),
         is_active=True,
@@ -104,9 +112,14 @@ async def get_session(
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
     
+    # Get student name
+    st_result = await db.execute(select(Student).where(Student.id == session.student_id))
+    st = st_result.scalar_one_or_none()
+    student_name = st.name if st else "Unknown"
+    
     return SessionSummary(
         id=session.id,
-        student_name=session.student_name,
+        student_name=student_name,
         student_id=session.student_id,
         exam_id=session.exam_id,
         started_at=session.started_at.isoformat(),
@@ -146,10 +159,14 @@ async def list_sessions(
     result = await db.execute(query)
     sessions = result.scalars().all()
     
-    return [
-        SessionSummary(
+    summaries = []
+    for s in sessions:
+        st_result = await db.execute(select(Student).where(Student.id == s.student_id))
+        st = st_result.scalar_one_or_none()
+        student_name = st.name if st else "Unknown"
+        summaries.append(SessionSummary(
             id=s.id,
-            student_name=s.student_name,
+            student_name=student_name,
             student_id=s.student_id,
             exam_id=s.exam_id,
             started_at=s.started_at.isoformat(),
@@ -167,9 +184,8 @@ async def list_sessions(
                 "forbidden_sites": s.forbidden_site_count,
                 "total": s.total_events
             }
-        )
-        for s in sessions
-    ]
+        ))
+    return summaries
 
 
 @router.get("/active/count")

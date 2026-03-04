@@ -58,11 +58,26 @@ async def create_session(
     db: AsyncSession = Depends(get_db)
 ):
     """Create a new exam session"""
+    from models.student import Student
+    
+    # Ensure student record exists (auto-create if needed)
+    result = await db.execute(select(ExamSession).where(False))  # just to init
+    student_result = await db.execute(
+        select(Student).where(Student.id == session_data.student_id)
+    )
+    student = student_result.scalar_one_or_none()
+    
+    if not student:
+        student = Student(
+            id=session_data.student_id,
+            name=session_data.student_name,
+        )
+        db.add(student)
+        await db.flush()
     
     # Create new session
     new_session = ExamSession(
         student_id=session_data.student_id,
-        student_name=session_data.student_name,
         exam_id=session_data.exam_id,
     )
     
@@ -73,7 +88,7 @@ async def create_session(
     return SessionResponse(
         session_id=new_session.id,
         student_id=new_session.student_id,
-        student_name=new_session.student_name,
+        student_name=session_data.student_name,
         exam_id=new_session.exam_id,
         started_at=new_session.started_at.isoformat(),
         is_active=True,

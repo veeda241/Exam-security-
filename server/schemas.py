@@ -18,7 +18,7 @@ class StudentCreate(BaseModel):
 class StudentResponse(BaseModel):
     id: str
     name: str
-    email: str
+    email: Optional[str] = None
     created_at: datetime
 
     class Config:
