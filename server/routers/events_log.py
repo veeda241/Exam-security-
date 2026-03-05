@@ -14,7 +14,7 @@ from database import get_db
 from models.session import ExamSession
 from models.event import Event
 from models.research import ResearchJourney
-from config import RISK_WEIGHTS
+from config import RISK_WEIGHTS, classify_url
 from scoring.engine import ScoringEngine
 from fastapi import BackgroundTasks
 
@@ -132,13 +132,48 @@ async def log_events_batch(
         
         # Phase 10: Research Journey Integration
         if event_data.type == "NAVIGATION" and event_data.data:
+            nav_url = event_data.data.get('url', 'unknown')
+            nav_title = event_data.data.get('title', 'unknown')
+            
+            # Classify URL server-side
+            url_class = classify_url(nav_url)
+            category = "General"
+            relevance = 0.5
+            if url_class:
+                category = url_class["category"]
+                if category == "AI":
+                    relevance = 0.1
+                elif category == "CHEATING":
+                    relevance = 0.0
+                elif category == "ENTERTAINMENT":
+                    relevance = 0.15
+            
             journey_entry = ResearchJourney(
                 session_id=batch.session_id,
-                url=event_data.data.get('url', 'unknown'),
-                title=event_data.data.get('title', 'unknown'),
-                timestamp=datetime.fromtimestamp(event_data.timestamp / 1000.0)
+                url=nav_url,
+                title=nav_title,
+                timestamp=datetime.fromtimestamp(event_data.timestamp / 1000.0),
+                category=category,
+                relevance_score=relevance,
             )
             db.add(journey_entry)
+        
+        # Handle FORBIDDEN_SITE events (from extension URL classification)
+        if event_data.type == "FORBIDDEN_SITE" and event_data.data:
+            # Also create research journey entry for the forbidden site
+            forbidden_url = event_data.data.get('url', 'unknown')
+            forbidden_category = event_data.data.get('category', 'Forbidden')
+            if not any(e.type == "NAVIGATION" and e.data and e.data.get('url') == forbidden_url 
+                       for e in batch.events):
+                journey_entry = ResearchJourney(
+                    session_id=batch.session_id,
+                    url=forbidden_url,
+                    title=event_data.data.get('title', 'unknown'),
+                    timestamp=datetime.fromtimestamp(event_data.timestamp / 1000.0),
+                    category=forbidden_category,
+                    relevance_score=0.0,
+                )
+                db.add(journey_entry)
         
         # Update session stats
         session.total_events += 1
@@ -227,9 +262,71 @@ async def _update_session_stats(session: ExamSession, event_type: str):
     
     if event_type == "TAB_SWITCH":
         session.tab_switch_count += 1
+    elif event_type == "NAVIGATION":
+        session.tab_switch_count += 1
     elif event_type in ("COPY", "PASTE"):
         session.copy_count += 1
     elif event_type in ("FORBIDDEN_SITE", "FORBIDDEN_CONTENT"):
         session.forbidden_site_count += 1
     elif event_type == "FACE_ABSENT":
         session.face_absence_count += 1
+
+
+# ==================== Visited Websites ====================
+
+@router.get("/session/{session_id}/visited-sites")
+async def get_visited_sites(
+    session_id: str,
+    db: AsyncSession = Depends(get_db)
+):
+    """Get all websites visited during a session with categories"""
+    
+    result = await db.execute(
+        select(ResearchJourney)
+        .where(ResearchJourney.session_id == session_id)
+        .order_by(ResearchJourney.timestamp.asc())
+    )
+    sites = result.scalars().all()
+    
+    # Also get FORBIDDEN_SITE events for extra context
+    events_result = await db.execute(
+        select(Event)
+        .where(Event.session_id == session_id)
+        .where(Event.event_type == "FORBIDDEN_SITE")
+        .order_by(Event.timestamp.asc())
+    )
+    forbidden_events = events_result.scalars().all()
+    
+    # Build site list
+    visited = []
+    seen_urls = set()
+    
+    for site in sites:
+        url = site.url
+        if url in seen_urls:
+            continue
+        seen_urls.add(url)
+        visited.append({
+            "url": url,
+            "title": site.title,
+            "category": site.category or "General",
+            "relevance_score": site.relevance_score,
+            "timestamp": site.timestamp.isoformat() if site.timestamp else None,
+            "is_flagged": site.category in ("AI", "CHEATING", "ENTERTAINMENT", "Forbidden"),
+        })
+    
+    # Summary stats
+    categories = {}
+    for v in visited:
+        cat = v["category"]
+        categories[cat] = categories.get(cat, 0) + 1
+    
+    flagged_count = sum(1 for v in visited if v["is_flagged"])
+    
+    return {
+        "session_id": session_id,
+        "total_sites": len(visited),
+        "flagged_count": flagged_count,
+        "category_breakdown": categories,
+        "sites": visited,
+    }

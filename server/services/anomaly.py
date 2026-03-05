@@ -53,6 +53,12 @@ class AnomalyDetector:
             
             ts = event.get("timestamp") or event.get("client_timestamp")
             if ts:
+                if isinstance(ts, str):
+                    try:
+                        from datetime import datetime as dt
+                        ts = dt.fromisoformat(ts.replace('Z', '+00:00'))
+                    except (ValueError, TypeError):
+                        continue
                 timestamps.append(ts)
         
         # Check 1: Tab switch frequency

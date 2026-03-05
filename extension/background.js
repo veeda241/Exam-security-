@@ -37,6 +37,420 @@ let wsReconnectTimer = null;
 let clipboardTexts = [];     // Buffer for transformer analysis
 let pendingAnalysis = [];    // Buffer for pending text analysis
 
+// ==================== BROWSING TRACKER ====================
+/**
+ * BrowsingTracker uses chrome.tabs API to monitor:
+ *  - Which website is currently active and for how long
+ *  - Time spent per site category (exam, AI, cheating, entertainment, other)
+ *  - All open tabs (periodic audit via chrome.tabs.query)
+ *  - Real-time risk & effort scores based on browsing behavior
+ */
+const browsingTracker = {
+  // Current active site tracking
+  activeSite: null,            // { url, title, tabId, category, startTime }
+  
+  // Time spent per category (milliseconds)
+  timeByCategory: {
+    exam: 0,
+    ai: 0,
+    cheating: 0,
+    entertainment: 0,
+    other: 0,
+  },
+  
+  // All visited sites with durations
+  visitedSites: [],            // [{ url, title, category, riskLevel, firstVisit, totalTime, visitCount }]
+  
+  // Open tabs snapshot (last audit)
+  openTabs: [],                // [{ tabId, url, title, category, riskLevel }]
+  
+  // Calculated scores
+  browsingRiskScore: 0,        // 0-100 based on sites visited
+  effortScore: 100,            // 0-100 based on time on task vs distractions
+  
+  // Audit interval
+  auditIntervalId: null,
+  
+  /** Start tracking when exam begins */
+  start() {
+    this.reset();
+    // Run an initial tab audit
+    this.auditOpenTabs();
+    // Audit open tabs every 10 seconds
+    this.auditIntervalId = setInterval(() => this.auditOpenTabs(), 10000);
+  },
+  
+  /** Stop tracking when exam ends */
+  stop() {
+    // Flush the active site time
+    this.flushActiveSite();
+    if (this.auditIntervalId) {
+      clearInterval(this.auditIntervalId);
+      this.auditIntervalId = null;
+    }
+  },
+  
+  /** Reset all tracking data */
+  reset() {
+    this.activeSite = null;
+    this.timeByCategory = { exam: 0, ai: 0, cheating: 0, entertainment: 0, other: 0 };
+    this.visitedSites = [];
+    this.openTabs = [];
+    this.browsingRiskScore = 0;
+    this.effortScore = 100;
+  },
+  
+  /** Called when user switches to a new tab or navigates to a new URL */
+  trackSiteChange(tabId, url, title) {
+    // Flush time for the previous active site
+    this.flushActiveSite();
+    
+    // Classify the new URL
+    const classification = classifyUrl(url);
+    let category = 'other';
+    let riskLevel = 'none';
+    if (classification) {
+      category = classification.category.toLowerCase(); // ai, cheating, entertainment
+      riskLevel = classification.riskLevel;
+    } else if (this.isExamRelated(url)) {
+      category = 'exam';
+    }
+    
+    // Set new active site
+    this.activeSite = {
+      url: sanitizeUrl(url),
+      title: title || 'Unknown',
+      tabId,
+      category,
+      riskLevel,
+      startTime: Date.now(),
+    };
+    
+    // Update visited sites list
+    this.recordVisit(url, title, category, riskLevel);
+    
+    // Recalculate scores
+    this.calculateScores();
+  },
+  
+  /** Flush accumulated time for the currently active site */
+  flushActiveSite() {
+    if (!this.activeSite || !this.activeSite.startTime) return;
+    
+    const elapsed = Date.now() - this.activeSite.startTime;
+    const cat = this.activeSite.category;
+    if (this.timeByCategory.hasOwnProperty(cat)) {
+      this.timeByCategory[cat] += elapsed;
+    } else {
+      this.timeByCategory.other += elapsed;
+    }
+    
+    // Also update totalTime in visitedSites
+    const cleanUrl = this.activeSite.url;
+    const entry = this.visitedSites.find(s => s.url === cleanUrl);
+    if (entry) {
+      entry.totalTime += elapsed;
+      entry.lastVisit = Date.now();
+    }
+    
+    this.activeSite.startTime = Date.now(); // Reset for next flush
+  },
+  
+  /** Record a visit to a specific site */
+  recordVisit(url, title, category, riskLevel) {
+    const cleanUrl = sanitizeUrl(url);
+    const existing = this.visitedSites.find(s => s.url === cleanUrl);
+    if (existing) {
+      existing.visitCount++;
+      existing.lastVisit = Date.now();
+    } else {
+      this.visitedSites.push({
+        url: cleanUrl,
+        title: title || 'Unknown',
+        category,
+        riskLevel,
+        firstVisit: Date.now(),
+        lastVisit: Date.now(),
+        totalTime: 0,
+        visitCount: 1,
+      });
+    }
+  },
+  
+  /** Check if a URL is exam-related (the exam platform itself, LMS, etc.) */
+  isExamRelated(url) {
+    if (!url) return false;
+    try {
+      const hostname = new URL(url).hostname.toLowerCase();
+      // Common LMS / exam platforms
+      const examPlatforms = [
+        'localhost', '127.0.0.1',             // Local exam platform
+        'canvas.', 'blackboard.', 'moodle.',  // LMS platforms
+        'forms.google.com', 'docs.google.com',
+        'exam.', 'test.', 'quiz.', 'assessment.',
+        'gradescope.com', 'proctorio.com',
+      ];
+      return examPlatforms.some(p => hostname.includes(p));
+    } catch {
+      return false;
+    }
+  },
+  
+  /** Audit all currently open tabs using chrome.tabs.query */
+  async auditOpenTabs() {
+    if (!examSession.active) return;
+    
+    try {
+      const tabs = await chrome.tabs.query({});
+      const auditResults = [];
+      let flaggedCount = 0;
+      
+      for (const tab of tabs) {
+        if (!tab.url || tab.url.startsWith('chrome://') || tab.url.startsWith('chrome-extension://')) {
+          continue;
+        }
+        
+        const classification = classifyUrl(tab.url);
+        const entry = {
+          tabId: tab.id,
+          url: sanitizeUrl(tab.url),
+          title: tab.title || 'Unknown',
+          category: classification ? classification.category : (this.isExamRelated(tab.url) ? 'EXAM' : 'OTHER'),
+          riskLevel: classification ? classification.riskLevel : 'none',
+          active: tab.active,
+          pinned: tab.pinned,
+        };
+        
+        auditResults.push(entry);
+        if (classification) flaggedCount++;
+        
+        // Record visit if not already tracked
+        this.recordVisit(tab.url, tab.title, entry.category.toLowerCase(), entry.riskLevel);
+      }
+      
+      this.openTabs = auditResults;
+      
+      // Log audit event if flagged tabs found
+      if (flaggedCount > 0) {
+        logEvent({
+          type: 'TAB_AUDIT',
+          timestamp: Date.now(),
+          data: {
+            totalTabs: auditResults.length,
+            flaggedTabs: flaggedCount,
+            flaggedUrls: auditResults.filter(t => t.riskLevel !== 'none').map(t => ({
+              url: t.url, category: t.category, riskLevel: t.riskLevel
+            })),
+            message: `Tab audit: ${flaggedCount} flagged out of ${auditResults.length} tabs`,
+          }
+        });
+      }
+      
+      this.calculateScores();
+    } catch (error) {
+      console.warn('Tab audit error:', error.message);
+    }
+  },
+  
+  /** Calculate browsing risk and effort scores */
+  calculateScores() {
+    // Flush current active site to get accurate totals
+    this.flushActiveSite();
+    
+    const totalTime = Object.values(this.timeByCategory).reduce((a, b) => a + b, 0) || 1;
+    
+    // --- Browsing Risk Score (0-100) ---
+    // Based on: time on forbidden sites, number of flagged sites, open flagged tabs
+    let risk = 0;
+    
+    // Time-based risk
+    const aiTimeRatio = this.timeByCategory.ai / totalTime;
+    const cheatingTimeRatio = this.timeByCategory.cheating / totalTime;
+    const entertainmentTimeRatio = this.timeByCategory.entertainment / totalTime;
+    
+    risk += aiTimeRatio * 80;             // AI usage: up to 80 risk
+    risk += cheatingTimeRatio * 100;      // Cheating: up to 100 risk
+    risk += entertainmentTimeRatio * 50;  // Entertainment: up to 50 risk
+    
+    // Count-based risk (unique flagged sites)
+    const flaggedSites = this.visitedSites.filter(s => ['ai', 'cheating', 'entertainment'].includes(s.category));
+    risk += Math.min(flaggedSites.length * 5, 25); // Up to 25 from site count
+    
+    // Open tabs risk bonus
+    const flaggedOpenTabs = this.openTabs.filter(t => t.riskLevel !== 'none').length;
+    risk += Math.min(flaggedOpenTabs * 3, 15); // Up to 15 from open tabs
+    
+    this.browsingRiskScore = Math.min(Math.round(risk), 100);
+    
+    // --- Effort Score (0-100) ---
+    // Effort is purely based on how much time was spent on exam vs non-exam.
+    // If student spends 100% on exam => effort 100. If 0% on exam => effort 0.
+    const examTime = this.timeByCategory.exam;
+    const examRatio = examTime / totalTime;
+    const distractionTime = this.timeByCategory.ai + this.timeByCategory.cheating + this.timeByCategory.entertainment;
+    const distractionRatio = distractionTime / totalTime;
+    const otherRatio = this.timeByCategory.other / totalTime;
+    
+    // Base effort: exam time drives it up, everything else drives it down
+    let effort = examRatio * 100;
+    
+    // "Other" (unknown/unclassified sites) gets very little credit
+    effort += otherRatio * 10;
+    
+    // Extra penalty for known distraction sites beyond ratio
+    effort -= Math.min(flaggedSites.length * 4, 25);
+    
+    // Bonus: if >80% exam time, small bonus. Student is focused.
+    if (examRatio > 0.8) effort += 10;
+    
+    this.effortScore = Math.min(Math.max(Math.round(effort), 0), 100);
+  },
+  
+  /** Generate a browsing summary event for syncing to server */
+  generateSummaryEvent() {
+    this.flushActiveSite();
+    this.calculateScores();
+    
+    const totalTime = Object.values(this.timeByCategory).reduce((a, b) => a + b, 0);
+    
+    return {
+      type: 'BROWSING_SUMMARY',
+      timestamp: Date.now(),
+      data: {
+        timeByCategory: { ...this.timeByCategory },
+        totalTime,
+        browsingRiskScore: this.browsingRiskScore,
+        effortScore: this.effortScore,
+        uniqueSitesVisited: this.visitedSites.length,
+        flaggedSitesCount: this.visitedSites.filter(s => ['ai', 'cheating', 'entertainment'].includes(s.category)).length,
+        openTabsCount: this.openTabs.length,
+        flaggedOpenTabs: this.openTabs.filter(t => t.riskLevel !== 'none').length,
+        topFlaggedSites: this.visitedSites
+          .filter(s => ['ai', 'cheating', 'entertainment'].includes(s.category))
+          .sort((a, b) => b.totalTime - a.totalTime)
+          .slice(0, 10)
+          .map(s => ({
+            url: s.url,
+            category: s.category,
+            riskLevel: s.riskLevel,
+            totalTime: s.totalTime,
+            visitCount: s.visitCount,
+          })),
+        examTimePercent: totalTime > 0 ? Math.round((this.timeByCategory.exam / totalTime) * 100) : 0,
+        distractionTimePercent: totalTime > 0 ? Math.round(
+          ((this.timeByCategory.ai + this.timeByCategory.cheating + this.timeByCategory.entertainment) / totalTime) * 100
+        ) : 0,
+      },
+    };
+  },
+  
+  /** Get current stats for the popup */
+  getStats() {
+    this.flushActiveSite();
+    this.calculateScores();
+    
+    const totalTime = Object.values(this.timeByCategory).reduce((a, b) => a + b, 0);
+    return {
+      activeSite: this.activeSite ? {
+        url: this.activeSite.url,
+        category: this.activeSite.category,
+        riskLevel: this.activeSite.riskLevel,
+      } : null,
+      timeByCategory: { ...this.timeByCategory },
+      totalTime,
+      browsingRiskScore: this.browsingRiskScore,
+      effortScore: this.effortScore,
+      flaggedSitesCount: this.visitedSites.filter(s => ['ai', 'cheating', 'entertainment'].includes(s.category)).length,
+      totalSitesVisited: this.visitedSites.length,
+      openTabsCount: this.openTabs.length,
+      flaggedOpenTabs: this.openTabs.filter(t => t.riskLevel !== 'none').length,
+      currentCategory: this.activeSite?.category || 'none',
+    };
+  },
+};
+
+// ==================== URL CLASSIFICATION ====================
+// AI / LLM Sites - high risk during exams
+const AI_SITES = [
+  'chat.openai.com', 'chatgpt.com', 'openai.com',
+  'gemini.google.com', 'bard.google.com',
+  'claude.ai', 'anthropic.com',
+  'perplexity.ai',
+  'copilot.microsoft.com', 'bing.com/chat',
+  'poe.com', 'character.ai',
+  'huggingface.co/chat', 'deepseek.com',
+  'you.com', 'phind.com',
+  'writesonic.com', 'jasper.ai',
+  'wolframalpha.com', 'symbolab.com',
+  'photomath.com', 'mathway.com',
+];
+
+// Entertainment / Distraction Sites - medium risk
+const ENTERTAINMENT_SITES = [
+  'youtube.com', 'netflix.com', 'hulu.com',
+  'disneyplus.com', 'primevideo.com', 'amazon.com/gp/video',
+  'twitch.tv', 'kick.com',
+  'tiktok.com', 'instagram.com', 'facebook.com', 'twitter.com', 'x.com',
+  'reddit.com', 'tumblr.com', 'pinterest.com',
+  'snapchat.com', 'discord.com',
+  'spotify.com', 'music.youtube.com', 'soundcloud.com',
+  'store.steampowered.com', 'epicgames.com',
+  'crunchyroll.com', 'funimation.com',
+  'roblox.com', 'miniclip.com',
+  // Streaming / movie sites
+  'movhub.ws', 'movhub.to', 'fmovies.to', 'fmovies.wtf',
+  'soap2day.to', 'soap2day.ac', 'putlocker.', 'gomovies.',
+  'solarmovie.', '123movies.', 'yesmovies.', 'flixhq.to',
+  'bflixz.to', 'myflixer.', 'cineb.net', 'hdtoday.',
+  'tinyzone.', 'zoechip.', 'primewire.', 'movieorca.',
+  'imdb.com', 'rottentomatoes.com', 'letterboxd.com',
+  'vimeo.com', 'dailymotion.com',
+  // Gaming
+  'twitch.tv', 'poki.com', 'crazygames.com', 'kongregate.com',
+  'itch.io', 'armor games.com', 'addictinggames.com',
+  // Social / news / forums
+  'threads.net', 'mastodon.social', 'linkedin.com',
+  'buzzfeed.com', '9gag.com', 'imgur.com',
+  'whatsapp.com', 'web.telegram.org', 'messenger.com',
+];
+
+// Cheating / Academic dishonesty sites - highest risk
+const CHEATING_SITES = [
+  'chegg.com', 'coursehero.com', 'studocu.com',
+  'quizlet.com', 'brainly.com', 'bartleby.com',
+  'numerade.com', 'slader.com', 'litanswers.org',
+  'stackoverflow.com', 'stackexchange.com',
+  'pastebin.com', 'github.com', 'gitlab.com',
+];
+
+/** Classify a URL into a risk category */
+function classifyUrl(url) {
+  if (!url) return null;
+  try {
+    const hostname = new URL(url).hostname.replace(/^www\./, '');
+    const fullUrl = url.toLowerCase();
+
+    for (const site of AI_SITES) {
+      if (hostname.includes(site) || fullUrl.includes(site)) {
+        return { category: 'AI', site, riskLevel: 'high' };
+      }
+    }
+    for (const site of CHEATING_SITES) {
+      if (hostname.includes(site) || fullUrl.includes(site)) {
+        return { category: 'CHEATING', site, riskLevel: 'critical' };
+      }
+    }
+    for (const site of ENTERTAINMENT_SITES) {
+      if (hostname.includes(site) || fullUrl.includes(site)) {
+        return { category: 'ENTERTAINMENT', site, riskLevel: 'medium' };
+      }
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 // ==================== INITIALIZATION ====================
 
 chrome.runtime.onInstalled.addListener(() => {
@@ -111,7 +525,7 @@ async function startExamSession(data) {
     // Try to create session on backend with retry
     for (let attempt = 1; attempt <= CONFIG.MAX_RETRY_ATTEMPTS; attempt++) {
       try {
-        const response = await fetch(`${CONFIG.API_BASE}/students/create`, {
+        const response = await fetch(`${CONFIG.API_BASE}/sessions/create`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -161,6 +575,9 @@ async function startExamSession(data) {
     // Start periodic sync
     startPeriodicSync();
 
+    // Start browsing tracker
+    browsingTracker.start();
+
     console.log('✅ Exam session started:', sessionId);
     return { success: true, sessionId };
 
@@ -179,9 +596,15 @@ async function stopExamSession() {
     // Final sync
     await syncEvents();
 
+    // Stop browsing tracker and send final summary
+    const browsingSummary = browsingTracker.generateSummaryEvent();
+    logEvent(browsingSummary);
+    await syncEvents(); // Sync the browsing summary
+    browsingTracker.stop();
+
     // End session on backend
     try {
-      await fetch(`${CONFIG.API_BASE}/students/${examSession.sessionId}/end`, {
+      await fetch(`${CONFIG.API_BASE}/sessions/${examSession.sessionId}/end`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
       });
@@ -248,16 +671,56 @@ chrome.tabs.onActivated.addListener(async (activeInfo) => {
 
   try {
     const tab = await chrome.tabs.get(activeInfo.tabId);
+    const url = sanitizeUrl(tab.url);
 
+    // Update browsing tracker with new active tab
+    browsingTracker.trackSiteChange(activeInfo.tabId, tab.url, tab.title);
+
+    // Log as TAB_SWITCH (not NAVIGATION) so the server counts it correctly
     logEvent({
-      type: 'NAVIGATION',
+      type: 'TAB_SWITCH',
       timestamp: Date.now(),
       data: {
-        url: sanitizeUrl(tab.url),
+        url: url,
         title: tab.title || 'Unknown',
         action: 'TAB_SWITCH',
+        // Include browsing context
+        currentCategory: browsingTracker.activeSite?.category || 'unknown',
+        browsingRisk: browsingTracker.browsingRiskScore,
+        effortScore: browsingTracker.effortScore,
       }
     });
+
+    // Classify the URL and log risk event if matched
+    const classification = classifyUrl(tab.url);
+    if (classification) {
+      logEvent({
+        type: 'FORBIDDEN_SITE',
+        timestamp: Date.now(),
+        data: {
+          url: url,
+          title: tab.title || 'Unknown',
+          category: classification.category,
+          site: classification.site,
+          riskLevel: classification.riskLevel,
+          timeOnSite: 0,
+          message: `${classification.category} site detected: ${classification.site}`,
+        }
+      });
+
+      // Send via WebSocket for immediate dashboard alert
+      sendViaWebSocket({
+        type: 'forbidden_site_detected',
+        session_id: examSession.sessionId,
+        category: classification.category,
+        site: classification.site,
+        url: url,
+        browsingRisk: browsingTracker.browsingRiskScore,
+        effortScore: browsingTracker.effortScore,
+      });
+
+      console.log(`🚨 [${classification.category}] Forbidden site: ${classification.site}`);
+    }
 
     examSession.tabSwitchCount++;
     await saveSession();
@@ -269,15 +732,100 @@ chrome.tabs.onActivated.addListener(async (activeInfo) => {
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   if (!examSession.active || !changeInfo.url) return;
 
+  const url = sanitizeUrl(changeInfo.url);
+
+  // Update browsing tracker when URL changes in any tab
+  // Only track if this is the active tab
+  if (tab.active) {
+    browsingTracker.trackSiteChange(tabId, changeInfo.url, tab.title);
+  } else {
+    // Still record the visit even for background tabs
+    const classification = classifyUrl(changeInfo.url);
+    const category = classification ? classification.category.toLowerCase() : 
+                     (browsingTracker.isExamRelated(changeInfo.url) ? 'exam' : 'other');
+    browsingTracker.recordVisit(changeInfo.url, tab.title, category, 
+                                classification?.riskLevel || 'none');
+  }
+
   logEvent({
     type: 'NAVIGATION',
     timestamp: Date.now(),
     data: {
-      url: sanitizeUrl(changeInfo.url),
+      url: url,
       title: tab.title || 'Unknown',
       action: 'NAVIGATE',
+      isActiveTab: tab.active,
+      currentCategory: browsingTracker.activeSite?.category || 'unknown',
     }
   });
+
+  // Classify the URL and log risk event if matched
+  const classification = classifyUrl(changeInfo.url);
+  if (classification) {
+    logEvent({
+      type: 'FORBIDDEN_SITE',
+      timestamp: Date.now(),
+      data: {
+        url: url,
+        title: tab.title || 'Unknown',
+        category: classification.category,
+        site: classification.site,
+        riskLevel: classification.riskLevel,
+        isActiveTab: tab.active,
+        message: `${classification.category} site detected: ${classification.site}`,
+      }
+    });
+
+    sendViaWebSocket({
+      type: 'forbidden_site_detected',
+      session_id: examSession.sessionId,
+      category: classification.category,
+      site: classification.site,
+      url: url,
+      browsingRisk: browsingTracker.browsingRiskScore,
+    });
+
+    console.log(`🚨 [${classification.category}] Forbidden site: ${classification.site}`);
+  }
+});
+
+// Track when a tab is created (student opening new tabs)
+chrome.tabs.onCreated.addListener(async (tab) => {
+  if (!examSession.active) return;
+  
+  logEvent({
+    type: 'TAB_CREATED',
+    timestamp: Date.now(),
+    data: {
+      tabId: tab.id,
+      url: tab.pendingUrl || tab.url || 'about:blank',
+      message: 'New tab opened during exam',
+      openTabsCount: browsingTracker.openTabs.length + 1,
+    }
+  });
+});
+
+// Track when a tab is closed
+chrome.tabs.onRemoved.addListener((tabId, removeInfo) => {
+  if (!examSession.active) return;
+  
+  // Check if the closed tab was flagged
+  const closedTab = browsingTracker.openTabs.find(t => t.tabId === tabId);
+  
+  logEvent({
+    type: 'TAB_CLOSED',
+    timestamp: Date.now(),
+    data: {
+      tabId,
+      wasWindowClosing: removeInfo.isWindowClosing,
+      wasFlagged: closedTab ? closedTab.riskLevel !== 'none' : false,
+      closedCategory: closedTab?.category || 'unknown',
+      message: 'Tab closed during exam',
+    }
+  });
+  
+  // Remove from open tabs
+  browsingTracker.openTabs = browsingTracker.openTabs.filter(t => t.tabId !== tabId);
 });
 
 chrome.windows.onFocusChanged.addListener((windowId) => {
@@ -391,6 +939,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         lastScreenCapture: examSession.lastScreenCapture,
         lastWebcamCapture: examSession.lastWebcamCapture,
         lastSync: examSession.lastSync,
+        // Browsing tracker data
+        browsing: examSession.active ? browsingTracker.getStats() : null,
       });
       return true;
 
@@ -631,6 +1181,11 @@ function startPeriodicSync() {
     if (examSession.active && examSession.events.length > 0) {
       syncEvents();
     }
+    // Send a browsing summary every sync cycle
+    if (examSession.active) {
+      const summary = browsingTracker.generateSummaryEvent();
+      logEvent(summary);
+    }
   }, CONFIG.SYNC_INTERVAL);
 
   // Periodic transformer analysis on accumulated clipboard text
@@ -758,7 +1313,7 @@ async function analyzeTextWithTransformer(text) {
   if (!text || text.length < 10) return { success: false, reason: 'text_too_short' };
 
   try {
-    const response = await fetch(`${CONFIG.API_BASE}/analysis/transformer/similarity`, {
+    const response = await fetch(`${CONFIG.API_BASE}/transformer/similarity`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -820,7 +1375,7 @@ async function runBatchTransformerAnalysis() {
   // Also cross-compare clipboard entries for suspicious patterns
   if (textsToAnalyze.length >= 2) {
     try {
-      const response = await fetch(`${CONFIG.API_BASE}/analysis/transformer/cross-compare`, {
+      const response = await fetch(`${CONFIG.API_BASE}/transformer/cross-compare`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

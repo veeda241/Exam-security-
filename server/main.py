@@ -203,14 +203,16 @@ if NEW_API_AVAILABLE and register_all_routers:
     except Exception as e:
         print(f"[WARN] Could not register new API: {e}")
 
-# Core routers (battle-tested, always available)
-app.include_router(students.router, prefix="/api/students", tags=["Students"])
-app.include_router(events_log.router, prefix="/api/events", tags=["Events"])
-app.include_router(uploads.router, prefix="/api/uploads", tags=["Uploads"])
-app.include_router(reports.router, prefix="/api/reports", tags=["Reports"])
-app.include_router(research.router, prefix="/api/research", tags=["Research"])
-app.include_router(analysis.router, prefix="/api/analysis", tags=["Analysis"])
-app.include_router(sessions.router, prefix="/api/sessions", tags=["Sessions"])
+# Legacy routers - only register if new API structure is NOT available
+# (New API covers all these routes, registering both causes duplicate operation IDs)
+if not NEW_API_AVAILABLE:
+    app.include_router(students.router, prefix="/api/students", tags=["Students"])
+    app.include_router(events_log.router, prefix="/api/events", tags=["Events"])
+    app.include_router(uploads.router, prefix="/api/uploads", tags=["Uploads"])
+    app.include_router(reports.router, prefix="/api/reports", tags=["Reports"])
+    app.include_router(research.router, prefix="/api/research", tags=["Research"])
+    app.include_router(analysis.router, prefix="/api/analysis", tags=["Analysis"])
+    app.include_router(sessions.router, prefix="/api/sessions", tags=["Sessions"])
 
 # Authentication router
 app.include_router(auth_router, prefix="/api/auth", tags=["Authentication"])

@@ -1527,3 +1527,812 @@ button.mobile-menu {
 .visible {
     display: block !important;
 }
+
+/* =============================================================================
+   StudentModal - Wide Layout & Tabs
+   ============================================================================= */
+
+.student-modal-wide {
+    max-width: 860px !important;
+    max-height: 90vh !important;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.student-modal-header {
+    display: flex !important;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1rem 1.5rem !important;
+    gap: 1rem;
+}
+
+.smh-left {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.smh-avatar {
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 1rem;
+    color: white;
+}
+
+.smh-avatar.safe { background: linear-gradient(135deg, #10b981, #06b6d4); }
+.smh-avatar.review { background: linear-gradient(135deg, #f59e0b, #f97316); }
+.smh-avatar.suspicious { background: linear-gradient(135deg, #ef4444, #dc2626); }
+
+.smh-info h3 {
+    margin: 0;
+    font-size: 1.1rem;
+    color: var(--text-primary);
+}
+
+.smh-meta {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
+
+.smh-right {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.smh-risk-badge {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.4rem 0.8rem;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: 600;
+}
+
+.smh-risk-badge.safe { background: rgba(16,185,129,0.15); color: #10b981; }
+.smh-risk-badge.review { background: rgba(245,158,11,0.15); color: #f59e0b; }
+.smh-risk-badge.suspicious { background: rgba(239,68,68,0.15); color: #ef4444; }
+
+/* Tab Bar */
+.sm-tabs {
+    display: flex;
+    padding: 0 1.5rem;
+    gap: 0.25rem;
+    border-bottom: 1px solid var(--border-color);
+    background: var(--bg-secondary);
+}
+
+.sm-tab {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.7rem 1rem;
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    font-size: 0.82rem;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: var(--transition-fast);
+    position: relative;
+}
+
+.sm-tab:hover {
+    color: var(--text-primary);
+    background: rgba(255,255,255,0.03);
+}
+
+.sm-tab.active {
+    color: var(--accent-blue);
+    border-bottom-color: var(--accent-blue);
+}
+
+.sm-tab-badge {
+    min-width: 18px;
+    height: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 10px;
+    background: rgba(239,68,68,0.2);
+    color: #ef4444;
+    font-size: 0.65rem;
+    font-weight: 700;
+    padding: 0 4px;
+}
+
+/* Tab Body */
+.sm-body {
+    overflow-y: auto;
+    max-height: calc(90vh - 200px);
+    padding: 1.25rem 1.5rem !important;
+}
+
+/* Score Cards Grid */
+.sm-score-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0.75rem;
+    margin-bottom: 1.25rem;
+}
+
+.sm-score-card {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    padding: 0.75rem;
+    text-align: center;
+}
+
+.sm-sc-header {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.35rem;
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    margin-bottom: 0.4rem;
+}
+
+.sm-sc-value {
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin-bottom: 0.4rem;
+}
+
+.sm-sc-bar {
+    height: 4px;
+    background: var(--border-color);
+    border-radius: 2px;
+    overflow: hidden;
+}
+
+.sm-sc-fill {
+    height: 100%;
+    border-radius: 2px;
+    transition: width 0.6s ease;
+}
+
+/* Section */
+.sm-section {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+}
+
+.sm-section-title {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    margin: 0 0 0.75rem 0;
+    font-weight: 600;
+}
+
+/* Action Badge Grid */
+.sm-action-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0.5rem;
+}
+
+.sm-action-badge {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.6rem 0.4rem;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background: var(--bg-card);
+    transition: var(--transition-fast);
+}
+
+.sm-action-badge:hover {
+    background: var(--bg-card-hover);
+}
+
+.sm-ab-count {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.sm-ab-label {
+    font-size: 0.65rem;
+    color: var(--text-muted);
+    text-align: center;
+}
+
+/* Event Items */
+.sm-event-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.6rem 0.5rem;
+    border-bottom: 1px solid var(--border-color);
+    transition: var(--transition-fast);
+}
+
+.sm-event-item:last-child {
+    border-bottom: none;
+}
+
+.sm-event-item:hover {
+    background: rgba(255,255,255,0.02);
+}
+
+.sm-event-item.compact {
+    padding: 0.4rem 0.25rem;
+}
+
+.sm-event-item.has-risk {
+    border-left: 2px solid #ef4444;
+    padding-left: 0.75rem;
+}
+
+.sm-ei-icon {
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    font-size: 0.8rem;
+    flex-shrink: 0;
+}
+
+.sm-event-item.compact .sm-ei-icon {
+    width: 26px;
+    height: 26px;
+    font-size: 0.7rem;
+}
+
+.sm-ei-content {
+    flex: 1;
+    min-width: 0;
+}
+
+.sm-ei-label {
+    display: block;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.sm-ei-desc {
+    display: block;
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.sm-ei-risk {
+    font-size: 0.65rem;
+    font-weight: 700;
+    color: #ef4444;
+    background: rgba(239,68,68,0.1);
+    padding: 2px 6px;
+    border-radius: 6px;
+    flex-shrink: 0;
+}
+
+.sm-ei-time {
+    font-size: 0.65rem;
+    color: var(--text-muted);
+    flex-shrink: 0;
+    white-space: nowrap;
+}
+
+/* Count Badge */
+.sm-count-badge {
+    font-size: 0.65rem;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 10px;
+    background: rgba(59,130,246,0.15);
+    color: var(--accent-blue);
+    margin-left: 0.5rem;
+}
+
+.sm-count-badge.danger {
+    background: rgba(239,68,68,0.15);
+    color: #ef4444;
+}
+
+/* See More */
+.sm-see-more {
+    text-align: center;
+    padding: 0.5rem;
+    font-size: 0.75rem;
+    color: var(--accent-blue);
+    cursor: pointer;
+}
+
+/* Loading & Empty State */
+.sm-loading {
+    text-align: center;
+    padding: 2rem;
+    color: var(--text-muted);
+    font-size: 0.85rem;
+}
+
+.sm-empty {
+    text-align: center;
+    padding: 2rem;
+    color: var(--text-muted);
+    font-size: 0.85rem;
+}
+
+.sm-empty.success {
+    color: var(--accent-green);
+}
+
+.sm-empty i {
+    font-size: 1.5rem;
+    margin-bottom: 0.5rem;
+    display: block;
+}
+
+/* Session ID */
+.sm-session-id {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-family: monospace;
+}
+
+/* =============================================================================
+   Timeline Tab
+   ============================================================================= */
+
+.sm-filter-bar {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+    padding: 0.5rem 0.75rem;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+}
+
+.sm-filter-select {
+    flex: 1;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+    padding: 0.4rem 0.6rem;
+    border-radius: 6px;
+    font-size: 0.8rem;
+}
+
+.sm-filter-count {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    white-space: nowrap;
+}
+
+.sm-event-list {
+    max-height: 500px;
+    overflow-y: auto;
+}
+
+/* =============================================================================
+   Browsing Tab
+   ============================================================================= */
+
+.sm-browse-scores {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+}
+
+.sm-browse-score-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.sm-bsi-label {
+    font-size: 0.78rem;
+    color: var(--text-secondary);
+    width: 110px;
+    flex-shrink: 0;
+}
+
+.sm-bsi-bar {
+    flex: 1;
+    height: 8px;
+    background: var(--border-color);
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.sm-bsi-fill {
+    height: 100%;
+    border-radius: 4px;
+    transition: width 0.6s ease;
+}
+
+.sm-bsi-value {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    width: 30px;
+    text-align: right;
+}
+
+.sm-browse-meta {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin-top: 0.5rem;
+}
+
+.sm-browse-meta span {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+}
+
+/* Category Chips */
+.sm-category-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+}
+
+.sm-category-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.25rem 0.6rem;
+    border-radius: 12px;
+    font-size: 0.72rem;
+    font-weight: 600;
+}
+
+/* Sites List */
+.sm-sites-list {
+    max-height: 350px;
+    overflow-y: auto;
+}
+
+.sm-site-item {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.5rem 0.25rem;
+    border-bottom: 1px solid var(--border-color);
+    font-size: 0.8rem;
+    transition: var(--transition-fast);
+}
+
+.sm-site-item:hover {
+    background: rgba(255,255,255,0.02);
+}
+
+.sm-site-item.flagged {
+    border-left: 2px solid #ef4444;
+    padding-left: 0.5rem;
+    background: rgba(239,68,68,0.03);
+}
+
+.sm-site-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.sm-site-title {
+    display: block;
+    font-size: 0.78rem;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.sm-site-url {
+    display: block;
+    font-size: 0.65rem;
+    color: var(--text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.sm-site-badge {
+    font-size: 0.62rem;
+    padding: 2px 6px;
+    border-radius: 8px;
+    font-weight: 600;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.sm-site-time {
+    font-size: 0.62rem;
+    color: var(--text-muted);
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+/* =============================================================================
+   Risks Tab
+   ============================================================================= */
+
+.sm-risk-hero {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+    padding: 1.25rem;
+    border-radius: 12px;
+    margin-bottom: 1rem;
+}
+
+.sm-risk-hero.safe {
+    background: linear-gradient(135deg, rgba(16,185,129,0.1), rgba(6,182,212,0.08));
+    border: 1px solid rgba(16,185,129,0.2);
+    color: #10b981;
+}
+
+.sm-risk-hero.review {
+    background: linear-gradient(135deg, rgba(245,158,11,0.1), rgba(249,115,22,0.08));
+    border: 1px solid rgba(245,158,11,0.2);
+    color: #f59e0b;
+}
+
+.sm-risk-hero.suspicious {
+    background: linear-gradient(135deg, rgba(239,68,68,0.1), rgba(220,38,38,0.08));
+    border: 1px solid rgba(239,68,68,0.2);
+    color: #ef4444;
+}
+
+.sm-risk-hero-score {
+    position: relative;
+    width: 80px;
+    height: 80px;
+    flex-shrink: 0;
+}
+
+.sm-risk-circle {
+    width: 100%;
+    height: 100%;
+}
+
+.sm-risk-hero-value {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 1.2rem;
+    font-weight: 700;
+}
+
+.sm-risk-hero-info h4 {
+    margin: 0 0 0.3rem 0;
+    font-size: 0.9rem;
+}
+
+.sm-risk-hero-info p {
+    margin: 0;
+    font-size: 0.78rem;
+    opacity: 0.8;
+}
+
+/* Risk Bars */
+.sm-risk-bars {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+}
+
+.sm-risk-bar-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.sm-rb-label {
+    font-size: 0.78rem;
+    color: var(--text-secondary);
+    width: 130px;
+    flex-shrink: 0;
+}
+
+.sm-rb-track {
+    flex: 1;
+    height: 8px;
+    background: var(--border-color);
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.sm-rb-fill {
+    height: 100%;
+    border-radius: 4px;
+    transition: width 0.6s ease;
+}
+
+.sm-rb-value {
+    font-size: 0.8rem;
+    font-weight: 600;
+    width: 40px;
+    text-align: right;
+}
+
+/* Risk Group */
+.sm-risk-group {
+    margin-bottom: 0.75rem;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.sm-risk-group-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    background: var(--bg-card);
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.sm-risk-group-items {
+    padding: 0 0.5rem;
+}
+
+/* Time Breakdown Bar */
+.sm-time-breakdown {
+    margin-bottom: 0.5rem;
+}
+
+.sm-tb-bar {
+    display: flex;
+    height: 12px;
+    border-radius: 6px;
+    overflow: hidden;
+    background: var(--border-color);
+    margin-bottom: 0.5rem;
+}
+
+.sm-tb-segment {
+    height: 100%;
+    transition: width 0.5s ease;
+}
+
+.sm-tb-legend {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.sm-tb-legend-item {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    font-size: 0.7rem;
+    color: var(--text-muted);
+}
+
+.sm-tb-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+/* Time Stats */
+.sm-time-stats {
+    display: flex;
+    gap: 1rem;
+    margin-top: 0.5rem;
+}
+
+.sm-time-stat {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.sm-time-stat.exam { color: #10b981; }
+.sm-time-stat.distraction { color: #f59e0b; }
+
+/* =============================================================================
+   Dashboard Table Enhancements
+   ============================================================================= */
+
+.action-count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 28px;
+    height: 24px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    border-radius: 6px;
+    background: var(--bg-card);
+    padding: 0 6px;
+}
+
+.action-count.warn {
+    color: #f59e0b;
+    background: rgba(245,158,11,0.12);
+}
+
+.action-count.danger {
+    color: #ef4444;
+    background: rgba(239,68,68,0.12);
+}
+
+.row-suspicious {
+    background: rgba(239,68,68,0.04) !important;
+}
+
+.row-suspicious:hover {
+    background: rgba(239,68,68,0.08) !important;
+}
+
+.avatar-safe {
+    background: linear-gradient(135deg, #10b981, #06b6d4) !important;
+}
+
+.avatar-review {
+    background: linear-gradient(135deg, #f59e0b, #f97316) !important;
+}
+
+.avatar-suspicious {
+    background: linear-gradient(135deg, #ef4444, #dc2626) !important;
+}
+
+/* =============================================================================
+   Responsive Adjustments for Modal
+   ============================================================================= */
+
+@media (max-width: 768px) {
+    .student-modal-wide {
+        max-width: 98vw !important;
+    }
+
+    .sm-score-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .sm-action-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .sm-risk-hero {
+        flex-direction: column;
+        text-align: center;
+    }
+
+    .sm-tabs {
+        padding: 0 0.75rem;
+        overflow-x: auto;
+    }
+}

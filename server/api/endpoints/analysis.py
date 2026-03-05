@@ -83,7 +83,8 @@ async def process_analysis_data(
         session_id=session.id,
         timestamp=datetime.utcnow(),
         analysis_type="MULTI_MODAL",
-        result_data={}
+        result_data={},
+        risk_score_added=0.0,
     )
     
     # 1. Webcam Analysis
@@ -204,6 +205,10 @@ async def get_dashboard_data(db: AsyncSession = Depends(get_db)):
                 risk_score=session.risk_score,
                 engagement_score=session.engagement_score,
                 effort_alignment=session.effort_alignment,
+                content_relevance=session.content_relevance,
+                tab_switch_count=session.tab_switch_count,
+                forbidden_site_count=session.forbidden_site_count,
+                copy_count=session.copy_count,
                 status=session.risk_level
             ))
         else:
@@ -215,6 +220,10 @@ async def get_dashboard_data(db: AsyncSession = Depends(get_db)):
                 risk_score=0,
                 engagement_score=0,
                 effort_alignment=0,
+                content_relevance=0,
+                tab_switch_count=0,
+                forbidden_site_count=0,
+                copy_count=0,
                 status="inactive"
             ))
             

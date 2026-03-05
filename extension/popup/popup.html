@@ -119,6 +119,49 @@
           </div>
         </div>
 
+        <!-- Browsing Tracker Stats -->
+        <div class="browsing-tracker">
+          <h3 class="browsing-title">🌐 Browsing Monitor</h3>
+          
+          <div class="browsing-scores">
+            <div class="score-item">
+              <span class="score-label">Risk</span>
+              <div class="score-bar-container">
+                <div id="risk-bar" class="score-bar risk-bar" style="width: 0%"></div>
+              </div>
+              <span class="score-value" id="browsing-risk">0</span>
+            </div>
+            <div class="score-item">
+              <span class="score-label">Effort</span>
+              <div class="score-bar-container">
+                <div id="effort-bar" class="score-bar effort-bar" style="width: 100%"></div>
+              </div>
+              <span class="score-value" id="browsing-effort">100</span>
+            </div>
+          </div>
+
+          <div class="browsing-details">
+            <div class="browse-stat">
+              <span class="browse-icon">📑</span>
+              <span>Open Tabs: <strong id="open-tabs-count">0</strong></span>
+              <span class="flagged-badge" id="flagged-tabs-badge" style="display:none">⚠️ <span id="flagged-tabs-count">0</span></span>
+            </div>
+            <div class="browse-stat">
+              <span class="browse-icon">🔍</span>
+              <span>Sites Visited: <strong id="sites-visited">0</strong></span>
+            </div>
+            <div class="browse-stat">
+              <span class="browse-icon">🎯</span>
+              <span>Exam Focus: <strong id="exam-focus">-</strong></span>
+            </div>
+            <div class="browse-stat active-site-display" id="active-site-container" style="display:none">
+              <span class="browse-icon">📍</span>
+              <span>Current: <strong id="active-site-name">-</strong></span>
+              <span class="category-badge" id="active-site-badge"></span>
+            </div>
+          </div>
+        </div>
+
         <button id="stop-btn" class="btn btn-danger">
           <span class="btn-icon">⏹️</span>
           End Exam Session

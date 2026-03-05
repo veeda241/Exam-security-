@@ -99,27 +99,39 @@ export default function Dashboard() {
                   <tr>
                     <th className="sortable" onClick={() => handleSort('name')}>Student <i className="fas fa-sort"></i></th>
                     <th className="sortable" onClick={() => handleSort('status')}>Status <i className="fas fa-sort"></i></th>
-                    <th className="sortable" onClick={() => handleSort('risk_score')}>Risk Score <i className="fas fa-sort"></i></th>
+                    <th className="sortable" onClick={() => handleSort('risk_score')}>Risk <i className="fas fa-sort"></i></th>
                     <th>Engagement</th>
                     <th>Effort</th>
+                    <th className="sortable" onClick={() => handleSort('tab_switch_count')}>
+                      <span title="Tab Switches"><i className="fas fa-window-restore"></i></span> <i className="fas fa-sort"></i>
+                    </th>
+                    <th className="sortable" onClick={() => handleSort('forbidden_site_count')}>
+                      <span title="Flagged Sites"><i className="fas fa-ban"></i></span> <i className="fas fa-sort"></i>
+                    </th>
+                    <th className="sortable" onClick={() => handleSort('copy_count')}>
+                      <span title="Copy/Paste"><i className="fas fa-copy"></i></span> <i className="fas fa-sort"></i>
+                    </th>
                     <th>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {students.length === 0 ? (
                     <tr className="loading-row">
-                      <td colSpan="6">
+                      <td colSpan="9">
                         <div className="loading-spinner"><i className="fas fa-inbox"></i><span>No students found</span></div>
                       </td>
                     </tr>
                   ) : students.map(student => {
                     const status = getRiskStatus(student.risk_score);
                     const riskClass = getRiskClass(student.risk_score);
+                    const tabSwitches = student.tab_switch_count || 0;
+                    const flaggedSites = student.forbidden_site_count || 0;
+                    const copyCount = student.copy_count || 0;
                     return (
-                      <tr key={student.student_id || student.id}>
+                      <tr key={student.student_id || student.id} className={status === 'suspicious' ? 'row-suspicious' : ''}>
                         <td>
                           <div className="student-cell">
-                            <div className="student-avatar">{getInitials(student.name)}</div>
+                            <div className={`student-avatar avatar-${status}`}>{getInitials(student.name)}</div>
                             <div className="student-info">
                               <span className="student-name">{student.name}</span>
                               <span className="student-email">{student.email}</span>
@@ -135,6 +147,21 @@ export default function Dashboard() {
                         <td>
                           <div className="progress-bar"><div className="progress-fill purple" style={{ width: `${student.effort_alignment || 0}%` }}></div></div>
                           <span className="text-muted" style={{ fontSize: '0.75rem' }}>{Math.round(student.effort_alignment || 0)}%</span>
+                        </td>
+                        <td>
+                          <span className={`action-count ${tabSwitches > 5 ? 'warn' : tabSwitches > 10 ? 'danger' : ''}`} title="Tab Switches">
+                            {tabSwitches}
+                          </span>
+                        </td>
+                        <td>
+                          <span className={`action-count ${flaggedSites > 0 ? 'danger' : ''}`} title="Flagged Sites">
+                            {flaggedSites}
+                          </span>
+                        </td>
+                        <td>
+                          <span className={`action-count ${copyCount > 3 ? 'warn' : ''}`} title="Copy/Paste">
+                            {copyCount}
+                          </span>
                         </td>
                         <td>
                           <button className="btn-details" onClick={() => setSelectedStudent(student)}>

@@ -78,10 +78,26 @@ export async function getPipelineStats() {
   return res.json();
 }
 
-// Fetch events for a session
-export async function fetchSessionEvents(sessionId) {
-  const res = await fetch(`${API_BASE}/events/session/${sessionId}`);
+// Fetch visited websites for a session
+export async function fetchVisitedSites(sessionId) {
+  const res = await fetch(`${API_BASE}/events/session/${sessionId}/visited-sites`);
+  if (!res.ok) throw new Error('Failed to fetch visited sites');
+  return res.json();
+}
+
+// Fetch events for a session (with optional type filter)
+export async function fetchSessionEvents(sessionId, eventType = null) {
+  let url = `${API_BASE}/events/session/${sessionId}?limit=200`;
+  if (eventType) url += `&event_type=${eventType}`;
+  const res = await fetch(url);
   if (!res.ok) throw new Error('Failed to fetch events');
+  return res.json();
+}
+
+// Fetch event timeline for a session
+export async function fetchSessionTimeline(sessionId) {
+  const res = await fetch(`${API_BASE}/events/session/${sessionId}/timeline`);
+  if (!res.ok) throw new Error('Failed to fetch timeline');
   return res.json();
 }
 
@@ -89,5 +105,19 @@ export async function fetchSessionEvents(sessionId) {
 export async function fetchAnalysisResults(sessionId) {
   const res = await fetch(`${API_BASE}/analysis/student/${sessionId}`);
   if (!res.ok) throw new Error('Failed to fetch analysis');
+  return res.json();
+}
+
+// Fetch detailed student info with sessions
+export async function fetchStudentDetails(studentId) {
+  const res = await fetch(`${API_BASE}/analysis/student/${studentId}`);
+  if (!res.ok) throw new Error('Failed to fetch student details');
+  return res.json();
+}
+
+// Fetch dashboard stats
+export async function fetchDashboardStats() {
+  const res = await fetch(`${API_BASE}/analysis/stats`);
+  if (!res.ok) throw new Error('Failed to fetch dashboard stats');
   return res.json();
 }

@@ -39,10 +39,14 @@ class WebcamCapture {
 
             const dataUrl = canvas.toDataURL('image/jpeg', 0.6);
 
-            // Send to background script
+            // Send to background script using callback style to avoid channel-closed errors
             chrome.runtime.sendMessage({
                 type: 'WEBCAM_CAPTURE',
                 data: { image: dataUrl, timestamp: Date.now() }
+            }, (response) => {
+                if (chrome.runtime.lastError) {
+                    console.warn('Webcam send error:', chrome.runtime.lastError.message);
+                }
             });
 
             return dataUrl;

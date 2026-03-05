@@ -25,17 +25,19 @@ class localLLMService:
             self.enabled = False
         return False
 
-    async def analyze_behavior(self, text: str, violations: list) -> Dict[str, Any]:
+    async def analyze_behavior(self, text: str, violations: list = None) -> Dict[str, Any]:
         """
         Use LLM to determine if the behavior is suspicious
         """
         if not self.enabled and not await self.check_connection():
             return {"status": "skipped", "reason": "Ollama not running"}
 
+        violations_str = ', '.join(violations) if violations else 'None'
+
         prompt = f"""
         Analyze the following student activity for potential cheating in an exam.
         Extracted Text from Screen: {text}
-        Detected Violations: {', '.join(violations)}
+        Detected Violations: {violations_str}
         
         Task: Determine if this behavior indicates meaningful cheating or just casual browsing.
         Return your answer in JSON format:

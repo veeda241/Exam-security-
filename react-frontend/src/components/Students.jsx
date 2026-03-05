@@ -62,18 +62,21 @@ export default function Students() {
           <div className="table-container">
             <table className="data-table">
               <thead>
-                <tr><th>Student</th><th>Email</th><th>Status</th><th>Risk Score</th><th>Engagement</th><th>Sessions</th><th>Actions</th></tr>
+                <tr><th>Student</th><th>Email</th><th>Status</th><th>Risk Score</th><th>Engagement</th><th title="Tab Switches"><i className="fas fa-window-restore"></i></th><th title="Flagged Sites"><i className="fas fa-ban"></i></th><th title="Copy/Paste"><i className="fas fa-copy"></i></th><th>Actions</th></tr>
               </thead>
               <tbody>
                 {students.length === 0 ? (
-                  <tr className="loading-row"><td colSpan="7"><div className="loading-spinner"><i className="fas fa-inbox"></i><span>No students found</span></div></td></tr>
+                  <tr className="loading-row"><td colSpan="9"><div className="loading-spinner"><i className="fas fa-inbox"></i><span>No students found</span></div></td></tr>
                 ) : students.map(s => {
                   const status = getRiskStatus(s.risk_score);
+                  const tabSwitches = s.tab_switch_count || 0;
+                  const flaggedSites = s.forbidden_site_count || 0;
+                  const copyCount = s.copy_count || 0;
                   return (
-                    <tr key={s.student_id || s.id}>
+                    <tr key={s.student_id || s.id} className={status === 'suspicious' ? 'row-suspicious' : ''}>
                       <td>
                         <div className="student-cell">
-                          <div className="student-avatar">{getInitials(s.name)}</div>
+                          <div className={`student-avatar avatar-${status}`}>{getInitials(s.name)}</div>
                           <span className="student-name">{s.name}</span>
                         </div>
                       </td>
@@ -81,7 +84,9 @@ export default function Students() {
                       <td><span className={`badge badge-${status}`}>{status.toUpperCase()}</span></td>
                       <td><span className={getRiskClass(s.risk_score)} style={{ fontWeight: 600 }}>{Math.round(s.risk_score)}%</span></td>
                       <td>{Math.round(s.engagement_score || 0)}%</td>
-                      <td>1</td>
+                      <td><span className={`action-count ${tabSwitches > 5 ? 'warn' : tabSwitches > 10 ? 'danger' : ''}`}>{tabSwitches}</span></td>
+                      <td><span className={`action-count ${flaggedSites > 0 ? 'danger' : ''}`}>{flaggedSites}</span></td>
+                      <td><span className={`action-count ${copyCount > 3 ? 'warn' : ''}`}>{copyCount}</span></td>
                       <td>
                         <button className="btn-details" style={{ marginRight: 4 }} onClick={() => setSelectedStudent(s)}>
                           <i className="fas fa-eye"></i> View

@@ -174,14 +174,45 @@ class ExamCapture {
     // ==================== CAPTURE METHODS ====================
 
     async captureWithImageCapture(videoTrack, type) {
-        const imageCapture = new ImageCapture(videoTrack);
-        const blob = await imageCapture.takePhoto({
-            imageWidth: type === 'screen' ? this.config.maxWidth : this.config.webcamWidth,
-            imageHeight: type === 'screen' ? this.config.maxHeight : this.config.webcamHeight,
-        });
+        try {
+            const imageCapture = new ImageCapture(videoTrack);
+            // Use grabFrame (always supported) instead of takePhoto
+            // takePhoto calls setPhotoOptions which fails on screen capture tracks
+            const bitmap = await imageCapture.grabFrame();
 
-        const dataUrl = await this.blobToDataUrl(blob);
-        this.sendCapture(type, dataUrl);
+            let width = bitmap.width;
+            let height = bitmap.height;
+            const maxW = type === 'screen' ? this.config.maxWidth : this.config.webcamWidth;
+            const maxH = type === 'screen' ? this.config.maxHeight : this.config.webcamHeight;
+
+            if (width > maxW) {
+                const ratio = maxW / width;
+                width = maxW;
+                height = Math.round(height * ratio);
+            }
+            if (height > maxH) {
+                const ratio = maxH / height;
+                height = maxH;
+                width = Math.round(width * ratio);
+            }
+
+            const canvas = document.createElement('canvas');
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(bitmap, 0, 0, width, height);
+            bitmap.close();
+
+            const dataUrl = canvas.toDataURL('image/jpeg', this.config.imageQuality);
+            this.sendCapture(type, dataUrl);
+        } catch (err) {
+            // Fallback to canvas method if ImageCapture fails
+            console.warn(`ImageCapture failed for ${type}, falling back to canvas:`, err.message);
+            const stream = type === 'screen' ? this.screenStream : this.webcamStream;
+            if (stream) {
+                await this.captureWithCanvas(stream, type);
+            }
+        }
     }
 
     async captureWithCanvas(stream, type) {
@@ -231,12 +262,19 @@ class ExamCapture {
     sendCapture(type, dataUrl) {
         const messageType = type === 'screen' ? 'UPLOAD_SCREENSHOT' : 'UPLOAD_WEBCAM';
 
-        chrome.runtime.sendMessage({
-            type: messageType,
-            data: dataUrl,
-        }).catch(err => {
-            console.warn(`${type} upload failed:`, err.message);
-        });
+        // Use callback-style sendMessage to avoid channel-closed errors
+        try {
+            chrome.runtime.sendMessage({
+                type: messageType,
+                data: dataUrl,
+            }, (response) => {
+                if (chrome.runtime.lastError) {
+                    console.warn(`${type} upload channel:`, chrome.runtime.lastError.message);
+                }
+            });
+        } catch (err) {
+            console.warn(`${type} upload error:`, err.message);
+        }
 
         console.log(`📷 ${type === 'screen' ? 'Screenshot' : 'Webcam frame'} #${this.captureCount[type] + 1}`);
     }

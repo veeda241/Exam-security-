@@ -145,6 +145,95 @@ function updateStats(status) {
     animateNumber(statTabs, status.tabSwitchCount || 0);
     animateNumber(statCopy, status.copyCount || 0);
     animateNumber(statEvents, status.eventCount || 0);
+    
+    // Update browsing tracker stats
+    updateBrowsingStats(status.browsing);
+}
+
+/** Update the browsing monitor section in the popup */
+function updateBrowsingStats(browsing) {
+    if (!browsing) return;
+    
+    // Risk score
+    const riskEl = document.getElementById('browsing-risk');
+    const riskBar = document.getElementById('risk-bar');
+    if (riskEl) {
+        riskEl.textContent = browsing.browsingRiskScore;
+        riskBar.style.width = `${browsing.browsingRiskScore}%`;
+        // Color: green→yellow→red
+        if (browsing.browsingRiskScore < 30) {
+            riskBar.style.background = 'linear-gradient(90deg, #10b981, #34d399)';
+        } else if (browsing.browsingRiskScore < 60) {
+            riskBar.style.background = 'linear-gradient(90deg, #f59e0b, #fbbf24)';
+        } else {
+            riskBar.style.background = 'linear-gradient(90deg, #ef4444, #f87171)';
+        }
+    }
+    
+    // Effort score
+    const effortEl = document.getElementById('browsing-effort');
+    const effortBar = document.getElementById('effort-bar');
+    if (effortEl) {
+        effortEl.textContent = browsing.effortScore;
+        effortBar.style.width = `${browsing.effortScore}%`;
+        if (browsing.effortScore > 70) {
+            effortBar.style.background = 'linear-gradient(90deg, #10b981, #34d399)';
+        } else if (browsing.effortScore > 40) {
+            effortBar.style.background = 'linear-gradient(90deg, #f59e0b, #fbbf24)';
+        } else {
+            effortBar.style.background = 'linear-gradient(90deg, #ef4444, #f87171)';
+        }
+    }
+    
+    // Open tabs count
+    const openTabsEl = document.getElementById('open-tabs-count');
+    if (openTabsEl) openTabsEl.textContent = browsing.openTabsCount || 0;
+    
+    // Flagged tabs
+    const flaggedBadge = document.getElementById('flagged-tabs-badge');
+    const flaggedCount = document.getElementById('flagged-tabs-count');
+    if (flaggedBadge && browsing.flaggedOpenTabs > 0) {
+        flaggedBadge.style.display = 'inline';
+        flaggedCount.textContent = browsing.flaggedOpenTabs;
+    } else if (flaggedBadge) {
+        flaggedBadge.style.display = 'none';
+    }
+    
+    // Sites visited
+    const sitesEl = document.getElementById('sites-visited');
+    if (sitesEl) {
+        const flagged = browsing.flaggedSitesCount || 0;
+        sitesEl.textContent = `${browsing.totalSitesVisited || 0}${flagged > 0 ? ` (${flagged} flagged)` : ''}`;
+    }
+    
+    // Exam focus percentage
+    const focusEl = document.getElementById('exam-focus');
+    if (focusEl && browsing.totalTime > 0) {
+        const examTime = browsing.timeByCategory?.exam || 0;
+        const pct = Math.round((examTime / browsing.totalTime) * 100);
+        focusEl.textContent = `${pct}%`;
+        focusEl.style.color = pct > 70 ? '#10b981' : pct > 40 ? '#f59e0b' : '#ef4444';
+    }
+    
+    // Active site
+    const activeContainer = document.getElementById('active-site-container');
+    const activeName = document.getElementById('active-site-name');
+    const activeBadge = document.getElementById('active-site-badge');
+    if (activeContainer && browsing.activeSite) {
+        activeContainer.style.display = 'flex';
+        // Show short hostname
+        try {
+            activeName.textContent = new URL(browsing.activeSite.url).hostname.replace('www.', '').substring(0, 25);
+        } catch {
+            activeName.textContent = browsing.activeSite.url?.substring(0, 25) || 'Unknown';
+        }
+        
+        const cat = browsing.activeSite.category;
+        activeBadge.textContent = cat.toUpperCase();
+        activeBadge.className = `category-badge cat-${cat}`;
+    } else if (activeContainer) {
+        activeContainer.style.display = 'none';
+    }
 }
 
 function animateNumber(element, targetValue) {
