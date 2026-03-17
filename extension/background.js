@@ -198,8 +198,9 @@ const browsingTracker = {
       ];
       if (examPlatforms.some(p => hostname.includes(p))) return true;
       
+      const fullUrl = url.toLowerCase();
       // Also count learning/research as productive time (increases effort score)
-      if (typeof LEARNING_SITES !== 'undefined' && LEARNING_SITES.some(p => hostname.includes(p))) {
+      if (typeof LEARNING_SITES !== 'undefined' && LEARNING_SITES.some(p => hostname.includes(p) || fullUrl.includes(p))) {
         return true;
       }
       return false;
@@ -437,7 +438,7 @@ const LEARNING_SITES = [
   'datacamp.com', 'linkedin.com/learning',
   'stackoverflow.com', 'stackexchange.com', 'github.com', 'gitlab.com',
   'developer.', 'docs.', 'w3schools.com', 'mdn.io', 'geeksforgeeks.org',
-  'google.com/search', 'google.co.in/search'
+  'google.com/search', 'google.co.in/search', 'bing.com/search', 'duckduckgo.com'
 ];
 
 /** Classify a URL into a risk category */
