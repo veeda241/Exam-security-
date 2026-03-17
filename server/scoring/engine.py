@@ -138,15 +138,23 @@ class ScoringEngine:
         other_time_ms = time_by_cat.get("other", 0)
         
         total_browse_ms = ai_time_ms + cheating_time_ms + entertainment_time_ms + exam_time_ms + other_time_ms
+        learning_time_ms = time_by_cat.get("learning", 0)
+        total_browse_ms += learning_time_ms
+        
+        productive_time_ms = exam_time_ms + learning_time_ms
         
         if total_browse_ms > 5000:
-            # Primary effort: based on exam time ratio
-            exam_ratio = exam_time_ms / max(total_browse_ms, 1)
-            effort = exam_ratio * 100
+            # Primary effort: based on productive time ratio
+            productive_ratio = productive_time_ms / max(total_browse_ms, 1)
+            effort = productive_ratio * 100
             
             # "Other" sites get minimal credit (10%)
             other_ratio = other_time_ms / max(total_browse_ms, 1)
             effort += other_ratio * 10
+            
+            # Time-based bonus: 1% effort per 30 seconds of productive time
+            productive_seconds = productive_time_ms / 1000.0
+            effort += (productive_seconds / 30.0)
             
             # Bonus for >80% exam time
             if exam_ratio > 0.8:

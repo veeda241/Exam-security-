@@ -313,7 +313,11 @@ const browsingTracker = {
     // Extra penalty for known distraction sites beyond ratio
     effort -= Math.min(flaggedSites.length * 4, 25);
     
-    // Bonus: if >80% exam/learning time, small bonus. Student is focused.
+    // Time-based Bonus: increase effort by 1% for every 30 seconds of productive time!
+    const productiveSeconds = productiveTime / 1000;
+    effort += (productiveSeconds / 30);
+    
+    // Ratio Bonus: if >80% exam/learning time, small bonus. Student is focused.
     if (productiveRatio > 0.8) effort += 10;
     
     this.effortScore = Math.min(Math.max(Math.round(effort), 0), 100);
