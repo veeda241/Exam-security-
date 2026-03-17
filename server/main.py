@@ -394,11 +394,21 @@ app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
 REACT_BUILD_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "react-frontend-dist")
 if os.path.exists(REACT_BUILD_DIR):
     # Serve React SPA - catch-all must be mounted last
-    from fastapi.responses import FileResponse
+    from fastapi.responses import FileResponse, JSONResponse
+
+    # Paths that should NOT be handled by the React SPA
+    _RESERVED_PREFIXES = (
+        "api/", "docs", "redoc", "openapi.json",
+        "ws/", "health", "uploads/",
+    )
 
     @app.get("/{full_path:path}", include_in_schema=False)
     async def serve_react(full_path: str):
         """Serve React frontend for all non-API routes"""
+        # Skip reserved backend paths
+        if full_path and any(full_path.startswith(p) or full_path == p.rstrip("/") for p in _RESERVED_PREFIXES):
+            return JSONResponse({"detail": "Not Found"}, status_code=404)
+
         file_path = os.path.join(REACT_BUILD_DIR, full_path)
         if os.path.isfile(file_path):
             return FileResponse(file_path)
