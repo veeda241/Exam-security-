@@ -4,8 +4,8 @@ services:
     runtime: python
     rootDir: server
     buildCommand: |
-      pip install -r requirements.txt
-      apt-get update && apt-get install -y tesseract-ocr libgl1-mesa-glx libglib2.0-0
+      pip install --upgrade pip
+      pip install -r requirements-deploy.txt
     startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
     envVars:
       - key: PYTHON_VERSION
