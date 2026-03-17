@@ -4,14 +4,22 @@ const hostname = window.location.hostname;
 const port = window.location.port;
 const protocol = window.location.protocol;
 
-// In production, API is served from the same origin
-// In dev, Vite proxy forwards /api and /ws to localhost:8000
+// Backend API URL
+// If VITE_API_URL env var is set (separate frontend deploy), use that
+// Otherwise, assume API is on the same origin (single deploy)
+const backendUrl = import.meta.env.VITE_API_URL || '';
+
 export const API_BASE = isProduction
-  ? `${protocol}//${hostname}${port ? ':' + port : ''}/api`
+  ? (backendUrl ? `${backendUrl}/api` : `${protocol}//${hostname}${port ? ':' + port : ''}/api`)
   : 'http://localhost:8000/api';
 
+const wsProtocol = protocol === 'https:' ? 'wss' : 'ws';
+const wsHost = backendUrl
+  ? backendUrl.replace(/^https?:\/\//, '')
+  : `${hostname}${port ? ':' + port : ''}`;
+
 export const WS_URL = isProduction
-  ? `${protocol === 'https:' ? 'wss' : 'ws'}://${hostname}${port ? ':' + port : ''}/ws/dashboard`
+  ? `${wsProtocol}://${wsHost}/ws/dashboard`
   : `ws://localhost:8000/ws/dashboard`;
 
 export const CONFIG = {
