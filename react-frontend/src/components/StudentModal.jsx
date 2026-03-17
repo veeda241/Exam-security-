@@ -131,6 +131,8 @@ export default function StudentModal({ student, onClose }) {
               <span className="smh-meta">
                 {student.email && <span>{student.email}</span>}
                 {student.student_id && <span> &middot; ID: {student.student_id}</span>}
+                {student.department && <span> &middot; {student.department}</span>}
+                {student.year && <span> &middot; {student.year}</span>}
               </span>
             </div>
           </div>

@@ -22,20 +22,34 @@ async def create_student(
 ):
     """Create a new student"""
     
+    # Check if id already exists if provided
+    if student_data.id:
+        result = await db.execute(select(Student).where(Student.id == student_data.id))
+        if result.scalar_one_or_none():
+            raise HTTPException(status_code=400, detail="Student ID already registered")
+            
     # Check if email already exists
-    result = await db.execute(
-        select(Student).where(Student.email == student_data.email)
-    )
-    existing = result.scalar_one_or_none()
-    
-    if existing:
-        raise HTTPException(status_code=400, detail="Email already registered")
+    if student_data.email:
+        result = await db.execute(
+            select(Student).where(Student.email == student_data.email)
+        )
+        existing = result.scalar_one_or_none()
+        
+        if existing:
+            raise HTTPException(status_code=400, detail="Email already registered")
     
     # Create student
-    new_student = Student(
-        name=student_data.name,
-        email=student_data.email
-    )
+    student_args = {
+        "name": student_data.name,
+        "email": student_data.email,
+        "department": student_data.department,
+        "year": student_data.year
+    }
+    
+    if student_data.id:
+        student_args["id"] = student_data.id
+        
+    new_student = Student(**student_args)
     
     db.add(new_student)
     await db.commit()

@@ -21,7 +21,9 @@ class Student(Base):
     
     id = Column(String, primary_key=True, default=generate_uuid)
     name = Column(String(255), nullable=False)
-    email = Column(String(255), unique=True, nullable=False)
+    email = Column(String(255), unique=True, nullable=True) # Also nullable here
+    department = Column(String(255), nullable=True)
+    year = Column(String(50), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     
     # Relationships
@@ -32,6 +34,8 @@ class Student(Base):
             "id": self.id,
             "name": self.name,
             "email": self.email,
+            "department": self.department,
+            "year": self.year,
             "created_at": self.created_at.isoformat() if self.created_at else None
         }
     

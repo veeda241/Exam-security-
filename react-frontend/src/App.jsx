@@ -8,6 +8,7 @@ import Students from './components/Students';
 import Alerts from './components/Alerts';
 import Reports from './components/Reports';
 import Analytics from './components/Analytics';
+import StudentRegistration from './components/StudentRegistration';
 
 import '@fortawesome/fontawesome-free/css/all.min.css';
 import './index.css';
@@ -16,17 +17,27 @@ function App() {
   return (
     <BrowserRouter>
       <AppProvider>
-        <Sidebar />
-        <main className="main-content">
-          <Routes>
-            <Route path="/" element={<Dashboard />} />
-            <Route path="/sessions" element={<Sessions />} />
-            <Route path="/students" element={<Students />} />
-            <Route path="/alerts" element={<Alerts />} />
-            <Route path="/reports" element={<Reports />} />
-            <Route path="/analytics" element={<Analytics />} />
-          </Routes>
-        </main>
+        <Routes>
+          {/* Public / Student Facing Routes */}
+          <Route path="/student/register" element={<StudentRegistration />} />
+
+          {/* Admin / Authenticated Routes */}
+          <Route path="/*" element={
+            <>
+              <Sidebar />
+              <main className="main-content">
+                <Routes>
+                  <Route path="/" element={<Dashboard />} />
+                  <Route path="/sessions" element={<Sessions />} />
+                  <Route path="/students" element={<Students />} />
+                  <Route path="/alerts" element={<Alerts />} />
+                  <Route path="/reports" element={<Reports />} />
+                  <Route path="/analytics" element={<Analytics />} />
+                </Routes>
+              </main>
+            </>
+          } />
+        </Routes>
         <ToastContainer />
       </AppProvider>
     </BrowserRouter>

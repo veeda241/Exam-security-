@@ -48,12 +48,14 @@ class DashboardStats(BaseModel):
 class StudentSummary(BaseModel):
     student_id: str
     name: str
-    email: str
-    latest_session_id: Optional[str]
-    risk_score: float
-    engagement_score: float
-    effort_alignment: float
-    status: str
+    email: Optional[str] = None
+    department: Optional[str] = None
+    year: Optional[str] = None
+    latest_session_id: Optional[str] = None
+    risk_score: float = 0.0
+    engagement_score: float = 0.0
+    effort_alignment: float = 0.0
+    status: str = "inactive"
 
 # Helper to decode image
 def decode_image(base64_string):
@@ -298,6 +300,8 @@ async def get_dashboard_data(db: AsyncSession = Depends(get_db)):
                 student_id=student.id,
                 name=student.name,
                 email=student.email,
+                department=getattr(student, 'department', None),
+                year=getattr(student, 'year', None),
                 latest_session_id=session.id,
                 risk_score=session.risk_score,
                 engagement_score=session.engagement_score,
@@ -309,6 +313,8 @@ async def get_dashboard_data(db: AsyncSession = Depends(get_db)):
                 student_id=student.id,
                 name=student.name,
                 email=student.email,
+                department=getattr(student, 'department', None),
+                year=getattr(student, 'year', None),
                 latest_session_id=None,
                 risk_score=0,
                 engagement_score=0,

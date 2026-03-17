@@ -62,7 +62,7 @@ export default function Students() {
           <div className="table-container">
             <table className="data-table">
               <thead>
-                <tr><th>Student</th><th>Email</th><th>Status</th><th>Risk Score</th><th>Engagement</th><th title="Tab Switches"><i className="fas fa-window-restore"></i></th><th title="Flagged Sites"><i className="fas fa-ban"></i></th><th title="Copy/Paste"><i className="fas fa-copy"></i></th><th>Actions</th></tr>
+                <tr><th>Student</th><th>Email / Info</th><th>Status</th><th>Risk Score</th><th>Engagement</th><th title="Tab Switches"><i className="fas fa-window-restore"></i></th><th title="Flagged Sites"><i className="fas fa-ban"></i></th><th title="Copy/Paste"><i className="fas fa-copy"></i></th><th>Actions</th></tr>
               </thead>
               <tbody>
                 {students.length === 0 ? (
@@ -80,7 +80,14 @@ export default function Students() {
                           <span className="student-name">{s.name}</span>
                         </div>
                       </td>
-                      <td style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>{s.email}</td>
+                      <td style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                        {s.email}<br/>
+                        {(s.department || s.year) && (
+                          <span style={{ fontSize: '0.75rem', opacity: 0.8 }}>
+                            {s.department} {s.year ? `(${s.year})` : ''}
+                          </span>
+                        )}
+                      </td>
                       <td><span className={`badge badge-${status}`}>{status.toUpperCase()}</span></td>
                       <td><span className={getRiskClass(s.risk_score)} style={{ fontWeight: 600 }}>{Math.round(s.risk_score)}%</span></td>
                       <td>{Math.round(s.engagement_score || 0)}%</td>
