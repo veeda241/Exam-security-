@@ -455,7 +455,7 @@ function classifyUrl(url) {
     // Check AI after learning so that Claude/GPT count as LEARNING instead of AI if specified
     for (const site of AI_SITES) {
       if (hostname.includes(site) || fullUrl.includes(site)) {
-        return { category: 'AI', site, riskLevel: 'high' };
+        return { category: 'AI', site, riskLevel: 'medium' };
       }
     }
     for (const site of CHEATING_SITES) {
@@ -465,7 +465,7 @@ function classifyUrl(url) {
     }
     for (const site of ENTERTAINMENT_SITES) {
       if (hostname.includes(site) || fullUrl.includes(site)) {
-        return { category: 'ENTERTAINMENT', site, riskLevel: 'medium' };
+        return { category: 'ENTERTAINMENT', site, riskLevel: 'critical' };
       }
     }
     return null;
