@@ -6,9 +6,9 @@ services:
     rootDir: server
     buildCommand: |
       pip install --upgrade pip
-      pip install -r requirements-deploy.txt
-      pip uninstall -y matplotlib || true
-      python -c "print('Build ready')"
+      pip install -r requirements.txt
+      pip uninstall -y matplotlib matplotlib-inline contourpy kiwisolver fonttools cycler 2>/dev/null || true
+      echo "Build ready - matplotlib removed"
     startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
     envVars:
       - key: PYTHON_VERSION
