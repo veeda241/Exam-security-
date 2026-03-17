@@ -4,7 +4,7 @@
  */
 
 // ==================== CONFIGURATION ====================
-const BACKEND_URL = 'https://examguard-api.onrender.com';
+const BACKEND_URL = 'https://exam-security.onrender.com';
 
 const CONFIG = {
     API_BASE: `${BACKEND_URL}/api`,

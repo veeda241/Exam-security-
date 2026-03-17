@@ -417,7 +417,8 @@ for directory in [SCREENSHOTS_DIR, WEBCAM_DIR, REPORTS_DIR]:
 app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
 
 # Mount React frontend (production build)
-REACT_BUILD_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "react-frontend-dist")
+# Updated to point to the actual latest build folder
+REACT_BUILD_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "react-frontend", "dist")
 if os.path.exists(REACT_BUILD_DIR):
     from fastapi.responses import FileResponse
     from starlette.exceptions import HTTPException as StarletteHTTPException
