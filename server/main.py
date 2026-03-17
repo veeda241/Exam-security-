@@ -407,6 +407,8 @@ if os.path.exists(REACT_BUILD_DIR):
     @app.get("/reports", include_in_schema=False)
     @app.get("/analytics", include_in_schema=False)
     @app.get("/settings", include_in_schema=False)
+    @app.get("/student/register", include_in_schema=False)
+    @app.get("/student/{path:path}", include_in_schema=False)
     async def serve_react_pages():
         """Serve React SPA for known frontend routes"""
         return FileResponse(os.path.join(REACT_BUILD_DIR, "index.html"))
