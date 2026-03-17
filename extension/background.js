@@ -98,7 +98,7 @@ const browsingTracker = {
   /** Reset all tracking data */
   reset() {
     this.activeSite = null;
-    this.timeByCategory = { exam: 0, ai: 0, cheating: 0, entertainment: 0, other: 0 };
+    this.timeByCategory = { exam: 0, learning: 0, ai: 0, cheating: 0, entertainment: 0, other: 0 };
     this.visitedSites = [];
     this.openTabs = [];
     this.browsingRiskScore = 0;
@@ -297,15 +297,15 @@ const browsingTracker = {
     
     // --- Effort Score (0-100) ---
     // Effort is purely based on how much time was spent on exam vs non-exam.
-    // If student spends 100% on exam => effort 100. If 0% on exam => effort 0.
-    const examTime = this.timeByCategory.exam;
-    const examRatio = examTime / totalTime;
+    // If student spends 100% on exam + learning => effort 100. If 0% => effort 0.
+    const productiveTime = this.timeByCategory.exam + (this.timeByCategory.learning || 0);
+    const productiveRatio = productiveTime / totalTime;
     const distractionTime = this.timeByCategory.ai + this.timeByCategory.cheating + this.timeByCategory.entertainment;
     const distractionRatio = distractionTime / totalTime;
     const otherRatio = this.timeByCategory.other / totalTime;
     
-    // Base effort: exam time drives it up, everything else drives it down
-    let effort = examRatio * 100;
+    // Base effort: productive time (exam + learning) drives it up, everything else drives it down
+    let effort = productiveRatio * 100;
     
     // "Other" (unknown/unclassified sites) gets very little credit
     effort += otherRatio * 10;
@@ -313,8 +313,8 @@ const browsingTracker = {
     // Extra penalty for known distraction sites beyond ratio
     effort -= Math.min(flaggedSites.length * 4, 25);
     
-    // Bonus: if >80% exam time, small bonus. Student is focused.
-    if (examRatio > 0.8) effort += 10;
+    // Bonus: if >80% exam/learning time, small bonus. Student is focused.
+    if (productiveRatio > 0.8) effort += 10;
     
     this.effortScore = Math.min(Math.max(Math.round(effort), 0), 100);
   },
