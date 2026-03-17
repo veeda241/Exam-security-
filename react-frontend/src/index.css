@@ -4,44 +4,46 @@
 
 /* CSS Variables - Premium Modern Glassmorphic Theme */
 :root {
-    /* Colors - Deep Rich Dark Theme */
-    --bg-primary: #050b14;
-    --bg-secondary: #0a1120;
-    --bg-card: rgba(18, 26, 47, 0.65);
-    --bg-card-hover: rgba(26, 36, 60, 0.85);
-    --bg-sidebar: rgba(10, 17, 32, 0.85);
+    /* Colors - Oracle Red Bull Racing Theme */
+    --bg-primary: #000c1d;    /* Deepest Navy */
+    --bg-secondary: #001226;  /* Red Bull Dark Blue */
+    --bg-card: rgba(0, 26, 48, 0.7);
+    --bg-card-hover: rgba(0, 38, 70, 0.9);
+    --bg-sidebar: rgba(0, 20, 40, 0.95);
 
     /* Text Colors */
-    --text-primary: #f8fafc;
+    --text-primary: #ffffff;
     --text-secondary: #cbd5e1;
-    --text-muted: #64748b;
+    --text-muted: #94a3b8;
 
-    /* Accent Colors - Vibrant & Glowing */
-    --accent-blue: #3b82f6;
-    --accent-blue-hover: #60a5fa;
-    --accent-purple: #8b5cf6;
+    /* Accent Colors - Red Bull Palette */
+    --accent-blue: #003666;
+    --accent-blue-hover: #005096;
+    --accent-red: #e10600;      /* Red Bull Red */
+    --accent-red-hover: #ff0700;
+    --accent-yellow: #ffd200;   /* Red Bull Yellow */
     --accent-green: #10b981;
-    --accent-yellow: #f59e0b;
-    --accent-red: #ef4444;
     --accent-cyan: #06b6d4;
 
-    /* Premium Gradients */
-    --gradient-primary: linear-gradient(135deg, #2563eb 0%, #7c3aed 100%);
+    /* Premium Gradients - Racing Dynamics */
+    --gradient-primary: linear-gradient(135deg, #e10600 0%, #a00400 100%); /* Red Primary */
+    --gradient-sidebar: linear-gradient(180deg, #001226 0%, #000c1d 100%);
     --gradient-success: linear-gradient(135deg, #059669 0%, #0d9488 100%);
-    --gradient-danger: linear-gradient(135deg, #dc2626 0%, #d97706 100%);
+    --gradient-danger: linear-gradient(135deg, #e10600 0%, #8b0000 100%);
     --gradient-glass: linear-gradient(135deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.01) 100%);
+    --gradient-gold: linear-gradient(135deg, #ffd200 0%, #ccaa00 100%);
 
     /* Border & Glass */
-    --border-color: rgba(255, 255, 255, 0.08);
-    --border-light: rgba(255, 255, 255, 0.15);
-    --glass-blur: blur(16px);
+    --border-color: rgba(255, 255, 255, 0.1);
+    --border-light: rgba(255, 255, 255, 0.2);
+    --glass-blur: blur(20px);
 
-    /* Shadows - Deep & Glowing */
+    /* Shadows - Deep & Glowing Red */
     --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.4);
     --shadow-md: 0 8px 16px rgba(0, 0, 0, 0.5);
     --shadow-lg: 0 16px 32px rgba(0, 0, 0, 0.6);
-    --shadow-glow: 0 0 24px rgba(59, 130, 246, 0.4);
-    --shadow-glow-purple: 0 0 24px rgba(139, 92, 246, 0.4);
+    --shadow-glow: 0 0 15px rgba(225, 6, 0, 0.3); /* Red Glow */
+    --shadow-glow-yellow: 0 0 15px rgba(255, 210, 0, 0.3);
 
     /* Sizing */
     --sidebar-width: 280px;
@@ -61,18 +63,6 @@
     --radius-full: 9999px;
 }
 
-/* Light Theme */
-[data-theme="light"] {
-    --bg-primary: #f1f5f9;
-    --bg-secondary: #ffffff;
-    --bg-card: #ffffff;
-    --bg-card-hover: #f8fafc;
-    --bg-sidebar: #1e293b;
-    --text-primary: #1e293b;
-    --text-secondary: #475569;
-    --text-muted: #94a3b8;
-    --border-color: #e2e8f0;
-}
 
 /* =============================================================================
    Reset & Base Styles
@@ -93,13 +83,18 @@ html {
 
 body {
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    background: radial-gradient(circle at 50% -20%, #1e3a8a 0%, var(--bg-primary) 50%);
+    background: radial-gradient(circle at 50% -20%, #001226 0%, var(--bg-primary) 80%);
     background-attachment: fixed;
     color: var(--text-primary);
     line-height: 1.6;
     min-height: 100vh;
-    display: flex;
     overflow-x: hidden;
+}
+
+.app-container {
+    display: flex;
+    width: 100%;
+    min-height: 100vh;
 }
 
 a {
@@ -124,7 +119,7 @@ select {
    Sidebar Navigation
    ============================================================================= */
 .sidebar {
-    position: fixed;
+    position: sticky;
     left: 0;
     top: 0;
     width: var(--sidebar-width);
@@ -137,6 +132,7 @@ select {
     transition: width var(--transition-normal);
     backdrop-filter: var(--glass-blur);
     -webkit-backdrop-filter: var(--glass-blur);
+    flex-shrink: 0;
 }
 
 .sidebar.collapsed {
@@ -294,15 +290,16 @@ select {
    ============================================================================= */
 .main-content {
     flex: 1;
-    margin-left: var(--sidebar-width);
     min-height: 100vh;
     display: flex;
     flex-direction: column;
     transition: margin-left var(--transition-normal);
+    overflow-x: hidden;
 }
 
-.sidebar.collapsed~.main-content {
-    margin-left: var(--sidebar-collapsed);
+/* Responsive adjustments for sidebar flow */
+.sidebar.collapsed {
+    width: var(--sidebar-collapsed);
 }
 
 /* =============================================================================
@@ -355,8 +352,9 @@ button.mobile-menu {
 
 .header-center {
     flex: 1;
-    max-width: 540px;
-    margin: 0 2rem;
+    display: flex;
+    justify-content: center;
+    margin: 0 1rem;
 }
 
 .search-box {
@@ -367,6 +365,8 @@ button.mobile-menu {
     border: 1px solid var(--border-color);
     border-radius: var(--radius-full);
     padding: 0.6rem 1.25rem;
+    width: 100%;
+    max-width: 540px;
     transition: all var(--transition-fast);
 }
 
@@ -490,10 +490,10 @@ button.mobile-menu {
    ============================================================================= */
 .dashboard-content {
     flex: 1;
-    padding: 2rem;
+    padding: 1.5rem 2rem;
     display: flex;
     flex-direction: column;
-    gap: 2rem;
+    gap: 1.25rem;
 }
 
 /* Stats Row */
@@ -984,7 +984,7 @@ button.mobile-menu {
 /* Loading State */
 .loading-row td {
     text-align: center;
-    padding: 3rem 1rem;
+    padding: 1.5rem 1rem;
 }
 
 .loading-spinner {
@@ -2533,3 +2533,229 @@ button.mobile-menu {
         overflow-x: auto;
     }
 }
+
+/* =============================================================================
+   Login Page - Red Bull Racing Aesthetic
+   ============================================================================= */
+.login-page {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #000c1d;
+    z-index: 1000;
+    overflow: hidden;
+}
+
+.login-backdrop {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    background: 
+        radial-gradient(circle at 20% 30%, rgba(225, 6, 0, 0.1) 0%, transparent 40%),
+        radial-gradient(circle at 80% 70%, rgba(255, 210, 0, 0.05) 0%, transparent 40%),
+        linear-gradient(135deg, #000c1d 0%, #001226 100%);
+    z-index: -1;
+}
+
+.login-backdrop::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: url('https://www.transparenttextures.com/patterns/carbon-fibre.png');
+    opacity: 0.1;
+    pointer-events: none;
+}
+
+.login-card {
+    width: 100%;
+    max-width: 440px;
+    background: rgba(0, 18, 38, 0.6);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-xl);
+    padding: 3rem;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5), var(--shadow-glow);
+    animation: slideUpFade 0.6s ease-out;
+}
+
+@keyframes slideUpFade {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.login-header {
+    text-align: center;
+    margin-bottom: 2.5rem;
+}
+
+.login-logo {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.75rem;
+    font-size: 1.5rem;
+    font-weight: 800;
+    margin-bottom: 1rem;
+    letter-spacing: -0.02em;
+}
+
+.login-logo i {
+    color: var(--accent-red);
+    font-size: 2rem;
+    filter: drop-shadow(0 0 10px rgba(225, 6, 0, 0.5));
+}
+
+.login-logo strong {
+    color: var(--accent-red);
+}
+
+.login-header h1 {
+    font-size: 1.75rem;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+    color: white;
+}
+
+.login-header p {
+    color: var(--text-muted);
+    font-size: 0.9rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+}
+
+.login-error {
+    background: rgba(225, 6, 0, 0.1);
+    border: 1px solid rgba(225, 6, 0, 0.2);
+    color: #ff8e8e;
+    padding: 0.75rem 1rem;
+    border-radius: var(--radius-sm);
+    margin-bottom: 1.5rem;
+    font-size: 0.85rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.login-form {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.form-group label {
+    display: block;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    margin-bottom: 0.5rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.input-with-icon {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.input-with-icon i {
+    position: absolute;
+    left: 1rem;
+    color: var(--text-muted);
+    font-size: 1rem;
+    pointer-events: none;
+}
+
+.input-with-icon input {
+    width: 100%;
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    padding: 0.85rem 1rem 0.85rem 2.75rem;
+    color: white;
+    font-size: 1rem;
+    outline: none;
+    transition: all var(--transition-fast);
+}
+
+.input-with-icon input:focus {
+    border-color: var(--accent-red);
+    background: rgba(0, 0, 0, 0.5);
+    box-shadow: 0 0 0 4px rgba(225, 6, 0, 0.1);
+}
+
+.login-btn {
+    background: var(--gradient-primary);
+    color: white;
+    padding: 1rem;
+    border: none;
+    border-radius: var(--radius-md);
+    font-size: 1rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    cursor: pointer;
+    transition: all var(--transition-normal);
+    margin-top: 0.5rem;
+}
+
+.login-btn:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 20px rgba(225, 6, 0, 0.3);
+    filter: brightness(1.1);
+}
+
+.login-btn:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+}
+
+.login-footer {
+    margin-top: 2.5rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--border-color);
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.loading-screen {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: #000c1d;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    gap: 1.5rem;
+    z-index: 2000;
+}
+
+.loading-screen i {
+    font-size: 3rem;
+    color: var(--accent-red);
+    text-shadow: 0 0 20px rgba(225, 6, 0, 0.5);
+}
+
+.loading-screen span {
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+}

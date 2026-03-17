@@ -4,7 +4,7 @@
  */
 
 // ==================== CONFIGURATION ====================
-const BACKEND_URL = 'https://exam-security.onrender.com';
+const BACKEND_URL = 'https://examguard-api.onrender.com';
 
 const CONFIG = {
     API_BASE: `${BACKEND_URL}/api`,
@@ -211,8 +211,8 @@ function updateBrowsingStats(browsing) {
     // Exam focus percentage
     const focusEl = document.getElementById('exam-focus');
     if (focusEl && browsing.totalTime > 0) {
-        const examTime = browsing.timeByCategory?.exam || 0;
-        const pct = Math.round((examTime / browsing.totalTime) * 100);
+        const productiveTime = (browsing.timeByCategory?.exam || 0) + (browsing.timeByCategory?.learning || 0);
+        const pct = Math.round((productiveTime / browsing.totalTime) * 100);
         focusEl.textContent = `${pct}%`;
         focusEl.style.color = pct > 70 ? '#10b981' : pct > 40 ? '#f59e0b' : '#ef4444';
     }

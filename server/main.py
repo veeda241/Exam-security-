@@ -185,11 +185,26 @@ app = FastAPI(
 # Middleware Configuration
 # =============================================================================
 from config import CORS_ORIGINS
+# Parse CORS_ORIGINS from env if it's a string
+origins = []
+if isinstance(CORS_ORIGINS, str):
+    if CORS_ORIGINS == "*":
+        origins = ["*"]
+    else:
+        origins = [o.strip() for o in CORS_ORIGINS.split(",")]
+else:
+    origins = list(CORS_ORIGINS) if CORS_ORIGINS else []
+
+# Add default dev origins if not present
+dev_origins = ["http://localhost:3000", "http://localhost:5173", "http://127.0.0.1:3000", "http://127.0.0.1:5173"]
+for o in dev_origins:
+    if o not in origins and "*" not in origins:
+        origins.append(o)
+
 app.add_middleware(
     CORSMiddleware,
-    # Specific origins are required when allow_credentials=True
-    allow_origins=["http://localhost:3000", "http://localhost:5173", "http://127.0.0.1:3000"],
-    allow_credentials=True,
+    allow_origins=origins if "*" not in origins else ["*"],
+    allow_credentials=True if "*" not in origins else False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -199,6 +214,9 @@ app.add_middleware(
 # Register API Routers
 # =============================================================================
 
+# Always include Authentication router (it's essential for all versions)
+app.include_router(auth_router, prefix="/api/auth", tags=["Authentication"])
+
 # New organized API structure (from api/ folder) - optional
 if NEW_API_AVAILABLE and register_all_routers:
     try:
@@ -206,10 +224,16 @@ if NEW_API_AVAILABLE and register_all_routers:
         print("[INFO] New API structure registered successfully")
     except Exception as e:
         print(f"[WARN] Could not register new API: {e}")
-
-# Legacy routers - only register if new API structure is NOT available
-# (New API covers all these routes, registering both causes duplicate operation IDs)
-if not NEW_API_AVAILABLE:
+        # Fallback to legacy
+        app.include_router(students.router, prefix="/api/students", tags=["Students"])
+        app.include_router(events_log.router, prefix="/api/events", tags=["Events"])
+        app.include_router(uploads.router, prefix="/api/uploads", tags=["Uploads"])
+        app.include_router(reports.router, prefix="/api/reports", tags=["Reports"])
+        app.include_router(research.router, prefix="/api/research", tags=["Research"])
+        app.include_router(analysis.router, prefix="/api/analysis", tags=["Analysis"])
+        app.include_router(sessions.router, prefix="/api/sessions", tags=["Sessions"])
+else:
+    # Legacy routers
     app.include_router(students.router, prefix="/api/students", tags=["Students"])
     app.include_router(events_log.router, prefix="/api/events", tags=["Events"])
     app.include_router(uploads.router, prefix="/api/uploads", tags=["Uploads"])
@@ -217,28 +241,17 @@ if not NEW_API_AVAILABLE:
     app.include_router(research.router, prefix="/api/research", tags=["Research"])
     app.include_router(analysis.router, prefix="/api/analysis", tags=["Analysis"])
     app.include_router(sessions.router, prefix="/api/sessions", tags=["Sessions"])
-
-# Authentication router
-app.include_router(auth_router, prefix="/api/auth", tags=["Authentication"])
-
-# Advanced Analytics router (100% local ML services)
-try:
-    from api.analytics import router as analytics_router
-    app.include_router(analytics_router)  # Already has /api/analytics prefix
-    print("[INFO] Advanced Analytics API registered (biometrics, gaze, forensics, audio)")
-except ImportError as e:
-    print(f"[WARN] Advanced Analytics not available: {e}")
-
-# =============================================================================
 # WebSocket Endpoints - Real-Time Monitoring
 # =============================================================================
 
 @app.websocket("/ws/alerts")
+@app.websocket("/ws/alerts/")
 async def websocket_alerts(websocket: WebSocket):
     """
     WebSocket endpoint for real-time alerts to dashboard.
     Legacy endpoint - maintains backward compatibility.
     """
+    print(f"[WS] Dashboard client connecting to legacy alerts...")
     await manager.connect(websocket)
     try:
         while True:
@@ -250,11 +263,13 @@ async def websocket_alerts(websocket: WebSocket):
 
 
 @app.websocket("/ws/dashboard")
+@app.websocket("/ws/dashboard/")
 async def websocket_dashboard(websocket: WebSocket):
     """
     WebSocket endpoint for dashboard real-time updates.
     Receives all events across all sessions.
     """
+    print(f"[WS] Dashboard client connecting...")
     realtime = get_realtime_manager()
     await realtime.connect_dashboard(websocket)
     
@@ -278,6 +293,7 @@ async def websocket_dashboard(websocket: WebSocket):
 
 
 @app.websocket("/ws/proctor/{session_id}")
+@app.websocket("/ws/proctor/{session_id}/")
 async def websocket_proctor(
     websocket: WebSocket,
     session_id: str
@@ -286,6 +302,7 @@ async def websocket_proctor(
     WebSocket endpoint for proctors monitoring a specific session.
     Receives events only for the specified session.
     """
+    print(f"[WS] Proctor client connecting to session: {session_id}")
     realtime = get_realtime_manager()
     await realtime.connect_proctor(websocket, session_id)
     
@@ -311,16 +328,24 @@ async def websocket_proctor(
         realtime.disconnect(websocket)
 
 
+@app.websocket("/ws/student")
+@app.websocket("/ws/student/")
 @app.websocket("/ws/student/{student_id}")
+@app.websocket("/ws/student/{student_id}/")
 async def websocket_student(
     websocket: WebSocket,
-    student_id: str,
+    student_id: Optional[str] = None,
     session_id: Optional[str] = Query(None)
 ):
     """
     WebSocket endpoint for students.
     Receives alerts and instructions from proctors.
     """
+    # Still none? Try to get from query params manually
+    if not student_id:
+        student_id = websocket.query_params.get("student_id", "unknown")
+
+    print(f"[WS] Incoming student connection: {student_id} (Session: {session_id})")
     realtime = get_realtime_manager()
     await realtime.connect_student(websocket, student_id, session_id or "default")
     
@@ -421,12 +446,20 @@ if os.path.exists(REACT_BUILD_DIR):
             path = request.url.path
             # Only serve React for non-API/non-system paths
             if not any(path.startswith(p) for p in ("/api", "/docs", "/redoc", "/openapi", "/ws", "/health", "/uploads")):
+                # Check if this might be a websocket upgrade attempt on a common path
+                if "upgrade" in request.headers.get("connection", "").lower() and "websocket" in request.headers.get("upgrade", "").lower():
+                    print(f"[WS] 404 on WebSocket upgrade for path: {path}")
+                
                 index_path = os.path.join(REACT_BUILD_DIR, "index.html")
                 if os.path.isfile(index_path):
                     return FileResponse(index_path)
         # For API 404s and other errors, return JSON
         from fastapi.responses import JSONResponse
-        return JSONResponse({"detail": exc.detail}, status_code=exc.status_code)
+        return JSONResponse({
+            "detail": exc.detail,
+            "path": request.url.path,
+            "method": request.method
+        }, status_code=exc.status_code)
 
     print(f"[INFO] React frontend served from {REACT_BUILD_DIR}")
 else:

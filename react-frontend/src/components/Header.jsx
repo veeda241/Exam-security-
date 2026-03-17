@@ -4,17 +4,10 @@ import { useApp } from '../context/AppContext';
 export default function Header({ title }) {
   const { state } = useApp();
   const [time, setTime] = useState(new Date().toLocaleTimeString());
-  const [theme, setTheme] = useState(localStorage.getItem('examguard-theme') || 'dark');
-
   useEffect(() => {
     const timer = setInterval(() => setTime(new Date().toLocaleTimeString()), 1000);
     return () => clearInterval(timer);
   }, []);
-
-  useEffect(() => {
-    document.documentElement.setAttribute('data-theme', theme);
-    localStorage.setItem('examguard-theme', theme);
-  }, [theme]);
 
   const alertCount = state.activities.filter(a => a.type === 'danger' || a.type === 'warning').length;
 
@@ -45,13 +38,6 @@ export default function Header({ title }) {
         <button className="btn-icon notification-btn">
           <i className="fas fa-bell"></i>
           <span className="notification-badge">{alertCount}</span>
-        </button>
-        <button
-          className="btn-icon theme-toggle"
-          title="Toggle Theme"
-          onClick={() => setTheme(t => t === 'dark' ? 'light' : 'dark')}
-        >
-          <i className={`fas fa-${theme === 'dark' ? 'moon' : 'sun'}`}></i>
         </button>
       </div>
     </header>

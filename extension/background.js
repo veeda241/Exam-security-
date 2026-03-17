@@ -7,7 +7,7 @@
 // Change BACKEND_URL to your deployed server URL
 // For local dev: 'http://localhost:8000'
 // For cloud:     'https://exam-security.onrender.com'
-const BACKEND_URL = 'https://exam-security.onrender.com';
+const BACKEND_URL = 'https://examguard-api.onrender.com';
 
 const CONFIG = {
   API_BASE: `${BACKEND_URL}/api`,
@@ -57,6 +57,7 @@ const browsingTracker = {
   // Time spent per category (milliseconds)
   timeByCategory: {
     exam: 0,
+    learning: 0,
     ai: 0,
     cheating: 0,
     entertainment: 0,
@@ -352,7 +353,7 @@ const browsingTracker = {
             totalTime: s.totalTime,
             visitCount: s.visitCount,
           })),
-        examTimePercent: totalTime > 0 ? Math.round((this.timeByCategory.exam / totalTime) * 100) : 0,
+        examTimePercent: totalTime > 0 ? Math.round(((this.timeByCategory.exam + (this.timeByCategory.learning || 0)) / totalTime) * 100) : 0,
         distractionTimePercent: totalTime > 0 ? Math.round(
           ((this.timeByCategory.ai + this.timeByCategory.cheating + this.timeByCategory.entertainment) / totalTime) * 100
         ) : 0,

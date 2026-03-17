@@ -651,6 +651,11 @@ body {
   color: #10b981;
 }
 
+.cat-learning {
+  background: rgba(124, 58, 237, 0.15);
+  color: #a78bfa;
+}
+
 .cat-ai {
   background: rgba(239, 68, 68, 0.15);
   color: #ef4444;

@@ -1,10 +1,18 @@
 import { useState } from 'react';
-import { NavLink } from 'react-router-dom';
+import { NavLink, useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
+import { useAuth } from '../context/AuthContext';
 
 export default function Sidebar() {
   const [collapsed, setCollapsed] = useState(false);
   const { state } = useApp();
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
+
+  function handleLogout() {
+    logout();
+    navigate('/login');
+  }
 
   const alertCount = state.activities.filter(a => a.type === 'danger' || a.type === 'warning').length;
   const sessionCount = state.sessions.length;
@@ -54,12 +62,12 @@ export default function Sidebar() {
           <div className="user-avatar"><i className="fas fa-user"></i></div>
           {!collapsed && (
             <div className="user-details">
-              <span className="user-name">Proctor</span>
-              <span className="user-role">Administrator</span>
+              <span className="user-name">{user?.full_name || user?.username || 'Proctor'}</span>
+              <span className="user-role">{user?.role?.toUpperCase() || 'ADMINISTRATOR'}</span>
             </div>
           )}
         </div>
-        <button className="btn-icon" title="Settings"><i className="fas fa-cog"></i></button>
+        <button className="btn-icon" title="Logout" onClick={handleLogout}><i className="fas fa-sign-out-alt"></i></button>
       </div>
     </aside>
   );
