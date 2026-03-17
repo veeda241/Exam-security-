@@ -6,8 +6,8 @@
 // ==================== CONFIGURATION ====================
 // Change BACKEND_URL to your deployed server URL
 // For local dev: 'http://localhost:8000'
-// For cloud:     'https://examguard-api.onrender.com'
-const BACKEND_URL = 'https://examguard-api.onrender.com';
+// For cloud:     'https://exam-security.onrender.com'
+const BACKEND_URL = 'https://exam-security.onrender.com';
 
 const CONFIG = {
   API_BASE: `${BACKEND_URL}/api`,
