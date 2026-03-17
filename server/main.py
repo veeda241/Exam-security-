@@ -5,6 +5,9 @@ Main FastAPI application entry point
 Updated to use organized API structure from api/ folder
 """
 
+# Prevent matplotlib font cache build on startup (blocks port binding)
+import os
+os.environ.setdefault("MPLBACKEND", "Agg")
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -12,7 +15,6 @@ from contextlib import asynccontextmanager
 from typing import List, Optional
 import uvicorn
 import asyncio
-import os
 
 from database import init_db
 from services.face_detection import SecureVision

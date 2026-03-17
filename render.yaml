@@ -7,10 +7,15 @@ services:
     buildCommand: |
       pip install --upgrade pip
       pip install -r requirements-deploy.txt
+      python -c "import matplotlib; matplotlib.use('Agg')" 2>/dev/null || true
     startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
     envVars:
       - key: PYTHON_VERSION
         value: "3.11"
+      - key: MPLBACKEND
+        value: "Agg"
+      - key: MATPLOTLIB_DONT_INIT
+        value: "1"
       - key: PG_HOST
         sync: false
       - key: PG_PASSWORD
