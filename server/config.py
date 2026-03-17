@@ -44,7 +44,7 @@ API_HOST = os.getenv("API_HOST", "0.0.0.0")
 API_PORT = int(os.getenv("API_PORT", "8000"))
 
 # CORS - comma-separated allowed origins (use * for dev)
-CORS_ORIGINS = os.getenv("CORS_ORIGINS", "*").split(",")
+CORS_ORIGINS = os.getenv("CORS_ORIGINS", "http://localhost:5173,http://localhost:4173,http://localhost:3000").split(",")
 
 # Capture settings
 SCREENSHOT_INTERVAL_SECONDS = 3

@@ -31,7 +31,7 @@ from auth.dependencies import (
 )
 
 
-router = APIRouter(prefix="/auth", tags=["Authentication"])
+router = APIRouter(tags=["Authentication"])
 
 
 # =============================================================================
