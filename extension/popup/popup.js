@@ -4,8 +4,10 @@
  */
 
 // ==================== CONFIGURATION ====================
+const BACKEND_URL = 'https://examguard-api.onrender.com';
+
 const CONFIG = {
-    API_BASE: 'http://localhost:8000/api',
+    API_BASE: `${BACKEND_URL}/api`,
     HEALTH_CHECK_INTERVAL: 5000,
 };
 

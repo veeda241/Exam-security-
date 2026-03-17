@@ -4,9 +4,14 @@
  */
 
 // ==================== CONFIGURATION ====================
+// Change BACKEND_URL to your deployed server URL
+// For local dev: 'http://localhost:8000'
+// For cloud:     'https://examguard-api.onrender.com'
+const BACKEND_URL = 'https://examguard-api.onrender.com';
+
 const CONFIG = {
-  API_BASE: 'http://localhost:8000/api',
-  WS_URL: 'ws://localhost:8000/ws/student',
+  API_BASE: `${BACKEND_URL}/api`,
+  WS_URL: `${BACKEND_URL.replace('https://', 'wss://').replace('http://', 'ws://')}/ws/student`,
   SCREENSHOT_INTERVAL: 3000,
   WEBCAM_INTERVAL: 5000,
   SYNC_INTERVAL: 5000,        // Faster sync for real-time DB updates
@@ -185,6 +190,7 @@ const browsingTracker = {
       // Common LMS / exam platforms
       const examPlatforms = [
         'localhost', '127.0.0.1',             // Local exam platform
+        'onrender.com',                       // Cloud backend
         'canvas.', 'blackboard.', 'moodle.',  // LMS platforms
         'forms.google.com', 'docs.google.com',
         'exam.', 'test.', 'quiz.', 'assessment.',
