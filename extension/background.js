@@ -182,7 +182,7 @@ const browsingTracker = {
     }
   },
   
-  /** Check if a URL is exam-related (the exam platform itself, LMS, etc.) */
+  /** Check if a URL is productive (exam platform itself, LMS, or learning research) */
   isExamRelated(url) {
     if (!url) return false;
     try {
@@ -196,7 +196,13 @@ const browsingTracker = {
         'exam.', 'test.', 'quiz.', 'assessment.',
         'gradescope.com', 'proctorio.com',
       ];
-      return examPlatforms.some(p => hostname.includes(p));
+      if (examPlatforms.some(p => hostname.includes(p))) return true;
+      
+      // Also count learning/research as productive time (increases effort score)
+      if (typeof LEARNING_SITES !== 'undefined' && LEARNING_SITES.some(p => hostname.includes(p))) {
+        return true;
+      }
+      return false;
     } catch {
       return false;
     }
@@ -420,13 +426,21 @@ const ENTERTAINMENT_SITES = [
   'whatsapp.com', 'web.telegram.org', 'messenger.com',
 ];
 
-// Cheating / Academic dishonesty sites - highest risk
+// Cheating / Academic dishonesty sites - high risk
+// (Removed GitHub, StackOverflow, etc. since they are used for learning/projects)
 const CHEATING_SITES = [
   'chegg.com', 'coursehero.com', 'studocu.com',
   'quizlet.com', 'brainly.com', 'bartleby.com',
   'numerade.com', 'slader.com', 'litanswers.org',
-  'stackoverflow.com', 'stackexchange.com',
-  'pastebin.com', 'github.com', 'gitlab.com',
+  'pastebin.com',
+];
+
+// Learning / Project / Research sites - productive
+const LEARNING_SITES = [
+  'stackoverflow.com', 'stackexchange.com', 'github.com', 'gitlab.com',
+  'developer.', 'docs.', 'w3schools.com', 'mdn.io', 'geeksforgeeks.org',
+  'google.com/search', 'google.co.in/search', 'chatgpt.com', 'claude.ai',
+  'youtube.com/watch?v=' // Educational videos
 ];
 
 /** Classify a URL into a risk category */
@@ -436,6 +450,12 @@ function classifyUrl(url) {
     const hostname = new URL(url).hostname.replace(/^www\./, '');
     const fullUrl = url.toLowerCase();
 
+    for (const site of LEARNING_SITES) {
+      if (hostname.includes(site) || fullUrl.includes(site)) {
+        return { category: 'LEARNING', site, riskLevel: 'none' };
+      }
+    }
+    // Check AI after learning so that Claude/GPT count as LEARNING instead of AI if specified
     for (const site of AI_SITES) {
       if (hostname.includes(site) || fullUrl.includes(site)) {
         return { category: 'AI', site, riskLevel: 'high' };
