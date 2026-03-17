@@ -382,22 +382,18 @@ const browsingTracker = {
 };
 
 // ==================== URL CLASSIFICATION ====================
-// AI / LLM Sites - high risk during exams
+// AI / LLM Sites - semi-effort, semi-risk
 const AI_SITES = [
   'chat.openai.com', 'chatgpt.com', 'openai.com',
   'gemini.google.com', 'bard.google.com',
   'claude.ai', 'anthropic.com',
-  'perplexity.ai',
-  'copilot.microsoft.com', 'bing.com/chat',
-  'poe.com', 'character.ai',
-  'huggingface.co/chat', 'deepseek.com',
-  'you.com', 'phind.com',
-  'writesonic.com', 'jasper.ai',
-  'wolframalpha.com', 'symbolab.com',
-  'photomath.com', 'mathway.com',
+  'perplexity.ai', 'copilot.microsoft.com', 'bing.com/chat',
+  'poe.com', 'character.ai', 'huggingface.co/chat', 'deepseek.com',
+  'you.com', 'phind.com', 'writesonic.com', 'jasper.ai',
+  'wolframalpha.com', 'symbolab.com', 'photomath.com', 'mathway.com',
 ];
 
-// Entertainment / Distraction Sites - medium risk
+// Entertainment / Distraction Sites - maximum risk (Critical)
 const ENTERTAINMENT_SITES = [
   'youtube.com', 'netflix.com', 'hulu.com',
   'disneyplus.com', 'primevideo.com', 'amazon.com/gp/video',
@@ -426,8 +422,7 @@ const ENTERTAINMENT_SITES = [
   'whatsapp.com', 'web.telegram.org', 'messenger.com',
 ];
 
-// Cheating / Academic dishonesty sites - high risk
-// (Removed GitHub, StackOverflow, etc. since they are used for learning/projects)
+// Cheating / Academic dishonesty sites - Critical risk
 const CHEATING_SITES = [
   'chegg.com', 'coursehero.com', 'studocu.com',
   'quizlet.com', 'brainly.com', 'bartleby.com',
@@ -435,12 +430,14 @@ const CHEATING_SITES = [
   'pastebin.com',
 ];
 
-// Learning / Project / Research sites - productive
+// Learning / Project / Course sites - Max Effort
 const LEARNING_SITES = [
+  'udemy.com', 'coursera.org', 'edx.org', 'pluralsight.com', 'codecademy.com',
+  'freecodecamp.org', 'khanacademy.org', 'udacity.com', 'skillshare.com',
+  'datacamp.com', 'linkedin.com/learning',
   'stackoverflow.com', 'stackexchange.com', 'github.com', 'gitlab.com',
   'developer.', 'docs.', 'w3schools.com', 'mdn.io', 'geeksforgeeks.org',
-  'google.com/search', 'google.co.in/search', 'chatgpt.com', 'claude.ai',
-  'youtube.com/watch?v=' // Educational videos
+  'google.com/search', 'google.co.in/search'
 ];
 
 /** Classify a URL into a risk category */
