@@ -4,12 +4,21 @@ YOLOv8 integration for identifying forbidden objects
 """
 
 import os
-from ultralytics import YOLO
+try:
+    from ultralytics import YOLO
+    YOLO_AVAILABLE = True
+except ImportError:
+    YOLO_AVAILABLE = False
+    print("[WARN] ultralytics not installed. Object detection disabled.")
 import cv2
 import numpy as np
 
 class ObjectDetector:
     def __init__(self):
+        if not YOLO_AVAILABLE:
+            self.model = None
+            self.FORBIDDEN_CLASSES = {}
+            return
         # Load nano model for speed
         # Will auto-download on first run
         self.model = YOLO("yolov8n.pt")
@@ -29,6 +38,8 @@ class ObjectDetector:
         Returns:
             dict: { detected: bool, objects: list, risk_score: int }
         """
+        if self.model is None:
+            return {"forbidden_detected": False, "objects": [], "risk_score": 0}
         results = self.model(image, verbose=False)
         
         detected_objects = []
