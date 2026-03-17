@@ -393,30 +393,38 @@ app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
 # Mount React frontend (production build)
 REACT_BUILD_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "react-frontend-dist")
 if os.path.exists(REACT_BUILD_DIR):
-    # Serve React SPA - catch-all must be mounted last
-    from fastapi.responses import FileResponse, JSONResponse
-
-    # Paths that should NOT be handled by the React SPA
-    _RESERVED_PREFIXES = (
-        "api/", "docs", "redoc", "openapi.json",
-        "ws/", "health", "uploads/",
-    )
-
-    @app.get("/{full_path:path}", include_in_schema=False)
-    async def serve_react(full_path: str):
-        """Serve React frontend for all non-API routes"""
-        # Skip reserved backend paths
-        if full_path and any(full_path.startswith(p) or full_path == p.rstrip("/") for p in _RESERVED_PREFIXES):
-            return JSONResponse({"detail": "Not Found"}, status_code=404)
-
-        file_path = os.path.join(REACT_BUILD_DIR, full_path)
-        if os.path.isfile(file_path):
-            return FileResponse(file_path)
-        # SPA fallback: return index.html for client-side routing
-        return FileResponse(os.path.join(REACT_BUILD_DIR, "index.html"))
+    from fastapi.responses import FileResponse
+    from starlette.exceptions import HTTPException as StarletteHTTPException
 
     # Mount static assets (JS, CSS, images)
     app.mount("/assets", StaticFiles(directory=os.path.join(REACT_BUILD_DIR, "assets")), name="react-assets")
+
+    # Serve index.html at root
+    @app.get("/dashboard", include_in_schema=False)
+    @app.get("/sessions", include_in_schema=False)
+    @app.get("/students", include_in_schema=False)
+    @app.get("/alerts", include_in_schema=False)
+    @app.get("/reports", include_in_schema=False)
+    @app.get("/analytics", include_in_schema=False)
+    @app.get("/settings", include_in_schema=False)
+    async def serve_react_pages():
+        """Serve React SPA for known frontend routes"""
+        return FileResponse(os.path.join(REACT_BUILD_DIR, "index.html"))
+
+    # Custom 404 handler: serve React for unknown non-API paths
+    @app.exception_handler(StarletteHTTPException)
+    async def spa_fallback(request, exc):
+        if exc.status_code == 404:
+            path = request.url.path
+            # Only serve React for non-API/non-system paths
+            if not any(path.startswith(p) for p in ("/api", "/docs", "/redoc", "/openapi", "/ws", "/health", "/uploads")):
+                index_path = os.path.join(REACT_BUILD_DIR, "index.html")
+                if os.path.isfile(index_path):
+                    return FileResponse(index_path)
+        # For API 404s and other errors, return JSON
+        from fastapi.responses import JSONResponse
+        return JSONResponse({"detail": exc.detail}, status_code=exc.status_code)
+
     print(f"[INFO] React frontend served from {REACT_BUILD_DIR}")
 else:
     print(f"[INFO] React build not found at {REACT_BUILD_DIR} - skipping SPA serving")
