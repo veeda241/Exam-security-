@@ -1,0 +1,22 @@
+# Core API (required)
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+sqlalchemy>=2.0.0
+aiosqlite>=0.19.0
+pydantic>=2.0.0
+email-validator>=2.0.0
+python-multipart>=0.0.6
+pillow>=10.0.0
+
+# Authentication
+python-jose[cryptography]>=3.3.0
+passlib[bcrypt]>=1.7.4
+
+# PDF Generation
+reportlab>=4.0.0
+httpx>=0.25.0
+
+# Lightweight ML (small footprint)
+pytesseract>=0.3.10
+opencv-python-headless>=4.8.0
+numpy>=1.24.0
