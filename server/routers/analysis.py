@@ -358,95 +358,38 @@ class MultiAnswerRequest(BaseModel):
     answers: List[str]
 
 
-@router.post("/transformer/similarity")
-async def transformer_similarity_check(request: TextAnalysisRequest):
-    """
-    Check text similarity using Transformer model.
-    
-    Use for comparing student answers against reference materials.
-    """
+@router.post("/transformer/classify-url")
+async def transformer_classify_url(url: str):
+    """Classify a URL into a risk category using the transformer model."""
     from services.transformer_analysis import get_transformer_analyzer
-    
+
     analyzer = get_transformer_analyzer()
-    
-    if not request.compare_texts:
-        return {
-            "error": "No comparison texts provided",
-            "status": analyzer.get_status()
-        }
-    
-    results = []
-    for compare_text in request.compare_texts:
-        result = analyzer.compute_similarity(request.text, compare_text)
-        results.append({
-            "compare_text_preview": compare_text[:100] + "..." if len(compare_text) > 100 else compare_text,
-            **result
-        })
-    
-    # Find max similarity
-    max_sim = max(r.get("similarity", 0) for r in results)
-    
-    return {
-        "results": results,
-        "max_similarity": round(max_sim, 4),
-        "is_suspicious": max_sim > 0.7,
-        "analyzer_status": analyzer.get_status()
-    }
+    return analyzer.classify_url(url)
 
 
-@router.post("/transformer/plagiarism")
-async def transformer_plagiarism_check(request: PlagiarismCheckRequest):
-    """
-    Check for potential plagiarism in student answer.
-    
-    Compares answer against known reference texts.
-    """
+@router.post("/transformer/analyze-behavior")
+async def transformer_analyze_behavior(events: list):
+    """Analyze a sequence of student events for anomalous behavior."""
     from services.transformer_analysis import get_transformer_analyzer
-    
+
     analyzer = get_transformer_analyzer()
-    
-    result = analyzer.check_plagiarism(
-        request.answer_text,
-        request.reference_texts,
-        request.threshold
-    )
-    
-    return {
-        **result,
-        "analyzer_status": analyzer.get_status()
-    }
+    return analyzer.predict_behavior_risk(events)
 
 
-@router.post("/transformer/cross-compare")
-async def transformer_cross_compare(request: MultiAnswerRequest):
-    """
-    Compare multiple student answers to detect potential copying.
-    
-    Useful for detecting collusion between students.
-    """
+@router.post("/transformer/classify-screen")
+async def transformer_classify_screen(text: str):
+    """Classify screenshot/OCR text into a risk category."""
     from services.transformer_analysis import get_transformer_analyzer
-    
+
     analyzer = get_transformer_analyzer()
-    
-    if len(request.answers) < 2:
-        raise HTTPException(
-            status_code=400, 
-            detail="At least 2 answers required for comparison"
-        )
-    
-    result = analyzer.analyze_answer_patterns(request.answers)
-    
-    return {
-        **result,
-        "analyzer_status": analyzer.get_status()
-    }
+    return analyzer.classify_screen_content(text)
 
 
 @router.get("/transformer/status")
 async def transformer_status():
     """Get Transformer analyzer status."""
     from services.transformer_analysis import get_transformer_analyzer
-    
+
     analyzer = get_transformer_analyzer()
     return analyzer.get_status()
 

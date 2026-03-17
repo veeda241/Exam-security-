@@ -1,92 +1,197 @@
-# ExamGuard Pro - Exam Proctoring System
+# ExamGuard Pro
 
-A comprehensive exam security and proctoring solution with real-time monitoring, AI-powered analysis, and automated risk scoring.
+AI-powered exam proctoring system with real-time monitoring, face detection, OCR analysis, NLP-based plagiarism detection, and automated risk scoring.
 
-## ✅ Status: Ready to Run
+## Tech Stack
 
-All errors have been fixed and the application is fully operational.
+| Layer | Technology |
+|-------|-----------|
+| Backend | FastAPI, SQLAlchemy (async), PostgreSQL / SQLite |
+| Frontend | React 19, Vite, React Router v7 |
+| AI/ML | MediaPipe, YOLOv8, Tesseract OCR, Sentence-Transformers |
+| Extension | Chrome Manifest V3 |
+| Deployment | Docker, Docker Compose |
+
+## Project Structure
+
+```
+├── server/                  # FastAPI backend
+│   ├── api/                 # Organized API endpoints
+│   ├── auth/                # JWT authentication
+│   ├── models/              # SQLAlchemy models
+│   ├── routers/             # Route handlers
+│   ├── scoring/             # Risk score engine
+│   ├── services/            # ML services (16 modules)
+│   │   ├── face_detection   # MediaPipe face mesh
+│   │   ├── gaze_tracking    # Eye gaze analysis
+│   │   ├── ocr              # Tesseract screenshot analysis
+│   │   ├── similarity       # Text plagiarism detection
+│   │   ├── anomaly          # Behavior anomaly detection
+│   │   ├── object_detection # YOLOv8 object detection
+│   │   ├── biometrics       # Biometric verification
+│   │   ├── pipeline         # Real-time analysis pipeline
+│   │   └── realtime         # WebSocket event manager
+│   ├── tasks/               # Background task queue
+│   └── utils/               # Shared utilities
+├── react-frontend/          # React dashboard (Vite)
+│   └── src/components/      # Dashboard, Sessions, Alerts,
+│                            # Analytics, Reports, Students
+├── extension/               # Chrome extension (Manifest V3)
+│   ├── background.js        # Service worker
+│   ├── content.js           # Page monitoring
+│   ├── webcam.js            # Webcam capture
+│   └── popup/               # Extension popup UI
+├── transformer/             # Custom NLP model
+│   ├── model/               # Transformer architecture
+│   ├── data/                # Tokenizer & datasets
+│   ├── checkpoints/         # Trained model weights
+│   ├── train_examguard.py   # Model training
+│   └── train_similarity.py  # Similarity model training
+└── deployment/              # Docker configuration
+    ├── Dockerfile           # Multi-stage build (Node + Python)
+    ├── docker-compose.yml   # Backend + PostgreSQL
+    └── .env.example         # Environment template
+```
 
 ## Quick Start
 
-### Windows Users
-```bash
-start_server.bat
-```
+### Local Development
 
-### Manual Start
 ```bash
+# 1. Backend
 cd server
+python -m venv .venv
+.venv\Scripts\activate        # Windows
+pip install -r requirements.txt
 python -m uvicorn main:app --host 0.0.0.0 --port 8000
+
+# 2. Frontend (separate terminal)
+cd react-frontend
+npm install
+npm run dev                   # http://localhost:3000
 ```
 
-The API will be available at: **http://localhost:8000**
+### Docker Deployment (Self-hosted)
+
+```bash
+cd deployment
+copy .env.example .env        # Edit with production secrets
+docker-compose --env-file .env up --build -d
+```
+
+### Render Deployment (Recommended for Remote Access)
+
+1. **Push to GitHub** — Push this repo to a GitHub repository
+
+2. **Create a Render Web Service**
+   - Go to [render.com](https://render.com) → **New** → **Web Service**
+   - Connect your GitHub repo
+   - Set **Root Directory** to `server`
+   - Set **Build Command**: `chmod +x build.sh && ./build.sh`
+   - Set **Start Command**: `uvicorn main:app --host 0.0.0.0 --port $PORT`
+   - Choose **Python 3** runtime
+
+3. **Add Environment Variables** in Render dashboard:
+   | Variable | Value |
+   |----------|-------|
+   | `PG_HOST` | `db.fpnopsvzvfqwvyqmhgei.supabase.co` |
+   | `PG_PASSWORD` | Your Supabase DB password |
+   | `SUPABASE_URL` | `https://fpnopsvzvfqwvyqmhgei.supabase.co` |
+   | `SUPABASE_KEY` | Your Supabase anon key |
+   | `SUPABASE_DB_PASSWORD` | Your Supabase DB password |
+   | `SECRET_KEY` | Generate a random string |
+   | `CORS_ORIGINS` | `*` |
+
+4. **Deploy** — Render builds and gives you a URL like `https://examguard-api.onrender.com`
+
+5. **Update Chrome Extension** — In `extension/background.js`, change:
+   ```js
+   API_BASE: 'https://examguard-api.onrender.com/api',
+   WS_URL: 'wss://examguard-api.onrender.com/ws/student',
+   ```
+
+6. **Update React Frontend** — In `react-frontend/src/config.js`, the URLs auto-detect in production. For local dev pointing to Render:
+   ```js
+   export const API_BASE = 'https://examguard-api.onrender.com/api';
+   ```
+
+Access points after deployment:
+- **API** — `https://examguard-api.onrender.com`
+- **API Docs** — `https://examguard-api.onrender.com/docs`
+- **WebSocket** — `wss://examguard-api.onrender.com/ws/dashboard`
+
+### Chrome Extension
+
+1. Open `chrome://extensions`
+2. Enable **Developer mode**
+3. Click **Load unpacked** → select the `extension/` folder
+4. Click the ExamGuard icon → enter exam session details
+
+> For production, update `API_BASE` and `WS_URL` in `extension/background.js` to your server domain.
 
 ## Features
 
-### 🛡️ Security Monitoring
-- **Real-time Activity Tracking**: Monitor tab switches, window focus, copy/paste events
-- **Face Detection**: Verify student presence using webcam
-- **Screenshot Analysis**: OCR-based forbidden content detection
-- **Anomaly Detection**: AI-powered suspicious behavior identification
+### Real-Time Monitoring
+- Tab switch & window blur detection
+- Copy/paste event tracking
+- Periodic screenshot capture (3s interval)
+- Webcam frame capture (5s interval)
+- WebSocket-based live dashboard updates
 
-### 📊 Risk Scoring System
-- **Weighted Event Scoring**: Different event types have different risk weights
-- **Dynamic Risk Levels**: Safe, Review, Suspicious classifications
-- **Cumulative Risk Analysis**: Track risk over time
+### AI Analysis Pipeline
+- **Face Detection** — MediaPipe face mesh for presence verification
+- **Gaze Tracking** — Eye movement analysis for engagement scoring
+- **OCR Analysis** — Tesseract-based forbidden content detection (ChatGPT, Chegg, etc.)
+- **Object Detection** — YOLOv8 for unauthorized device detection
+- **Text Similarity** — Sentence-transformer plagiarism detection
+- **Anomaly Detection** — ML-based suspicious behavior identification
+- **Audio Analysis** — Environment sound monitoring
+- **Browser Forensics** — Domain categorization & browsing pattern analysis
 
-### 📋 Session Management
-- **Session Control**: Start, monitor, and end exam sessions
-- **Student Information**: Track student ID, name, exam code
-- **Event Logging**: Comprehensive event history with timestamps
+### Risk Scoring
+- Weighted event scoring with dynamic risk levels (Safe / Review / Suspicious)
+- Cumulative risk analysis with timeline visualization
+- Per-student and per-session risk breakdowns
 
-### 📈 Reporting
-- **JSON Reports**: Structured data export
-- **PDF Reports**: Professional formatted reports (with reportlab)
-- **Risk Analysis**: Event timeline with risk contributions
+### Reporting
+- PDF report generation with risk timelines
+- JSON data export
+- Session analytics and trend charts
 
-### 🔌 Chrome Extension
-- **Seamless Integration**: Monitors exam activity in real-time
-- **Automatic Capture**: Periodic screenshots and webcam frames
-- **Event Logging**: Sends all events to backend
+## API Overview
 
-### 👨‍🏫 Teacher Dashboard
-- **Session Overview**: View all active sessions
-- **Risk Alerts**: Immediate flagging of suspicious activity
-- **Report Generation**: Create detailed reports
+| Endpoint | Description |
+|----------|-------------|
+| `POST /api/auth/login` | JWT authentication |
+| `GET /api/students` | List students |
+| `POST /api/sessions` | Create exam session |
+| `POST /api/events` | Log monitoring event |
+| `POST /api/uploads/screenshot` | Upload screenshot for OCR |
+| `POST /api/uploads/webcam` | Upload webcam frame |
+| `GET /api/analysis/{session_id}` | Get AI analysis results |
+| `GET /api/reports/{session_id}` | Generate session report |
+| `WS /ws/dashboard` | Dashboard real-time events |
+| `WS /ws/student/{id}` | Student monitoring channel |
 
-## Installation
+Full interactive docs available at `/docs` when the server is running.
 
-1. **Install Dependencies**
-   ```bash
-   cd server
-   pip install -r requirements.txt
-   ```
+## Environment Variables
 
-2. **Start Server**
-   ```bash
-   python -m uvicorn main:app --host 0.0.0.0 --port 8000
-   ```
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `DATABASE_URL` | — | Full DB connection string (auto-detected on Render) |
+| `PG_HOST` | — | Supabase PostgreSQL host |
+| `PG_USER` | `postgres` | PostgreSQL username |
+| `PG_PASSWORD` | — | PostgreSQL password |
+| `PG_DB` | `postgres` | PostgreSQL database name |
+| `SUPABASE_URL` | — | Supabase project URL |
+| `SUPABASE_KEY` | — | Supabase anon/public key |
+| `SUPABASE_DB_PASSWORD` | — | Supabase database password |
+| `SECRET_KEY` | — | App secret for sessions |
+| `CORS_ORIGINS` | `*` | Comma-separated allowed origins |
 
-3. **Access Dashboard**
-   - Open `dashboard/index.html` in your browser
-
-4. **Install Chrome Extension**
-   - Go to `chrome://extensions`
-   - Enable "Developer mode"
-   - Click "Load unpacked"
-   - Select `extension/` folder
-
-## Documentation
-
-- **QUICKSTART.md** - Quick start guide
-- **VERIFICATION_REPORT.md** - Detailed verification report
+> If no `DATABASE_URL` or `PG_HOST` is set, falls back to local SQLite (`examguard.db`).
 
 ## License
 
-MIT License
-
----
-
-**Status**: ✅ Ready to Run  
-**Version**: 1.0.0  
-**All Systems**: Operational
+MIT

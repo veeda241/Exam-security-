@@ -506,7 +506,7 @@ async function onCaptureReady(captureData) {
     // Send success notification
     chrome.notifications.create({
       type: 'basic',
-      iconUrl: 'icons/icon48.svg',
+      iconUrl: 'icons/icon48.png',
       title: '🛡️ ExamGuard Pro',
       message: 'Proctoring session started. Good luck!',
       priority: 2,
@@ -649,7 +649,7 @@ async function stopExamSession() {
 
     chrome.notifications.create({
       type: 'basic',
-      iconUrl: 'icons/icon48.svg',
+      iconUrl: 'icons/icon48.png',
       title: '🛡️ ExamGuard Pro',
       message: `Session ended. ${summary.totalEvents} events recorded.`,
       priority: 2,
@@ -1119,7 +1119,7 @@ async function uploadWebcamFrame(dataUrl) {
         // Show warning notification
         chrome.notifications.create({
           type: 'basic',
-          iconUrl: 'icons/icon48.svg',
+          iconUrl: 'icons/icon48.png',
           title: '🚨 EXAM VIOLATION DETECTED',
           message: 'Phone usage detected! Chrome will close in 3 seconds. Your session has been flagged.',
           priority: 2,
@@ -1276,7 +1276,7 @@ function handleServerMessage(data) {
       // Show alert from proctor to student
       chrome.notifications.create({
         type: 'basic',
-        iconUrl: 'icons/icon48.svg',
+        iconUrl: 'icons/icon48.png',
         title: '⚠️ Proctor Alert',
         message: data.data?.message || 'Please focus on your exam.',
         priority: 2,

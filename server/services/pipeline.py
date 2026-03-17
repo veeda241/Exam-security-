@@ -129,14 +129,8 @@ class AnalysisPipeline:
             try:
                 from services.transformer_analysis import get_transformer_analyzer
                 analyzer = get_transformer_analyzer()
-                if analyzer._initialized:
-                    # Quick similarity against known sources
-                    reference_texts = [
-                        "The answer can be found by searching online",
-                        "According to the textbook",
-                        "Copy and paste from the internet",
-                    ]
-                    transformer_result = analyzer.check_plagiarism(text, reference_texts)
+                if analyzer._screen_initialized:
+                    transformer_result = analyzer.classify_screen_content(text)
                     self._stats["transformer_analyses"] += 1
             except Exception as e:
                 print(f"[Pipeline] Transformer analysis skipped: {e}")

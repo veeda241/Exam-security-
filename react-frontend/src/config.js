@@ -1,8 +1,18 @@
 // API & WebSocket Configuration
-const isProduction = window.location.protocol === 'https:';
+const isProduction = import.meta.env.PROD;
+const hostname = window.location.hostname;
+const port = window.location.port;
+const protocol = window.location.protocol;
 
-export const API_BASE = 'http://localhost:8000/api';
-export const WS_URL = `${isProduction ? 'wss' : 'ws'}://localhost:8000/ws/dashboard`;
+// In production, API is served from the same origin
+// In dev, Vite proxy forwards /api and /ws to localhost:8000
+export const API_BASE = isProduction
+  ? `${protocol}//${hostname}${port ? ':' + port : ''}/api`
+  : 'http://localhost:8000/api';
+
+export const WS_URL = isProduction
+  ? `${protocol === 'https:' ? 'wss' : 'ws'}://${hostname}${port ? ':' + port : ''}/ws/dashboard`
+  : `ws://localhost:8000/ws/dashboard`;
 
 export const CONFIG = {
   API_BASE,

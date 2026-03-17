@@ -182,9 +182,10 @@ app = FastAPI(
 # =============================================================================
 # Middleware Configuration
 # =============================================================================
+from config import CORS_ORIGINS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # In production, restrict to specific origins
+    allow_origins=CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -387,12 +388,26 @@ for directory in [SCREENSHOTS_DIR, WEBCAM_DIR, REPORTS_DIR]:
 # Mount static files for uploaded content
 app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
 
-# Mount frontend dashboard
-FRONTEND_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "frontend")
-if os.path.exists(FRONTEND_DIR):
-    app.mount("/dashboard", StaticFiles(directory=FRONTEND_DIR, html=True), name="frontend")
+# Mount React frontend (production build)
+REACT_BUILD_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "react-frontend-dist")
+if os.path.exists(REACT_BUILD_DIR):
+    # Serve React SPA - catch-all must be mounted last
+    from fastapi.responses import FileResponse
+
+    @app.get("/{full_path:path}", include_in_schema=False)
+    async def serve_react(full_path: str):
+        """Serve React frontend for all non-API routes"""
+        file_path = os.path.join(REACT_BUILD_DIR, full_path)
+        if os.path.isfile(file_path):
+            return FileResponse(file_path)
+        # SPA fallback: return index.html for client-side routing
+        return FileResponse(os.path.join(REACT_BUILD_DIR, "index.html"))
+
+    # Mount static assets (JS, CSS, images)
+    app.mount("/assets", StaticFiles(directory=os.path.join(REACT_BUILD_DIR, "assets")), name="react-assets")
+    print(f"[INFO] React frontend served from {REACT_BUILD_DIR}")
 else:
-    print(f"[WARN] Frontend directory not found at {FRONTEND_DIR}")
+    print(f"[INFO] React build not found at {REACT_BUILD_DIR} - skipping SPA serving")
 
 
 # =============================================================================

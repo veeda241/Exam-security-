@@ -1,0 +1,4622 @@
+[
+  {
+    "url": "https://cliffsnotes.com/path/to/page",
+    "domain": "cliffsnotes.com",
+    "category": "cheating",
+    "risk_score": 0.95,
+    "label_id": 7
+  },
+  {
+    "url": "https://together.ai",
+    "domain": "together.ai",
+    "category": "ai_tool",
+    "risk_score": 0.9,
+    "label_id": 6
+  },
+  {
+    "url": "https://music.youtube.com",
+    "domain": "music.youtube.com",
+    "category": "entertainment",
+    "risk_score": 0.6,
+    "label_id": 5
+  },
+  {
+    "url": "https://www.jasper.ai/some-page",
+    "domain": "jasper.ai",
+    "category": "ai_tool",
+    "risk_score": 0.9,
+    "label_id": 6
+  },
+  {
+    "url": "wyzant.com",
+    "domain": "wyzant.com",
+    "category": "cheating",
+    "risk_score": 0.95,
+    "label_id": 7
+  },
+  {
+    "url": "https://bitbucket.org",
+    "domain": "bitbucket.org",
+    "category": "code_hosting",
+    "risk_score": 0.35,
+    "label_id": 3
+  },
+  {
+    "url": "https://mathway.com",
+    "domain": "mathway.com",
+    "category": "ai_tool",
+    "risk_score": 0.9,
+    "label_id": 6
+  },
+  {
+    "url": "https://edx.org",
+    "domain": "edx.org",
+    "category": "educational",
+    "risk_score": 0.1,
+    "label_id": 1
+  },
+  {
+    "url": "https://netflix.com/browse",
+    "domain": "netflix.com",
+    "category": "entertainment",
+    "risk_score": 0.6,
+    "label_id": 5
+  },
+  {
+    "url": "https://brainly.in",
+    "domain": "brainly.in",
+    "category": "cheating",
+    "risk_score": 0.95,
+    "label_id": 7
+  },
+  {
+    "url": "www.w3schools.com",
+    "domain": "w3schools.com",
+    "category": "educational",
+    "risk_score": 0.1,
+    "label_id": 1
+  },
+  {
+    "url": "https://udacity.com",
+    "domain": "udacity.com",
+    "category": "educational",
+    "risk_score": 0.1,
+    "label_id": 1
+  },
+  {
+    "url": "https://coursera.org",
+    "domain": "coursera.org",
+    "category": "educational",
+    "risk_score": 0.1,
+    "label_id": 1
+  },
+  {
+    "url": "https://www.brainly.in/some-page",
+    "domain": "brainly.in",
+    "category": "cheating",
+    "risk_score": 0.95,
+    "label_id": 7
+  },
+  {
+    "url": "https://geeksforgeeks.org",
+    "domain": "geeksforgeeks.org",
+    "category": "educational",
+    "risk_score": 0.1,
+    "label_id": 1
+  },
+  {
+    "url": "www.chat.mistral.ai",
+    "domain": "chat.mistral.ai",
+    "category": "ai_tool",
+    "risk_score": 0.9,
+    "label_id": 6
+  },
+  {
+    "url": "http://imgur.com",
+    "domain": "imgur.com",
+    "category": "entertainment",
+    "risk_score": 0.6,
+    "label_id": 5
+  },
+  {
+    "url": "https://photomath.com/practice/path/to/page",
+    "domain": "photomath.com",
+    "category": "cheating",
+    "risk_score": 0.95,
+    "label_id": 7
+  },
+  {
+    "url": "https://cohere.com/chat",
+    "domain": "cohere.com",
+    "category": "ai_tool",
+    "risk_score": 0.9,
+    "label_id": 6
+  },
+  {
+    "url": "https://discord.com",
+    "domain": "discord.com",
+    "category": "entertainment",
+    "risk_score": 0.6,
+    "label_id": 5
+  },
+  {
+    "url": "https://studocu.com/document",
+    "domain": "studocu.com",
+    "category": "cheating",
+    "risk_score": 0.95,
+    "label_id": 7
+  },
+  {
+    "url": "https://gitlab.com",
+    "domain": "gitlab.com",
+    "category": "code_hosting",
+    "risk_score": 0.35,
+    "label_id": 3
+  },
+  {
+    "url": "stanford.edu",
+    "domain": "stanford.edu",
+    "category": "educational",
+    "risk_score": 0.1,
+    "label_id": 1
+  },
+  {
+    "url": "https://discord.com",
+    "domain": "discord.com",
+    "category": "entertainment",
+    "risk_score": 0.6,
+    "label_id": 5
+  },
+  {
+    "url": "homeworklib.com",
+    "domain": "homeworklib.com",
+    "category": "cheating",
+    "risk_score": 0.95,
+    "label_id": 7
+  },
+  {
+    "url": "turnitin.com",
+    "domain": "turnitin.com",
+    "category": "exam_platform",
+    "risk_score": 0.0,
+    "label_id": 0
+  },
+  {
+    "url": "https://music.youtube.com",
+    "domain": "music.youtube.com",
+    "category": "entertainment",
+    "risk_score": 0.6,
+    "label_id": 5
+  },
+  {
+    "url": "https://docs.python.org/3",
+    "domain": "docs.python.org",
+    "category": "educational",
+    "risk_score": 0.1,
+    "label_id": 1
+  },
+  {
+    "url": "http://docs.python.org",
+    "domain": "docs.python.org",
+    "category": "educational",
+    "risk_score": 0.1,
+    "label_id": 1
+  },
+  {
+    "url": "https://www.researchgate.net",
+    "domain": "researchgate.net",
+    "category": "educational",
+    "risk_score": 0.1,
+    "label_id": 1
+  },
+  {
+    "url": "https://bartleby.com/path/to/page",
+    "domain": "bartleby.com",
+    "category": "cheating",
+    "risk_score": 0.95,
+    "label_id": 7
+  },
+  {
+    "url": "duckduckgo.com",
+    "domain": "duckduckgo.com",
+    "category": "search_engine",
+    "risk_score": 0.15,
+    "label_id": 2
+  },
+  {
+    "url": "http://claude.ai",
+    "domain": "claude.ai",
+    "category": "ai_tool",
+    "risk_score": 0.9,
+    "label_id": 6
+  },
+  {
+    "url": "https://cliffsnotes.com",
+    "domain": "cliffsnotes.com",
+    "category": "cheating",
+    "risk_score": 0.95,
+    "label_id": 7
+  },
+  {
+    "url": "https://bartleby.com",
+    "domain": "bartleby.com",
+    "category": "cheating",
+    "risk_score": 0.95,
+    "label_id": 7
+  },
+  {
+    "url": "www.classroom.google.com",
+    "domain": "classroom.google.com",
+    "category": "exam_platform",
+    "risk_score": 0.0,
+    "label_id": 0
+  },
+  {
+    "url": "you.com",
+    "domain": "you.com",
+    "category": "ai_tool",
+    "risk_score": 0.9,
+    "label_id": 6
+  },
+  {
+    "url": "https://www.web.whatsapp.com/some-page",
+    "domain": "web.whatsapp.com",
+    "category": "social_media",
+    "risk_score": 0.45,
+    "label_id": 4
+  },
+  {
+    "url": "cohere.com",
+    "domain": "cohere.com",
+    "category": "ai_tool",
+    "risk_score": 0.9,
+    "label_id": 6
+  },
+  {
+    "url": "tutorialspoint.com",
+    "domain": "tutorialspoint.com",
+    "category": "educational",
+    "risk_score": 0.1,
+    "label_id": 1
+  },
+  {
+    "url": "www.hulu.com",
+    "domain": "hulu.com",
+    "category": "entertainment",
+    "risk_score": 0.6,
+    "label_id": 5
+  },
+  {
+    "url": "https://codesandbox.io",
+    "domain": "codesandbox.io",
+    "category": "code_hosting",
+    "risk_score": 0.35,
+    "label_id": 3
+  },
+  {
+    "url": "https://www.bartleby.com/some-page",
+    "domain": "bartleby.com",
+    "category": "cheating",
+    "risk_score": 0.95,
+    "label_id": 7
+  },
+  {
+    "url": "https://imgur.com/path/to/page",
+    "domain": "imgur.com",
+    "category": "entertainment",
+    "risk_score": 0.6,
+    "label_id": 5
+  },
+  {
+    "url": "geeksforgeeks.org",
+    "domain": "geeksforgeeks.org",
+    "category": "educational",
+    "risk_score": 0.1,
+    "label_id": 1
+  },
+  {
+    "url": "moodle.org",
+    "domain": "moodle.org",
+    "category": "exam_platform",
+    "risk_score": 0.0,
+    "label_id": 0
+  },
+  {
+    "url": "https://brainly.in",
+    "domain": "brainly.in",
+    "category": "cheating",
+    "risk_score": 0.95,
+    "label_id": 7
+  },
+  {
+    "url": "https://www.coursehero.com/tutors/some-page",
+    "domain": "coursehero.com",
+    "category": "cheating",
+    "risk_score": 0.95,
+    "label_id": 7
+  },
+  {
+    "url": "quizlet.com",
+    "domain": "quizlet.com",
+    "category": "cheating",
+    "risk_score": 0.95,
+    "label_id": 7
+  },
+  {
+    "url": "https://www.codepen.io",
+    "domain": "codepen.io",
+    "category": "code_hosting",
+    "risk_score": 0.35,
+    "label_id": 3
+  },
+  {
+    "url": "perplexity.ai/search",
+    "domain": "perplexity.ai",
+    "category": "ai_tool",
+    "risk_score": 0.9,
+    "label_id": 6
+  },
+  {
+    "url": "https://google.com/path/to/page",
+    "domain": "google.com",
+    "category": "search_engine",
+    "risk_score": 0.15,
+    "label_id": 2
+  },
+  {
+    "url": "https://boredpanda.com",
+    "domain": "boredpanda.com",
+    "category": "entertainment",
+    "risk_score": 0.6,
+    "label_id": 5
+  },
+  {
+    "url": "https://www.writesonic.com/some-page",
+    "domain": "writesonic.com",
+    "category": "ai_tool",
+    "risk_score": 0.9,
+    "label_id": 6
+  },
+  {
+    "url": "numerade.com/ask",
+    "domain": "numerade.com",
+    "category": "cheating",
+    "risk_score": 0.95,
+    "label_id": 7
+  },
+  {
+    "url": "https://twitter.com",
+    "domain": "twitter.com",
+    "category": "entertainment",
+    "risk_score": 0.6,
+    "label_id": 5
+  },
+  {
+    "url": "https://bing.com",
+    "domain": "bing.com",
+    "category": "search_engine",
+    "risk_score": 0.15,
+    "label_id": 2
+  },
+  {
+    "url": "https://www.reddit.com/some-page",
+    "domain": "reddit.com",
+    "category": "entertainment",
+    "risk_score": 0.6,
+    "label_id": 5
+  },
+  {
+    "url": "https://gradescope.com/path/to/page",
+    "domain": "gradescope.com",
+    "category": "exam_platform",
+    "risk_score": 0.0,
+    "label_id": 0
+  },
+  {
+    "url": "www.twitch.tv",
+    "domain": "twitch.tv",
+    "category": "entertainment",
+    "risk_score": 0.6,
+    "label_id": 5
+  },
+  {
+    "url": "http://quora.com",
+    "domain": "quora.com",
+    "category": "social_media",
+    "risk_score": 0.45,
+    "label_id": 4
+  },
+  {
+    "url": "https://brave.com/search",
+    "domain": "brave.com",
+    "category": "search_engine",
+    "risk_score": 0.15,
+    "label_id": 2
+  },
+  {
+    "url": "http://together.ai",
+    "domain": "together.ai",
+    "category": "ai_tool",
+    "risk_score": 0.9,
+    "label_id": 6
+  },
+  {
+    "url": "https://quillbot.com/path/to/page",
+    "domain": "quillbot.com",
+    "category": "ai_tool",
+    "risk_score": 0.9,
+    "label_id": 6
+  },
+  {
+    "url": "https://www.docs.oracle.com",
+    "domain": "docs.oracle.com",
+    "category": "educational",
+    "risk_score": 0.1,
+    "label_id": 1
+  },
+  {
+    "url": "together.ai",
+    "domain": "together.ai",
+    "category": "ai_tool",
+    "risk_score": 0.9,
+    "label_id": 6
+  },
+  {
+    "url": "https://netflix.com",
+    "domain": "netflix.com",
+    "category": "entertainment",
+    "risk_score": 0.6,
+    "label_id": 5
+  },
+  {
+    "url": "https://docs.oracle.com",
+    "domain": "docs.oracle.com",
+    "category": "educational",
+    "risk_score": 0.1,
+    "label_id": 1
+  },
+  {
+    "url": "https://www.spotify.com",
+    "domain": "spotify.com",
+    "category": "entertainment",
+    "risk_score": 0.6,
+    "label_id": 5
+  },
+  {
+    "url": "www.ecosia.org",
+    "domain": "ecosia.org",
+    "category": "search_engine",
+    "risk_score": 0.15,
+    "label_id": 2
+  },
+  {
+    "url": "https://codesandbox.io",
+    "domain": "codesandbox.io",
+    "category": "code_hosting",
+    "risk_score": 0.35,
+    "label_id": 3
+  },
+  {
+    "url": "https://tome.app",
+    "domain": "tome.app",
+    "category": "ai_tool",
+    "risk_score": 0.9,
+    "label_id": 6
+  },
+  {
+    "url": "https://tumblr.com",
+    "domain": "tumblr.com",
+    "category": "entertainment",
+    "risk_score": 0.6,
+    "label_id": 5
+  },
+  {
+    "url": "https://www.mathsisfun.com/some-page",
+    "domain": "mathsisfun.com",
+    "category": "educational",
+    "risk_score": 0.1,
+    "label_id": 1
+  },
+  {
+    "url": "canvas.instructure.com",
+    "domain": "canvas.instructure.com",
+    "category": "exam_platform",
+    "risk_score": 0.0,
+    "label_id": 0
+  },
+  {
+    "url": "http://facebook.com",
+    "domain": "facebook.com",
+    "category": "entertainment",
+    "risk_score": 0.6,
+    "label_id": 5
+  },
+  {
+    "url": "roblox.com",
+    "domain": "roblox.com",
+    "category": "entertainment",
+    "risk_score": 0.6,
+    "label_id": 5
+  },
+  {
+    "url": "deepseek.com",
+    "domain": "deepseek.com",
+    "category": "ai_tool",
+    "risk_score": 0.9,
+    "label_id": 6
+  },
+  {
+    "url": "slack.com",
+    "domain": "slack.com",
+    "category": "social_media",
+    "risk_score": 0.45,
+    "label_id": 4
+  },
+  {
+    "url": "https://chat.mistral.ai",
+    "domain": "chat.mistral.ai",
+    "category": "ai_tool",
+    "risk_score": 0.9,
+    "label_id": 6
+  },
+  {
+    "url": "http://tiktok.com/foryou",
+    "domain": "tiktok.com",
+    "category": "entertainment",
+    "risk_score": 0.6,
+    "label_id": 5
+  },
+  {
+    "url": "https://www.scholar.google.com/some-page",
+    "domain": "scholar.google.com",
+    "category": "educational",
+    "risk_score": 0.1,
+    "label_id": 1
+  },
+  {
+    "url": "http://forms.google.com",
+    "domain": "forms.google.com",
+    "category": "exam_platform",
+    "risk_score": 0.0,
+    "label_id": 0
+  },
+  {
+    "url": "https://buzzfeed.com",
+    "domain": "buzzfeed.com",
+    "category": "entertainment",
+    "risk_score": 0.6,
+    "label_id": 5
+  },
+  {
+    "url": "http://netflix.com",
+    "domain": "netflix.com",
+    "category": "entertainment",
+    "risk_score": 0.6,
+    "label_id": 5
+  },
+  {
+    "url": "https://www.forms.google.com",
+    "domain": "forms.google.com",
+    "category": "exam_platform",
+    "risk_score": 0.0,
+    "label_id": 0
+  },
+  {
+    "url": "https://spotify.com",
+    "domain": "spotify.com",
+    "category": "entertainment",
+    "risk_score": 0.6,
+    "label_id": 5
+  },
+  {
+    "url": "https://blackboard.com",
+    "domain": "blackboard.com",
+    "category": "exam_platform",
+    "risk_score": 0.0,
+    "label_id": 0
+  },
+  {
+    "url": "https://groq.com/path/to/page",
+    "domain": "groq.com",
+    "category": "ai_tool",
+    "risk_score": 0.9,
+    "label_id": 6
+  },
+  {
+    "url": "http://facebook.com/groups",
+    "domain": "facebook.com",
+    "category": "social_media",
+    "risk_score": 0.45,
+    "label_id": 4
+  },
+  {
+    "url": "https://www.wolframalpha.com",
+    "domain": "wolframalpha.com",
+    "category": "ai_tool",
+    "risk_score": 0.9,
+    "label_id": 6
+  },
+  {
+    "url": "tome.app",
+    "domain": "tome.app",
+    "category": "ai_tool",
+    "risk_score": 0.9,
+    "label_id": 6
+  },
+  {
+    "url": "https://gradescope.com",
+    "domain": "gradescope.com",
+    "category": "exam_platform",
+    "risk_score": 0.0,
+    "label_id": 0
+  },
+  {
+    "url": "https://www.proctorio.com",
+    "domain": "proctorio.com",
+    "category": "exam_platform",
+    "risk_score": 0.0,
+    "label_id": 0
+  },
+  {
+    "url": "https://www.paperrater.com",
+    "domain": "paperrater.com",
+    "category": "cheating",
+    "risk_score": 0.95,
+    "label_id": 7
+  },
+  {
+    "url": "https://wolframalpha.com/path/to/page",
+    "domain": "wolframalpha.com",
+    "category": "ai_tool",
+    "risk_score": 0.9,
+    "label_id": 6
+  },
+  {
+    "url": "https://bitbucket.org",
+    "domain": "bitbucket.org",
+    "category": "code_hosting",
+    "risk_score": 0.35,
+    "label_id": 3
+  },
+  {
+    "url": "https://www.facebook.com/groups/some-page",
+    "domain": "facebook.com",
+    "category": "social_media",
+    "risk_score": 0.45,
+    "label_id": 4
+  },
+  {
+    "url": "https://www.grammarly.com/ai",
+    "domain": "grammarly.com",
+    "category": "ai_tool",
+    "risk_score": 0.9,
+    "label_id": 6
+  },
+  {
+    "url": "docs.python.org/3",
+    "domain": "docs.python.org",
+    "category": "educational",
+    "risk_score": 0.1,
+    "label_id": 1
+  },
+  {
+    "url": "https://groq.com",
+    "domain": "groq.com",
+    "category": "ai_tool",
+    "risk_score": 0.9,
+    "label_id": 6
+  },
+  {
+    "url": "https://forms.google.com",
+    "domain": "forms.google.com",
+    "category": "exam_platform",
+    "risk_score": 0.0,
+    "label_id": 0
+  },
+  {
+    "url": "https://bing.com/search/path/to/page",
+    "domain": "bing.com",
+    "category": "search_engine",
+    "risk_score": 0.15,
+    "label_id": 2
+  },
+  {
+    "url": "wolframalpha.com",
+    "domain": "wolframalpha.com",
+    "category": "ai_tool",
+    "risk_score": 0.9,
+    "label_id": 6
+  },
+  {
+    "url": "docs.oracle.com",
+    "domain": "docs.oracle.com",
+    "category": "educational",
+    "risk_score": 0.1,
+    "label_id": 1
+  },
+  {
+    "url": "replicate.com",
+    "domain": "replicate.com",
+    "category": "ai_tool",
+    "risk_score": 0.9,
+    "label_id": 6
+  },
+  {
+    "url": "https://litanswers.org/path/to/page",
+    "domain": "litanswers.org",
+    "category": "cheating",
+    "risk_score": 0.95,
+    "label_id": 7
+  },
+  {
+    "url": "www.socratic.org",
+    "domain": "socratic.org",
+    "category": "cheating",
+    "risk_score": 0.95,
+    "label_id": 7
+  },
+  {
+    "url": "https://quizlet.com",
+    "domain": "quizlet.com",
+    "category": "cheating",
+    "risk_score": 0.95,
+    "label_id": 7
+  },
+  {
+    "url": "www.arxiv.org",
+    "domain": "arxiv.org",
+    "category": "educational",
+    "risk_score": 0.1,
+    "label_id": 1
+  },
+  {
+    "url": "http://udemy.com",
+    "domain": "udemy.com",
+    "category": "educational",
+    "risk_score": 0.1,
+    "label_id": 1
+  },
+  {
+    "url": "http://litanswers.org",
+    "domain": "litanswers.org",
+    "category": "cheating",
+    "risk_score": 0.95,
+    "label_id": 7
+  },
+  {
+    "url": "https://www.essaybot.com/some-page",
+    "domain": "essaybot.com",
+    "category": "cheating",
+    "risk_score": 0.95,
+    "label_id": 7
+  },
+  {
+    "url": "socratic.org",
+    "domain": "socratic.org",
+    "category": "cheating",
+    "risk_score": 0.95,
+    "label_id": 7
+  },
+  {
+    "url": "http://web.telegram.org",
+    "domain": "web.telegram.org",
+    "category": "social_media",
+    "risk_score": 0.45,
+    "label_id": 4
+  },
+  {
+    "url": "https://examsoft.com",
+    "domain": "examsoft.com",
+    "category": "exam_platform",
+    "risk_score": 0.0,
+    "label_id": 0
+  },
+  {
+    "url": "https://slader.com",
+    "domain": "slader.com",
+    "category": "cheating",
+    "risk_score": 0.95,
+    "label_id": 7
+  },
+  {
+    "url": "https://www.mathway.com",
+    "domain": "mathway.com",
+    "category": "ai_tool",
+    "risk_score": 0.9,
+    "label_id": 6
+  },
+  {
+    "url": "blackboard.com",
+    "domain": "blackboard.com",
+    "category": "exam_platform",
+    "risk_score": 0.0,
+    "label_id": 0
+  },
+  {
+    "url": "https://www.bing.com/chat/some-page",
+    "domain": "bing.com",
+    "category": "ai_tool",
+    "risk_score": 0.9,
+    "label_id": 6
+  },
+  {
+    "url": "learn.microsoft.com",
+    "domain": "learn.microsoft.com",
+    "category": "educational",
+    "risk_score": 0.1,
+    "label_id": 1
+  },
+  {
+    "url": "https://proctorio.com",
+    "domain": "proctorio.com",
+    "category": "exam_platform",
+    "risk_score": 0.0,
+    "label_id": 0
+  },
+  {
+    "url": "chegg.com/homework-help",
+    "domain": "chegg.com",
+    "category": "cheating",
+    "risk_score": 0.95,
+    "label_id": 7
+  },
+  {
+    "url": "https://github.com/search",
+    "domain": "github.com",
+    "category": "code_hosting",
+    "risk_score": 0.35,
+    "label_id": 3
+  },
+  {
+    "url": "https://proctoru.com/path/to/page",
+    "domain": "proctoru.com",
+    "category": "exam_platform",
+    "risk_score": 0.0,
+    "label_id": 0
+  },
+  {
+    "url": "https://coursehero.com/tutors",
+    "domain": "coursehero.com",
+    "category": "cheating",
+    "risk_score": 0.95,
+    "label_id": 7
+  },
+  {
+    "url": "chat.openai.com",
+    "domain": "chat.openai.com",
+    "category": "ai_tool",
+    "risk_score": 0.9,
+    "label_id": 6
+  },
+  {
+    "url": "https://www.linkedin.com/messaging/some-page",
+    "domain": "linkedin.com",
+    "category": "social_media",
+    "risk_score": 0.45,
+    "label_id": 4
+  },
+  {
+    "url": "disneyplus.com",
+    "domain": "disneyplus.com",
+    "category": "entertainment",
+    "risk_score": 0.6,
+    "label_id": 5
+  },
+  {
+    "url": "https://exam.google.com",
+    "domain": "exam.google.com",
+    "category": "exam_platform",
+    "risk_score": 0.0,
+    "label_id": 0
+  },
+  {
+    "url": "https://sparknotes.com",
+    "domain": "sparknotes.com",
+    "category": "cheating",
+    "risk_score": 0.95,
+    "label_id": 7
+  },
+  {
+    "url": "https://brainly.com",
+    "domain": "brainly.com",
+    "category": "cheating",
+    "risk_score": 0.95,
+    "label_id": 7
+  },
+  {
+    "url": "https://instagram.com",
+    "domain": "instagram.com",
+    "category": "entertainment",
+    "risk_score": 0.6,
+    "label_id": 5
+  },
+  {
+    "url": "https://canvas.instructure.com",
+    "domain": "canvas.instructure.com",
+    "category": "exam_platform",
+    "risk_score": 0.0,
+    "label_id": 0
+  },
+  {
+    "url": "https://snapchat.com/path/to/page",
+    "domain": "snapchat.com",
+    "category": "entertainment",
+    "risk_score": 0.6,
+    "label_id": 5
+  },
+  {
+    "url": "https://www.teams.microsoft.com",
+    "domain": "teams.microsoft.com",
+    "category": "social_media",
+    "risk_score": 0.45,
+    "label_id": 4
+  },
+  {
+    "url": "https://yahoo.com/path/to/page",
+    "domain": "yahoo.com",
+    "category": "search_engine",
+    "risk_score": 0.15,
+    "label_id": 2
+  },
+  {
+    "url": "http://quizlet.com/flashcards",
+    "domain": "quizlet.com",
+    "category": "cheating",
+    "risk_score": 0.95,
+    "label_id": 7
+  },
+  {
+    "url": "stackblitz.com",
+    "domain": "stackblitz.com",
+    "category": "code_hosting",
+    "risk_score": 0.35,
+    "label_id": 3
+  },
+  {
+    "url": "https://9gag.com",
+    "domain": "9gag.com",
+    "category": "entertainment",
+    "risk_score": 0.6,
+    "label_id": 5
+  },
+  {
+    "url": "https://numerade.com/ask",
+    "domain": "numerade.com",
+    "category": "cheating",
+    "risk_score": 0.95,
+    "label_id": 7
+  },
+  {
+    "url": "https://deepseek.com/path/to/page",
+    "domain": "deepseek.com",
+    "category": "ai_tool",
+    "risk_score": 0.9,
+    "label_id": 6
+  },
+  {
+    "url": "coursehero.com",
+    "domain": "coursehero.com",
+    "category": "cheating",
+    "risk_score": 0.95,
+    "label_id": 7
+  },
+  {
+    "url": "www.essaybot.com",
+    "domain": "essaybot.com",
+    "category": "cheating",
+    "risk_score": 0.95,
+    "label_id": 7
+  },
+  {
+    "url": "https://www.arxiv.org/some-page",
+    "domain": "arxiv.org",
+    "category": "educational",
+    "risk_score": 0.1,
+    "label_id": 1
+  },
+  {
+    "url": "https://sparknotes.com/path/to/page",
+    "domain": "sparknotes.com",
+    "category": "cheating",
+    "risk_score": 0.95,
+    "label_id": 7
+  },
+  {
+    "url": "examsoft.com",
+    "domain": "examsoft.com",
+    "category": "exam_platform",
+    "risk_score": 0.0,
+    "label_id": 0
+  },
+  {
+    "url": "http://blackboard.com",
+    "domain": "blackboard.com",
+    "category": "exam_platform",
+    "risk_score": 0.0,
+    "label_id": 0
+  },
+  {
+    "url": "https://linkedin.com/messaging/path/to/page",
+    "domain": "linkedin.com",
+    "category": "social_media",
+    "risk_score": 0.45,
+    "label_id": 4
+  },
+  {
+    "url": "https://www.stanford.edu",
+    "domain": "stanford.edu",
+    "category": "educational",
+    "risk_score": 0.1,
+    "label_id": 1
+  },
+  {
+    "url": "https://gamma.app",
+    "domain": "gamma.app",
+    "category": "ai_tool",
+    "risk_score": 0.9,
+    "label_id": 6
+  },
+  {
+    "url": "https://tiktok.com",
+    "domain": "tiktok.com",
+    "category": "entertainment",
+    "risk_score": 0.6,
+    "label_id": 5
+  },
+  {
+    "url": "chat.mistral.ai",
+    "domain": "chat.mistral.ai",
+    "category": "ai_tool",
+    "risk_score": 0.9,
+    "label_id": 6
+  },
+  {
+    "url": "www.assignmentexpert.com",
+    "domain": "assignmentexpert.com",
+    "category": "cheating",
+    "risk_score": 0.95,
+    "label_id": 7
+  },
+  {
+    "url": "https://www.pastebin.com",
+    "domain": "pastebin.com",
+    "category": "code_hosting",
+    "risk_score": 0.35,
+    "label_id": 3
+  },
+  {
+    "url": "https://brave.com/search/path/to/page",
+    "domain": "brave.com",
+    "category": "search_engine",
+    "risk_score": 0.15,
+    "label_id": 2
+  },
+  {
+    "url": "bard.google.com",
+    "domain": "bard.google.com",
+    "category": "ai_tool",
+    "risk_score": 0.9,
+    "label_id": 6
+  },
+  {
+    "url": "https://www.replit.com",
+    "domain": "replit.com",
+    "category": "code_hosting",
+    "risk_score": 0.35,
+    "label_id": 3
+  },
+  {
+    "url": "https://jasper.ai",
+    "domain": "jasper.ai",
+    "category": "ai_tool",
+    "risk_score": 0.9,
+    "label_id": 6
+  },
+  {
+    "url": "www.tome.app",
+    "domain": "tome.app",
+    "category": "ai_tool",
+    "risk_score": 0.9,
+    "label_id": 6
+  },
+  {
+    "url": "https://w3schools.com",
+    "domain": "w3schools.com",
+    "category": "educational",
+    "risk_score": 0.1,
+    "label_id": 1
+  },
+  {
+    "url": "https://youtube.com",
+    "domain": "youtube.com",
+    "category": "entertainment",
+    "risk_score": 0.6,
+    "label_id": 5
+  },
+  {
+    "url": "http://teams.microsoft.com",
+    "domain": "teams.microsoft.com",
+    "category": "social_media",
+    "risk_score": 0.45,
+    "label_id": 4
+  },
+  {
+    "url": "https://bing.com/search",
+    "domain": "bing.com",
+    "category": "search_engine",
+    "risk_score": 0.15,
+    "label_id": 2
+  },
+  {
+    "url": "https://aistudio.google.com",
+    "domain": "aistudio.google.com",
+    "category": "ai_tool",
+    "risk_score": 0.9,
+    "label_id": 6
+  },
+  {
+    "url": "https://www.wyzant.com/some-page",
+    "domain": "wyzant.com",
+    "category": "cheating",
+    "risk_score": 0.95,
+    "label_id": 7
+  },
+  {
+    "url": "https://www.soundcloud.com",
+    "domain": "soundcloud.com",
+    "category": "entertainment",
+    "risk_score": 0.6,
+    "label_id": 5
+  },
+  {
+    "url": "https://epicgames.com/path/to/page",
+    "domain": "epicgames.com",
+    "category": "entertainment",
+    "risk_score": 0.6,
+    "label_id": 5
+  },
+  {
+    "url": "https://aistudio.google.com",
+    "domain": "aistudio.google.com",
+    "category": "ai_tool",
+    "risk_score": 0.9,
+    "label_id": 6
+  },
+  {
+    "url": "https://instagram.com/path/to/page",
+    "domain": "instagram.com",
+    "category": "entertainment",
+    "risk_score": 0.6,
+    "label_id": 5
+  },
+  {
+    "url": "https://geeksforgeeks.org",
+    "domain": "geeksforgeeks.org",
+    "category": "educational",
+    "risk_score": 0.1,
+    "label_id": 1
+  },
+  {
+    "url": "https://docs.python.org/path/to/page",
+    "domain": "docs.python.org",
+    "category": "educational",
+    "risk_score": 0.1,
+    "label_id": 1
+  },
+  {
+    "url": "https://www.wa.me/some-page",
+    "domain": "wa.me",
+    "category": "social_media",
+    "risk_score": 0.45,
+    "label_id": 4
+  },
+  {
+    "url": "https://crunchyroll.com/path/to/page",
+    "domain": "crunchyroll.com",
+    "category": "entertainment",
+    "risk_score": 0.6,
+    "label_id": 5
+  },
+  {
+    "url": "http://buzzfeed.com",
+    "domain": "buzzfeed.com",
+    "category": "entertainment",
+    "risk_score": 0.6,
+    "label_id": 5
+  },
+  {
+    "url": "https://codepen.io",
+    "domain": "codepen.io",
+    "category": "code_hosting",
+    "risk_score": 0.35,
+    "label_id": 3
+  },
+  {
+    "url": "https://sparknotes.com",
+    "domain": "sparknotes.com",
+    "category": "cheating",
+    "risk_score": 0.95,
+    "label_id": 7
+  },
+  {
+    "url": "https://www.gemini.google.com/some-page",
+    "domain": "gemini.google.com",
+    "category": "ai_tool",
+    "risk_score": 0.9,
+    "label_id": 6
+  },
+  {
+    "url": "labs.google.com/ai",
+    "domain": "labs.google.com",
+    "category": "ai_tool",
+    "risk_score": 0.9,
+    "label_id": 6
+  },
+  {
+    "url": "https://www.purplemath.com",
+    "domain": "purplemath.com",
+    "category": "educational",
+    "risk_score": 0.1,
+    "label_id": 1
+  },
+  {
+    "url": "https://reddit.com/r/popular",
+    "domain": "reddit.com",
+    "category": "entertainment",
+    "risk_score": 0.6,
+    "label_id": 5
+  },
+  {
+    "url": "www.bartleby.com",
+    "domain": "bartleby.com",
+    "category": "cheating",
+    "risk_score": 0.95,
+    "label_id": 7
+  },
+  {
+    "url": "https://www.cohere.com/chat",
+    "domain": "cohere.com",
+    "category": "ai_tool",
+    "risk_score": 0.9,
+    "label_id": 6
+  },
+  {
+    "url": "http://youtube.com/watch",
+    "domain": "youtube.com",
+    "category": "entertainment",
+    "risk_score": 0.6,
+    "label_id": 5
+  },
+  {
+    "url": "https://learn.microsoft.com/path/to/page",
+    "domain": "learn.microsoft.com",
+    "category": "educational",
+    "risk_score": 0.1,
+    "label_id": 1
+  },
+  {
+    "url": "www.chatgpt.com",
+    "domain": "chatgpt.com",
+    "category": "ai_tool",
+    "risk_score": 0.9,
+    "label_id": 6
+  },
+  {
+    "url": "epicgames.com",
+    "domain": "epicgames.com",
+    "category": "entertainment",
+    "risk_score": 0.6,
+    "label_id": 5
+  },
+  {
+    "url": "http://boredpanda.com",
+    "domain": "boredpanda.com",
+    "category": "entertainment",
+    "risk_score": 0.6,
+    "label_id": 5
+  },
+  {
+    "url": "http://paperrater.com",
+    "domain": "paperrater.com",
+    "category": "cheating",
+    "risk_score": 0.95,
+    "label_id": 7
+  },
+  {
+    "url": "https://www.deepseek.com/chat/some-page",
+    "domain": "deepseek.com",
+    "category": "ai_tool",
+    "risk_score": 0.9,
+    "label_id": 6
+  },
+  {
+    "url": "http://coursehero.com/tutors",
+    "domain": "coursehero.com",
+    "category": "cheating",
+    "risk_score": 0.95,
+    "label_id": 7
+  },
+  {
+    "url": "https://anthropic.com/path/to/page",
+    "domain": "anthropic.com",
+    "category": "ai_tool",
+    "risk_score": 0.9,
+    "label_id": 6
+  },
+  {
+    "url": "https://www.proctorio.com/some-page",
+    "domain": "proctorio.com",
+    "category": "exam_platform",
+    "risk_score": 0.0,
+    "label_id": 0
+  },
+  {
+    "url": "https://www.essaytyper.com",
+    "domain": "essaytyper.com",
+    "category": "cheating",
+    "risk_score": 0.95,
+    "label_id": 7
+  },
+  {
+    "url": "https://www.bartleby.com/solution-answer/some-page",
+    "domain": "bartleby.com",
+    "category": "cheating",
+    "risk_score": 0.95,
+    "label_id": 7
+  },
+  {
+    "url": "https://www.google.com/search/some-page",
+    "domain": "google.com",
+    "category": "search_engine",
+    "risk_score": 0.15,
+    "label_id": 2
+  },
+  {
+    "url": "https://tiktok.com",
+    "domain": "tiktok.com",
+    "category": "entertainment",
+    "risk_score": 0.6,
+    "label_id": 5
+  },
+  {
+    "url": "http://music.youtube.com",
+    "domain": "music.youtube.com",
+    "category": "entertainment",
+    "risk_score": 0.6,
+    "label_id": 5
+  },
+  {
+    "url": "https://duckduckgo.com",
+    "domain": "duckduckgo.com",
+    "category": "search_engine",
+    "risk_score": 0.15,
+    "label_id": 2
+  },
+  {
+    "url": "www.buzzfeed.com",
+    "domain": "buzzfeed.com",
+    "category": "entertainment",
+    "risk_score": 0.6,
+    "label_id": 5
+  },
+  {
+    "url": "http://messenger.com",
+    "domain": "messenger.com",
+    "category": "social_media",
+    "risk_score": 0.45,
+    "label_id": 4
+  },
+  {
+    "url": "https://you.com",
+    "domain": "you.com",
+    "category": "ai_tool",
+    "risk_score": 0.9,
+    "label_id": 6
+  },
+  {
+    "url": "https://www.bard.google.com/some-page",
+    "domain": "bard.google.com",
+    "category": "ai_tool",
+    "risk_score": 0.9,
+    "label_id": 6
+  },
+  {
+    "url": "https://www.signal.org/some-page",
+    "domain": "signal.org",
+    "category": "social_media",
+    "risk_score": 0.45,
+    "label_id": 4
+  },
+  {
+    "url": "https://www.twitch.tv",
+    "domain": "twitch.tv",
+    "category": "entertainment",
+    "risk_score": 0.6,
+    "label_id": 5
+  },
+  {
+    "url": "www.enotes.com",
+    "domain": "enotes.com",
+    "category": "cheating",
+    "risk_score": 0.95,
+    "label_id": 7
+  },
+  {
+    "url": "http://mathsisfun.com",
+    "domain": "mathsisfun.com",
+    "category": "educational",
+    "risk_score": 0.1,
+    "label_id": 1
+  },
+  {
+    "url": "https://wyzant.com",
+    "domain": "wyzant.com",
+    "category": "cheating",
+    "risk_score": 0.95,
+    "label_id": 7
+  },
+  {
+    "url": "www.reddit.com",
+    "domain": "reddit.com",
+    "category": "entertainment",
+    "risk_score": 0.6,
+    "label_id": 5
+  },
+  {
+    "url": "https://netflix.com/path/to/page",
+    "domain": "netflix.com",
+    "category": "entertainment",
+    "risk_score": 0.6,
+    "label_id": 5
+  },
+  {
+    "url": "http://perplexity.ai",
+    "domain": "perplexity.ai",
+    "category": "ai_tool",
+    "risk_score": 0.9,
+    "label_id": 6
+  },
+  {
+    "url": "essaytyper.com",
+    "domain": "essaytyper.com",
+    "category": "cheating",
+    "risk_score": 0.95,
+    "label_id": 7
+  },
+  {
+    "url": "https://assignmentexpert.com/path/to/page",
+    "domain": "assignmentexpert.com",
+    "category": "cheating",
+    "risk_score": 0.95,
+    "label_id": 7
+  },
+  {
+    "url": "https://www.slader.com/some-page",
+    "domain": "slader.com",
+    "category": "cheating",
+    "risk_score": 0.95,
+    "label_id": 7
+  },
+  {
+    "url": "https://youtube.com/watch",
+    "domain": "youtube.com",
+    "category": "entertainment",
+    "risk_score": 0.6,
+    "label_id": 5
+  },
+  {
+    "url": "https://twitch.tv",
+    "domain": "twitch.tv",
+    "category": "entertainment",
+    "risk_score": 0.6,
+    "label_id": 5
+  },
+  {
+    "url": "https://assignmentexpert.com",
+    "domain": "assignmentexpert.com",
+    "category": "cheating",
+    "risk_score": 0.95,
+    "label_id": 7
+  },
+  {
+    "url": "http://brave.com/search",
+    "domain": "brave.com",
+    "category": "search_engine",
+    "risk_score": 0.15,
+    "label_id": 2
+  },
+  {
+    "url": "https://numerade.com",
+    "domain": "numerade.com",
+    "category": "cheating",
+    "risk_score": 0.95,
+    "label_id": 7
+  },
+  {
+    "url": "https://reddit.com",
+    "domain": "reddit.com",
+    "category": "entertainment",
+    "risk_score": 0.6,
+    "label_id": 5
+  },
+  {
+    "url": "https://quora.com",
+    "domain": "quora.com",
+    "category": "social_media",
+    "risk_score": 0.45,
+    "label_id": 4
+  },
+  {
+    "url": "reddit.com/r/popular",
+    "domain": "reddit.com",
+    "category": "entertainment",
+    "risk_score": 0.6,
+    "label_id": 5
+  },
+  {
+    "url": "photomath.com",
+    "domain": "photomath.com",
+    "category": "ai_tool",
+    "risk_score": 0.9,
+    "label_id": 6
+  },
+  {
+    "url": "https://telegram.org",
+    "domain": "telegram.org",
+    "category": "social_media",
+    "risk_score": 0.45,
+    "label_id": 4
+  },
+  {
+    "url": "https://www.messenger.com",
+    "domain": "messenger.com",
+    "category": "social_media",
+    "risk_score": 0.45,
+    "label_id": 4
+  },
+  {
+    "url": "https://chatgpt.com",
+    "domain": "chatgpt.com",
+    "category": "ai_tool",
+    "risk_score": 0.9,
+    "label_id": 6
+  },
+  {
+    "url": "https://homeworklib.com",
+    "domain": "homeworklib.com",
+    "category": "cheating",
+    "risk_score": 0.95,
+    "label_id": 7
+  },
+  {
+    "url": "https://signal.org",
+    "domain": "signal.org",
+    "category": "social_media",
+    "risk_score": 0.45,
+    "label_id": 4
+  },
+  {
+    "url": "https://enotes.com",
+    "domain": "enotes.com",
+    "category": "cheating",
+    "risk_score": 0.95,
+    "label_id": 7
+  },
+  {
+    "url": "http://character.ai",
+    "domain": "character.ai",
+    "category": "ai_tool",
+    "risk_score": 0.9,
+    "label_id": 6
+  },
+  {
+    "url": "https://www.symbolab.com/some-page",
+    "domain": "symbolab.com",
+    "category": "ai_tool",
+    "risk_score": 0.9,
+    "label_id": 6
+  },
+  {
+    "url": "www.youtube.com",
+    "domain": "youtube.com",
+    "category": "entertainment",
+    "risk_score": 0.6,
+    "label_id": 5
+  },
+  {
+    "url": "https://tumblr.com",
+    "domain": "tumblr.com",
+    "category": "entertainment",
+    "risk_score": 0.6,
+    "label_id": 5
+  },
+  {
+    "url": "https://forms.google.com/path/to/page",
+    "domain": "forms.google.com",
+    "category": "exam_platform",
+    "risk_score": 0.0,
+    "label_id": 0
+  },
+  {
+    "url": "https://www.facebook.com",
+    "domain": "facebook.com",
+    "category": "entertainment",
+    "risk_score": 0.6,
+    "label_id": 5
+  },
+  {
+    "url": "https://www.deepseek.com/chat",
+    "domain": "deepseek.com",
+    "category": "ai_tool",
+    "risk_score": 0.9,
+    "label_id": 6
+  },
+  {
+    "url": "https://symbolab.com",
+    "domain": "symbolab.com",
+    "category": "ai_tool",
+    "risk_score": 0.9,
+    "label_id": 6
+  },
+  {
+    "url": "https://www.bing.com",
+    "domain": "bing.com",
+    "category": "search_engine",
+    "risk_score": 0.15,
+    "label_id": 2
+  },
+  {
+    "url": "https://disneyplus.com",
+    "domain": "disneyplus.com",
+    "category": "entertainment",
+    "risk_score": 0.6,
+    "label_id": 5
+  },
+  {
+    "url": "https://www.google.com/some-page",
+    "domain": "google.com",
+    "category": "search_engine",
+    "risk_score": 0.15,
+    "label_id": 2
+  },
+  {
+    "url": "https://developer.mozilla.org/path/to/page",
+    "domain": "developer.mozilla.org",
+    "category": "educational",
+    "risk_score": 0.1,
+    "label_id": 1
+  },
+  {
+    "url": "https://www.spotify.com/some-page",
+    "domain": "spotify.com",
+    "category": "entertainment",
+    "risk_score": 0.6,
+    "label_id": 5
+  },
+  {
+    "url": "https://snapchat.com",
+    "domain": "snapchat.com",
+    "category": "entertainment",
+    "risk_score": 0.6,
+    "label_id": 5
+  },
+  {
+    "url": "https://docs.python.org",
+    "domain": "docs.python.org",
+    "category": "educational",
+    "risk_score": 0.1,
+    "label_id": 1
+  },
+  {
+    "url": "https://copilot.microsoft.com",
+    "domain": "copilot.microsoft.com",
+    "category": "ai_tool",
+    "risk_score": 0.9,
+    "label_id": 6
+  },
+  {
+    "url": "http://gamma.app",
+    "domain": "gamma.app",
+    "category": "ai_tool",
+    "risk_score": 0.9,
+    "label_id": 6
+  },
+  {
+    "url": "mathsisfun.com",
+    "domain": "mathsisfun.com",
+    "category": "educational",
+    "risk_score": 0.1,
+    "label_id": 1
+  },
+  {
+    "url": "https://www.reddit.com/r/popular",
+    "domain": "reddit.com",
+    "category": "entertainment",
+    "risk_score": 0.6,
+    "label_id": 5
+  },
+  {
+    "url": "https://www.turnitin.com/some-page",
+    "domain": "turnitin.com",
+    "category": "exam_platform",
+    "risk_score": 0.0,
+    "label_id": 0
+  },
+  {
+    "url": "http://primevideo.com",
+    "domain": "primevideo.com",
+    "category": "entertainment",
+    "risk_score": 0.6,
+    "label_id": 5
+  },
+  {
+    "url": "https://spotify.com",
+    "domain": "spotify.com",
+    "category": "entertainment",
+    "risk_score": 0.6,
+    "label_id": 5
+  },
+  {
+    "url": "https://hastebin.com",
+    "domain": "hastebin.com",
+    "category": "code_hosting",
+    "risk_score": 0.35,
+    "label_id": 3
+  },
+  {
+    "url": "https://perplexity.ai/search",
+    "domain": "perplexity.ai",
+    "category": "ai_tool",
+    "risk_score": 0.9,
+    "label_id": 6
+  },
+  {
+    "url": "studocu.com",
+    "domain": "studocu.com",
+    "category": "cheating",
+    "risk_score": 0.95,
+    "label_id": 7
+  },
+  {
+    "url": "https://stackblitz.com",
+    "domain": "stackblitz.com",
+    "category": "code_hosting",
+    "risk_score": 0.35,
+    "label_id": 3
+  },
+  {
+    "url": "https://www.khanacademy.org/some-page",
+    "domain": "khanacademy.org",
+    "category": "educational",
+    "risk_score": 0.1,
+    "label_id": 1
+  },
+  {
+    "url": "https://www.copilot.microsoft.com",
+    "domain": "copilot.microsoft.com",
+    "category": "ai_tool",
+    "risk_score": 0.9,
+    "label_id": 6
+  },
+  {
+    "url": "https://epicgames.com",
+    "domain": "epicgames.com",
+    "category": "entertainment",
+    "risk_score": 0.6,
+    "label_id": 5
+  },
+  {
+    "url": "https://researchgate.net",
+    "domain": "researchgate.net",
+    "category": "educational",
+    "risk_score": 0.1,
+    "label_id": 1
+  },
+  {
+    "url": "http://gradescope.com",
+    "domain": "gradescope.com",
+    "category": "exam_platform",
+    "risk_score": 0.0,
+    "label_id": 0
+  },
+  {
+    "url": "www.quizlet.com",
+    "domain": "quizlet.com",
+    "category": "cheating",
+    "risk_score": 0.95,
+    "label_id": 7
+  },
+  {
+    "url": "https://stanford.edu",
+    "domain": "stanford.edu",
+    "category": "educational",
+    "risk_score": 0.1,
+    "label_id": 1
+  },
+  {
+    "url": "https://twitch.tv/directory",
+    "domain": "twitch.tv",
+    "category": "entertainment",
+    "risk_score": 0.6,
+    "label_id": 5
+  },
+  {
+    "url": "www.cohere.com",
+    "domain": "cohere.com",
+    "category": "ai_tool",
+    "risk_score": 0.9,
+    "label_id": 6
+  },
+  {
+    "url": "symbolab.com",
+    "domain": "symbolab.com",
+    "category": "ai_tool",
+    "risk_score": 0.9,
+    "label_id": 6
+  },
+  {
+    "url": "https://www.learn.microsoft.com/some-page",
+    "domain": "learn.microsoft.com",
+    "category": "educational",
+    "risk_score": 0.1,
+    "label_id": 1
+  },
+  {
+    "url": "www.codesandbox.io",
+    "domain": "codesandbox.io",
+    "category": "code_hosting",
+    "risk_score": 0.35,
+    "label_id": 3
+  },
+  {
+    "url": "https://hulu.com",
+    "domain": "hulu.com",
+    "category": "entertainment",
+    "risk_score": 0.6,
+    "label_id": 5
+  },
+  {
+    "url": "https://www.homeworklib.com/some-page",
+    "domain": "homeworklib.com",
+    "category": "cheating",
+    "risk_score": 0.95,
+    "label_id": 7
+  },
+  {
+    "url": "https://www.9gag.com/some-page",
+    "domain": "9gag.com",
+    "category": "entertainment",
+    "risk_score": 0.6,
+    "label_id": 5
+  },
+  {
+    "url": "https://ecosia.org",
+    "domain": "ecosia.org",
+    "category": "search_engine",
+    "risk_score": 0.15,
+    "label_id": 2
+  },
+  {
+    "url": "www.slack.com",
+    "domain": "slack.com",
+    "category": "social_media",
+    "risk_score": 0.45,
+    "label_id": 4
+  },
+  {
+    "url": "https://soundcloud.com",
+    "domain": "soundcloud.com",
+    "category": "entertainment",
+    "risk_score": 0.6,
+    "label_id": 5
+  },
+  {
+    "url": "https://classroom.google.com",
+    "domain": "classroom.google.com",
+    "category": "exam_platform",
+    "risk_score": 0.0,
+    "label_id": 0
+  },
+  {
+    "url": "https://replicate.com",
+    "domain": "replicate.com",
+    "category": "ai_tool",
+    "risk_score": 0.9,
+    "label_id": 6
+  },
+  {
+    "url": "signal.org",
+    "domain": "signal.org",
+    "category": "social_media",
+    "risk_score": 0.45,
+    "label_id": 4
+  },
+  {
+    "url": "http://mit.edu",
+    "domain": "mit.edu",
+    "category": "educational",
+    "risk_score": 0.1,
+    "label_id": 1
+  },
+  {
+    "url": "https://assignmentexpert.com",
+    "domain": "assignmentexpert.com",
+    "category": "cheating",
+    "risk_score": 0.95,
+    "label_id": 7
+  },
+  {
+    "url": "https://cohere.com",
+    "domain": "cohere.com",
+    "category": "ai_tool",
+    "risk_score": 0.9,
+    "label_id": 6
+  },
+  {
+    "url": "www.roblox.com",
+    "domain": "roblox.com",
+    "category": "entertainment",
+    "risk_score": 0.6,
+    "label_id": 5
+  },
+  {
+    "url": "www.developer.mozilla.org",
+    "domain": "developer.mozilla.org",
+    "category": "educational",
+    "risk_score": 0.1,
+    "label_id": 1
+  },
+  {
+    "url": "https://www.instagram.com/reels/some-page",
+    "domain": "instagram.com",
+    "category": "entertainment",
+    "risk_score": 0.6,
+    "label_id": 5
+  },
+  {
+    "url": "google.com/search",
+    "domain": "google.com",
+    "category": "search_engine",
+    "risk_score": 0.15,
+    "label_id": 2
+  },
+  {
+    "url": "www.edx.org",
+    "domain": "edx.org",
+    "category": "educational",
+    "risk_score": 0.1,
+    "label_id": 1
+  },
+  {
+    "url": "www.chat.openai.com",
+    "domain": "chat.openai.com",
+    "category": "ai_tool",
+    "risk_score": 0.9,
+    "label_id": 6
+  },
+  {
+    "url": "https://www.brainly.com/some-page",
+    "domain": "brainly.com",
+    "category": "cheating",
+    "risk_score": 0.95,
+    "label_id": 7
+  },
+  {
+    "url": "https://www.ecosia.org/some-page",
+    "domain": "ecosia.org",
+    "category": "search_engine",
+    "risk_score": 0.15,
+    "label_id": 2
+  },
+  {
+    "url": "www.wa.me",
+    "domain": "wa.me",
+    "category": "social_media",
+    "risk_score": 0.45,
+    "label_id": 4
+  },
+  {
+    "url": "https://openai.com",
+    "domain": "openai.com",
+    "category": "ai_tool",
+    "risk_score": 0.9,
+    "label_id": 6
+  },
+  {
+    "url": "https://wolframalpha.com",
+    "domain": "wolframalpha.com",
+    "category": "ai_tool",
+    "risk_score": 0.9,
+    "label_id": 6
+  },
+  {
+    "url": "www.soundcloud.com",
+    "domain": "soundcloud.com",
+    "category": "entertainment",
+    "risk_score": 0.6,
+    "label_id": 5
+  },
+  {
+    "url": "http://tiktok.com",
+    "domain": "tiktok.com",
+    "category": "entertainment",
+    "risk_score": 0.6,
+    "label_id": 5
+  },
+  {
+    "url": "https://imgur.com",
+    "domain": "imgur.com",
+    "category": "entertainment",
+    "risk_score": 0.6,
+    "label_id": 5
+  },
+  {
+    "url": "https://www.kick.com",
+    "domain": "kick.com",
+    "category": "entertainment",
+    "risk_score": 0.6,
+    "label_id": 5
+  },
+  {
+    "url": "www.paperrater.com",
+    "domain": "paperrater.com",
+    "category": "cheating",
+    "risk_score": 0.95,
+    "label_id": 7
+  },
+  {
+    "url": "https://www.slack.com",
+    "domain": "slack.com",
+    "category": "social_media",
+    "risk_score": 0.45,
+    "label_id": 4
+  },
+  {
+    "url": "https://chegg.com/path/to/page",
+    "domain": "chegg.com",
+    "category": "cheating",
+    "risk_score": 0.95,
+    "label_id": 7
+  },
+  {
+    "url": "https://web.whatsapp.com",
+    "domain": "web.whatsapp.com",
+    "category": "social_media",
+    "risk_score": 0.45,
+    "label_id": 4
+  },
+  {
+    "url": "www.crunchyroll.com",
+    "domain": "crunchyroll.com",
+    "category": "entertainment",
+    "risk_score": 0.6,
+    "label_id": 5
+  },
+  {
+    "url": "https://turnitin.com/path/to/page",
+    "domain": "turnitin.com",
+    "category": "exam_platform",
+    "risk_score": 0.0,
+    "label_id": 0
+  },
+  {
+    "url": "https://chegg.com/homework-help",
+    "domain": "chegg.com",
+    "category": "cheating",
+    "risk_score": 0.95,
+    "label_id": 7
+  },
+  {
+    "url": "http://cppreference.com",
+    "domain": "cppreference.com",
+    "category": "educational",
+    "risk_score": 0.1,
+    "label_id": 1
+  },
+  {
+    "url": "https://instagram.com/reels/path/to/page",
+    "domain": "instagram.com",
+    "category": "entertainment",
+    "risk_score": 0.6,
+    "label_id": 5
+  },
+  {
+    "url": "http://geeksforgeeks.org",
+    "domain": "geeksforgeeks.org",
+    "category": "educational",
+    "risk_score": 0.1,
+    "label_id": 1
+  },
+  {
+    "url": "https://www.chegg.com/homework-help",
+    "domain": "chegg.com",
+    "category": "cheating",
+    "risk_score": 0.95,
+    "label_id": 7
+  },
+  {
+    "url": "www.perplexity.ai/search",
+    "domain": "perplexity.ai",
+    "category": "ai_tool",
+    "risk_score": 0.9,
+    "label_id": 6
+  },
+  {
+    "url": "https://www.claude.ai",
+    "domain": "claude.ai",
+    "category": "ai_tool",
+    "risk_score": 0.9,
+    "label_id": 6
+  },
+  {
+    "url": "https://github.com/path/to/page",
+    "domain": "github.com",
+    "category": "code_hosting",
+    "risk_score": 0.35,
+    "label_id": 3
+  },
+  {
+    "url": "https://chatgpt.com/path/to/page",
+    "domain": "chatgpt.com",
+    "category": "ai_tool",
+    "risk_score": 0.9,
+    "label_id": 6
+  },
+  {
+    "url": "https://tutor.com",
+    "domain": "tutor.com",
+    "category": "cheating",
+    "risk_score": 0.95,
+    "label_id": 7
+  },
+  {
+    "url": "udemy.com",
+    "domain": "udemy.com",
+    "category": "educational",
+    "risk_score": 0.1,
+    "label_id": 1
+  },
+  {
+    "url": "https://poe.com/path/to/page",
+    "domain": "poe.com",
+    "category": "ai_tool",
+    "risk_score": 0.9,
+    "label_id": 6
+  },
+  {
+    "url": "https://www.studocu.com/document",
+    "domain": "studocu.com",
+    "category": "cheating",
+    "risk_score": 0.95,
+    "label_id": 7
+  },
+  {
+    "url": "https://gamma.app/path/to/page",
+    "domain": "gamma.app",
+    "category": "ai_tool",
+    "risk_score": 0.9,
+    "label_id": 6
+  },
+  {
+    "url": "https://www.jsfiddle.net",
+    "domain": "jsfiddle.net",
+    "category": "code_hosting",
+    "risk_score": 0.35,
+    "label_id": 3
+  },
+  {
+    "url": "https://www.jsfiddle.net/some-page",
+    "domain": "jsfiddle.net",
+    "category": "code_hosting",
+    "risk_score": 0.35,
+    "label_id": 3
+  },
+  {
+    "url": "https://cppreference.com",
+    "domain": "cppreference.com",
+    "category": "educational",
+    "risk_score": 0.1,
+    "label_id": 1
+  },
+  {
+    "url": "https://www.claude.ai/some-page",
+    "domain": "claude.ai",
+    "category": "ai_tool",
+    "risk_score": 0.9,
+    "label_id": 6
+  },
+  {
+    "url": "http://exam.google.com",
+    "domain": "exam.google.com",
+    "category": "exam_platform",
+    "risk_score": 0.0,
+    "label_id": 0
+  },
+  {
+    "url": "www.slader.com",
+    "domain": "slader.com",
+    "category": "cheating",
+    "risk_score": 0.95,
+    "label_id": 7
+  },
+  {
+    "url": "https://www.yahoo.com",
+    "domain": "yahoo.com",
+    "category": "search_engine",
+    "risk_score": 0.15,
+    "label_id": 2
+  },
+  {
+    "url": "https://www.w3schools.com",
+    "domain": "w3schools.com",
+    "category": "educational",
+    "risk_score": 0.1,
+    "label_id": 1
+  },
+  {
+    "url": "https://wa.me",
+    "domain": "wa.me",
+    "category": "social_media",
+    "risk_score": 0.45,
+    "label_id": 4
+  },
+  {
+    "url": "https://www.youtube.com/watch",
+    "domain": "youtube.com",
+    "category": "entertainment",
+    "risk_score": 0.6,
+    "label_id": 5
+  },
+  {
+    "url": "http://labs.google.com/ai",
+    "domain": "labs.google.com",
+    "category": "ai_tool",
+    "risk_score": 0.9,
+    "label_id": 6
+  },
+  {
+    "url": "https://chat.openai.com",
+    "domain": "chat.openai.com",
+    "category": "ai_tool",
+    "risk_score": 0.9,
+    "label_id": 6
+  },
+  {
+    "url": "huggingface.co/chat",
+    "domain": "huggingface.co",
+    "category": "ai_tool",
+    "risk_score": 0.9,
+    "label_id": 6
+  },
+  {
+    "url": "britannica.com",
+    "domain": "britannica.com",
+    "category": "educational",
+    "risk_score": 0.1,
+    "label_id": 1
+  },
+  {
+    "url": "https://codepen.io",
+    "domain": "codepen.io",
+    "category": "code_hosting",
+    "risk_score": 0.35,
+    "label_id": 3
+  },
+  {
+    "url": "www.9gag.com",
+    "domain": "9gag.com",
+    "category": "entertainment",
+    "risk_score": 0.6,
+    "label_id": 5
+  },
+  {
+    "url": "https://replicate.com",
+    "domain": "replicate.com",
+    "category": "ai_tool",
+    "risk_score": 0.9,
+    "label_id": 6
+  },
+  {
+    "url": "https://www.quizlet.com/flashcards",
+    "domain": "quizlet.com",
+    "category": "cheating",
+    "risk_score": 0.95,
+    "label_id": 7
+  },
+  {
+    "url": "https://github.com",
+    "domain": "github.com",
+    "category": "code_hosting",
+    "risk_score": 0.35,
+    "label_id": 3
+  },
+  {
+    "url": "http://stackblitz.com",
+    "domain": "stackblitz.com",
+    "category": "code_hosting",
+    "risk_score": 0.35,
+    "label_id": 3
+  },
+  {
+    "url": "https://litanswers.org",
+    "domain": "litanswers.org",
+    "category": "cheating",
+    "risk_score": 0.95,
+    "label_id": 7
+  },
+  {
+    "url": "brainly.com",
+    "domain": "brainly.com",
+    "category": "cheating",
+    "risk_score": 0.95,
+    "label_id": 7
+  },
+  {
+    "url": "https://www.twitch.tv/some-page",
+    "domain": "twitch.tv",
+    "category": "entertainment",
+    "risk_score": 0.6,
+    "label_id": 5
+  },
+  {
+    "url": "https://www.netflix.com/browse/some-page",
+    "domain": "netflix.com",
+    "category": "entertainment",
+    "risk_score": 0.6,
+    "label_id": 5
+  },
+  {
+    "url": "https://www.linkedin.com/some-page",
+    "domain": "linkedin.com",
+    "category": "social_media",
+    "risk_score": 0.45,
+    "label_id": 4
+  },
+  {
+    "url": "https://coursera.org/path/to/page",
+    "domain": "coursera.org",
+    "category": "educational",
+    "risk_score": 0.1,
+    "label_id": 1
+  },
+  {
+    "url": "http://chegg.com/homework-help",
+    "domain": "chegg.com",
+    "category": "cheating",
+    "risk_score": 0.95,
+    "label_id": 7
+  },
+  {
+    "url": "www.studocu.com",
+    "domain": "studocu.com",
+    "category": "cheating",
+    "risk_score": 0.95,
+    "label_id": 7
+  },
+  {
+    "url": "www.tiktok.com/foryou",
+    "domain": "tiktok.com",
+    "category": "entertainment",
+    "risk_score": 0.6,
+    "label_id": 5
+  },
+  {
+    "url": "https://paperrater.com",
+    "domain": "paperrater.com",
+    "category": "cheating",
+    "risk_score": 0.95,
+    "label_id": 7
+  },
+  {
+    "url": "https://www.github.com",
+    "domain": "github.com",
+    "category": "code_hosting",
+    "risk_score": 0.35,
+    "label_id": 3
+  },
+  {
+    "url": "www.telegram.org",
+    "domain": "telegram.org",
+    "category": "social_media",
+    "risk_score": 0.45,
+    "label_id": 4
+  },
+  {
+    "url": "https://www.docs.python.org/some-page",
+    "domain": "docs.python.org",
+    "category": "educational",
+    "risk_score": 0.1,
+    "label_id": 1
+  },
+  {
+    "url": "https://writesonic.com/path/to/page",
+    "domain": "writesonic.com",
+    "category": "ai_tool",
+    "risk_score": 0.9,
+    "label_id": 6
+  },
+  {
+    "url": "https://www.twitch.tv/directory/some-page",
+    "domain": "twitch.tv",
+    "category": "entertainment",
+    "risk_score": 0.6,
+    "label_id": 5
+  },
+  {
+    "url": "http://numerade.com",
+    "domain": "numerade.com",
+    "category": "cheating",
+    "risk_score": 0.95,
+    "label_id": 7
+  },
+  {
+    "url": "https://perplexity.ai",
+    "domain": "perplexity.ai",
+    "category": "ai_tool",
+    "risk_score": 0.9,
+    "label_id": 6
+  },
+  {
+    "url": "tumblr.com",
+    "domain": "tumblr.com",
+    "category": "entertainment",
+    "risk_score": 0.6,
+    "label_id": 5
+  },
+  {
+    "url": "https://essaytyper.com",
+    "domain": "essaytyper.com",
+    "category": "cheating",
+    "risk_score": 0.95,
+    "label_id": 7
+  },
+  {
+    "url": "bing.com/chat",
+    "domain": "bing.com",
+    "category": "ai_tool",
+    "risk_score": 0.9,
+    "label_id": 6
+  },
+  {
+    "url": "http://docs.python.org/3",
+    "domain": "docs.python.org",
+    "category": "educational",
+    "risk_score": 0.1,
+    "label_id": 1
+  },
+  {
+    "url": "https://coursehero.com",
+    "domain": "coursehero.com",
+    "category": "cheating",
+    "risk_score": 0.95,
+    "label_id": 7
+  },
+  {
+    "url": "www.developer.mozilla.org/en-US/docs",
+    "domain": "developer.mozilla.org",
+    "category": "educational",
+    "risk_score": 0.1,
+    "label_id": 1
+  },
+  {
+    "url": "w3schools.com",
+    "domain": "w3schools.com",
+    "category": "educational",
+    "risk_score": 0.1,
+    "label_id": 1
+  },
+  {
+    "url": "https://labs.google.com/ai",
+    "domain": "labs.google.com",
+    "category": "ai_tool",
+    "risk_score": 0.9,
+    "label_id": 6
+  },
+  {
+    "url": "https://photomath.com/practice",
+    "domain": "photomath.com",
+    "category": "cheating",
+    "risk_score": 0.95,
+    "label_id": 7
+  },
+  {
+    "url": "https://arxiv.org",
+    "domain": "arxiv.org",
+    "category": "educational",
+    "risk_score": 0.1,
+    "label_id": 1
+  },
+  {
+    "url": "https://pinterest.com/path/to/page",
+    "domain": "pinterest.com",
+    "category": "entertainment",
+    "risk_score": 0.6,
+    "label_id": 5
+  },
+  {
+    "url": "https://www.litanswers.org",
+    "domain": "litanswers.org",
+    "category": "cheating",
+    "risk_score": 0.95,
+    "label_id": 7
+  },
+  {
+    "url": "https://www.cppreference.com",
+    "domain": "cppreference.com",
+    "category": "educational",
+    "risk_score": 0.1,
+    "label_id": 1
+  },
+  {
+    "url": "http://instagram.com",
+    "domain": "instagram.com",
+    "category": "entertainment",
+    "risk_score": 0.6,
+    "label_id": 5
+  },
+  {
+    "url": "www.jasper.ai",
+    "domain": "jasper.ai",
+    "category": "ai_tool",
+    "risk_score": 0.9,
+    "label_id": 6
+  },
+  {
+    "url": "https://instagram.com",
+    "domain": "instagram.com",
+    "category": "entertainment",
+    "risk_score": 0.6,
+    "label_id": 5
+  },
+  {
+    "url": "https://github.com",
+    "domain": "github.com",
+    "category": "code_hosting",
+    "risk_score": 0.35,
+    "label_id": 3
+  },
+  {
+    "url": "character.ai",
+    "domain": "character.ai",
+    "category": "ai_tool",
+    "risk_score": 0.9,
+    "label_id": 6
+  },
+  {
+    "url": "https://www.bing.com/search/some-page",
+    "domain": "bing.com",
+    "category": "search_engine",
+    "risk_score": 0.15,
+    "label_id": 2
+  },
+  {
+    "url": "www.yahoo.com",
+    "domain": "yahoo.com",
+    "category": "search_engine",
+    "risk_score": 0.15,
+    "label_id": 2
+  },
+  {
+    "url": "https://www.netflix.com/some-page",
+    "domain": "netflix.com",
+    "category": "entertainment",
+    "risk_score": 0.6,
+    "label_id": 5
+  },
+  {
+    "url": "https://perplexity.ai/path/to/page",
+    "domain": "perplexity.ai",
+    "category": "ai_tool",
+    "risk_score": 0.9,
+    "label_id": 6
+  },
+  {
+    "url": "https://www.together.ai/some-page",
+    "domain": "together.ai",
+    "category": "ai_tool",
+    "risk_score": 0.9,
+    "label_id": 6
+  },
+  {
+    "url": "https://www.pinterest.com/some-page",
+    "domain": "pinterest.com",
+    "category": "entertainment",
+    "risk_score": 0.6,
+    "label_id": 5
+  },
+  {
+    "url": "https://wa.me/path/to/page",
+    "domain": "wa.me",
+    "category": "social_media",
+    "risk_score": 0.45,
+    "label_id": 4
+  },
+  {
+    "url": "http://essaybot.com",
+    "domain": "essaybot.com",
+    "category": "cheating",
+    "risk_score": 0.95,
+    "label_id": 7
+  },
+  {
+    "url": "https://deepseek.com/chat",
+    "domain": "deepseek.com",
+    "category": "ai_tool",
+    "risk_score": 0.9,
+    "label_id": 6
+  },
+  {
+    "url": "https://www.docs.python.org/3/some-page",
+    "domain": "docs.python.org",
+    "category": "educational",
+    "risk_score": 0.1,
+    "label_id": 1
+  },
+  {
+    "url": "https://www.bitbucket.org",
+    "domain": "bitbucket.org",
+    "category": "code_hosting",
+    "risk_score": 0.35,
+    "label_id": 3
+  },
+  {
+    "url": "hulu.com",
+    "domain": "hulu.com",
+    "category": "entertainment",
+    "risk_score": 0.6,
+    "label_id": 5
+  },
+  {
+    "url": "https://researchgate.net/path/to/page",
+    "domain": "researchgate.net",
+    "category": "educational",
+    "risk_score": 0.1,
+    "label_id": 1
+  },
+  {
+    "url": "https://mathway.com/path/to/page",
+    "domain": "mathway.com",
+    "category": "ai_tool",
+    "risk_score": 0.9,
+    "label_id": 6
+  },
+  {
+    "url": "https://coursehero.com",
+    "domain": "coursehero.com",
+    "category": "cheating",
+    "risk_score": 0.95,
+    "label_id": 7
+  },
+  {
+    "url": "https://www.edx.org",
+    "domain": "edx.org",
+    "category": "educational",
+    "risk_score": 0.1,
+    "label_id": 1
+  },
+  {
+    "url": "https://roblox.com",
+    "domain": "roblox.com",
+    "category": "entertainment",
+    "risk_score": 0.6,
+    "label_id": 5
+  },
+  {
+    "url": "https://www.linkedin.com",
+    "domain": "linkedin.com",
+    "category": "social_media",
+    "risk_score": 0.45,
+    "label_id": 4
+  },
+  {
+    "url": "https://reddit.com",
+    "domain": "reddit.com",
+    "category": "entertainment",
+    "risk_score": 0.6,
+    "label_id": 5
+  },
+  {
+    "url": "https://grammarly.com/ai",
+    "domain": "grammarly.com",
+    "category": "ai_tool",
+    "risk_score": 0.9,
+    "label_id": 6
+  },
+  {
+    "url": "edx.org",
+    "domain": "edx.org",
+    "category": "educational",
+    "risk_score": 0.1,
+    "label_id": 1
+  },
+  {
+    "url": "https://bard.google.com",
+    "domain": "bard.google.com",
+    "category": "ai_tool",
+    "risk_score": 0.9,
+    "label_id": 6
+  },
+  {
+    "url": "https://www.gamma.app",
+    "domain": "gamma.app",
+    "category": "ai_tool",
+    "risk_score": 0.9,
+    "label_id": 6
+  },
+  {
+    "url": "https://www.socratic.org",
+    "domain": "socratic.org",
+    "category": "cheating",
+    "risk_score": 0.95,
+    "label_id": 7
+  },
+  {
+    "url": "https://respondus.com/path/to/page",
+    "domain": "respondus.com",
+    "category": "exam_platform",
+    "risk_score": 0.0,
+    "label_id": 0
+  },
+  {
+    "url": "http://arxiv.org",
+    "domain": "arxiv.org",
+    "category": "educational",
+    "risk_score": 0.1,
+    "label_id": 1
+  },
+  {
+    "url": "developer.mozilla.org",
+    "domain": "developer.mozilla.org",
+    "category": "educational",
+    "risk_score": 0.1,
+    "label_id": 1
+  },
+  {
+    "url": "ecosia.org",
+    "domain": "ecosia.org",
+    "category": "search_engine",
+    "risk_score": 0.15,
+    "label_id": 2
+  },
+  {
+    "url": "buzzfeed.com",
+    "domain": "buzzfeed.com",
+    "category": "entertainment",
+    "risk_score": 0.6,
+    "label_id": 5
+  },
+  {
+    "url": "www.groq.com",
+    "domain": "groq.com",
+    "category": "ai_tool",
+    "risk_score": 0.9,
+    "label_id": 6
+  },
+  {
+    "url": "https://studocu.com/document/path/to/page",
+    "domain": "studocu.com",
+    "category": "cheating",
+    "risk_score": 0.95,
+    "label_id": 7
+  },
+  {
+    "url": "http://deepseek.com/chat",
+    "domain": "deepseek.com",
+    "category": "ai_tool",
+    "risk_score": 0.9,
+    "label_id": 6
+  },
+  {
+    "url": "www.gitlab.com",
+    "domain": "gitlab.com",
+    "category": "code_hosting",
+    "risk_score": 0.35,
+    "label_id": 3
+  },
+  {
+    "url": "https://www.web.telegram.org/some-page",
+    "domain": "web.telegram.org",
+    "category": "social_media",
+    "risk_score": 0.45,
+    "label_id": 4
+  },
+  {
+    "url": "facebook.com",
+    "domain": "facebook.com",
+    "category": "entertainment",
+    "risk_score": 0.6,
+    "label_id": 5
+  },
+  {
+    "url": "https://pastebin.com",
+    "domain": "pastebin.com",
+    "category": "code_hosting",
+    "risk_score": 0.35,
+    "label_id": 3
+  },
+  {
+    "url": "https://gitlab.com",
+    "domain": "gitlab.com",
+    "category": "code_hosting",
+    "risk_score": 0.35,
+    "label_id": 3
+  },
+  {
+    "url": "chegg.com",
+    "domain": "chegg.com",
+    "category": "cheating",
+    "risk_score": 0.95,
+    "label_id": 7
+  },
+  {
+    "url": "https://www.udacity.com/some-page",
+    "domain": "udacity.com",
+    "category": "educational",
+    "risk_score": 0.1,
+    "label_id": 1
+  },
+  {
+    "url": "https://phind.com",
+    "domain": "phind.com",
+    "category": "ai_tool",
+    "risk_score": 0.9,
+    "label_id": 6
+  },
+  {
+    "url": "https://google.com",
+    "domain": "google.com",
+    "category": "search_engine",
+    "risk_score": 0.15,
+    "label_id": 2
+  },
+  {
+    "url": "https://x.com",
+    "domain": "x.com",
+    "category": "entertainment",
+    "risk_score": 0.6,
+    "label_id": 5
+  },
+  {
+    "url": "https://cohere.com/chat",
+    "domain": "cohere.com",
+    "category": "ai_tool",
+    "risk_score": 0.9,
+    "label_id": 6
+  },
+  {
+    "url": "https://www.examsoft.com",
+    "domain": "examsoft.com",
+    "category": "exam_platform",
+    "risk_score": 0.0,
+    "label_id": 0
+  },
+  {
+    "url": "https://roblox.com/path/to/page",
+    "domain": "roblox.com",
+    "category": "entertainment",
+    "risk_score": 0.6,
+    "label_id": 5
+  },
+  {
+    "url": "https://www.blackboard.com/some-page",
+    "domain": "blackboard.com",
+    "category": "exam_platform",
+    "risk_score": 0.0,
+    "label_id": 0
+  },
+  {
+    "url": "https://writesonic.com",
+    "domain": "writesonic.com",
+    "category": "ai_tool",
+    "risk_score": 0.9,
+    "label_id": 6
+  },
+  {
+    "url": "https://www.gemini.google.com",
+    "domain": "gemini.google.com",
+    "category": "ai_tool",
+    "risk_score": 0.9,
+    "label_id": 6
+  },
+  {
+    "url": "http://purplemath.com",
+    "domain": "purplemath.com",
+    "category": "educational",
+    "risk_score": 0.1,
+    "label_id": 1
+  },
+  {
+    "url": "www.bing.com/search",
+    "domain": "bing.com",
+    "category": "search_engine",
+    "risk_score": 0.15,
+    "label_id": 2
+  },
+  {
+    "url": "https://quillbot.com",
+    "domain": "quillbot.com",
+    "category": "ai_tool",
+    "risk_score": 0.9,
+    "label_id": 6
+  },
+  {
+    "url": "https://facebook.com/messenger",
+    "domain": "facebook.com",
+    "category": "social_media",
+    "risk_score": 0.45,
+    "label_id": 4
+  },
+  {
+    "url": "www.tutorialspoint.com",
+    "domain": "tutorialspoint.com",
+    "category": "educational",
+    "risk_score": 0.1,
+    "label_id": 1
+  },
+  {
+    "url": "https://you.com/path/to/page",
+    "domain": "you.com",
+    "category": "ai_tool",
+    "risk_score": 0.9,
+    "label_id": 6
+  },
+  {
+    "url": "https://facebook.com/messenger",
+    "domain": "facebook.com",
+    "category": "social_media",
+    "risk_score": 0.45,
+    "label_id": 4
+  },
+  {
+    "url": "https://www.photomath.com/some-page",
+    "domain": "photomath.com",
+    "category": "ai_tool",
+    "risk_score": 0.9,
+    "label_id": 6
+  },
+  {
+    "url": "https://www.openai.com",
+    "domain": "openai.com",
+    "category": "ai_tool",
+    "risk_score": 0.9,
+    "label_id": 6
+  },
+  {
+    "url": "https://netflix.com/browse",
+    "domain": "netflix.com",
+    "category": "entertainment",
+    "risk_score": 0.6,
+    "label_id": 5
+  },
+  {
+    "url": "https://udemy.com/path/to/page",
+    "domain": "udemy.com",
+    "category": "educational",
+    "risk_score": 0.1,
+    "label_id": 1
+  },
+  {
+    "url": "https://perplexity.ai",
+    "domain": "perplexity.ai",
+    "category": "ai_tool",
+    "risk_score": 0.9,
+    "label_id": 6
+  },
+  {
+    "url": "https://scholar.google.com",
+    "domain": "scholar.google.com",
+    "category": "educational",
+    "risk_score": 0.1,
+    "label_id": 1
+  },
+  {
+    "url": "https://store.steampowered.com",
+    "domain": "store.steampowered.com",
+    "category": "entertainment",
+    "risk_score": 0.6,
+    "label_id": 5
+  },
+  {
+    "url": "www.tumblr.com",
+    "domain": "tumblr.com",
+    "category": "entertainment",
+    "risk_score": 0.6,
+    "label_id": 5
+  },
+  {
+    "url": "https://www.pastebin.com/some-page",
+    "domain": "pastebin.com",
+    "category": "code_hosting",
+    "risk_score": 0.35,
+    "label_id": 3
+  },
+  {
+    "url": "https://bartleby.com/solution-answer/path/to/page",
+    "domain": "bartleby.com",
+    "category": "cheating",
+    "risk_score": 0.95,
+    "label_id": 7
+  },
+  {
+    "url": "www.google.com/search",
+    "domain": "google.com",
+    "category": "search_engine",
+    "risk_score": 0.15,
+    "label_id": 2
+  },
+  {
+    "url": "instagram.com/reels",
+    "domain": "instagram.com",
+    "category": "entertainment",
+    "risk_score": 0.6,
+    "label_id": 5
+  },
+  {
+    "url": "https://khanacademy.org",
+    "domain": "khanacademy.org",
+    "category": "educational",
+    "risk_score": 0.1,
+    "label_id": 1
+  },
+  {
+    "url": "https://respondus.com",
+    "domain": "respondus.com",
+    "category": "exam_platform",
+    "risk_score": 0.0,
+    "label_id": 0
+  },
+  {
+    "url": "https://messenger.com",
+    "domain": "messenger.com",
+    "category": "social_media",
+    "risk_score": 0.45,
+    "label_id": 4
+  },
+  {
+    "url": "https://primevideo.com",
+    "domain": "primevideo.com",
+    "category": "entertainment",
+    "risk_score": 0.6,
+    "label_id": 5
+  },
+  {
+    "url": "https://udemy.com",
+    "domain": "udemy.com",
+    "category": "educational",
+    "risk_score": 0.1,
+    "label_id": 1
+  },
+  {
+    "url": "https://classroom.google.com/path/to/page",
+    "domain": "classroom.google.com",
+    "category": "exam_platform",
+    "risk_score": 0.0,
+    "label_id": 0
+  },
+  {
+    "url": "http://homeworklib.com",
+    "domain": "homeworklib.com",
+    "category": "cheating",
+    "risk_score": 0.95,
+    "label_id": 7
+  },
+  {
+    "url": "pinterest.com",
+    "domain": "pinterest.com",
+    "category": "entertainment",
+    "risk_score": 0.6,
+    "label_id": 5
+  },
+  {
+    "url": "https://www.brainly.com",
+    "domain": "brainly.com",
+    "category": "cheating",
+    "risk_score": 0.95,
+    "label_id": 7
+  },
+  {
+    "url": "https://www.music.youtube.com/some-page",
+    "domain": "music.youtube.com",
+    "category": "entertainment",
+    "risk_score": 0.6,
+    "label_id": 5
+  },
+  {
+    "url": "https://www.chatgpt.com",
+    "domain": "chatgpt.com",
+    "category": "ai_tool",
+    "risk_score": 0.9,
+    "label_id": 6
+  },
+  {
+    "url": "http://respondus.com",
+    "domain": "respondus.com",
+    "category": "exam_platform",
+    "risk_score": 0.0,
+    "label_id": 0
+  },
+  {
+    "url": "https://epicgames.com",
+    "domain": "epicgames.com",
+    "category": "entertainment",
+    "risk_score": 0.6,
+    "label_id": 5
+  },
+  {
+    "url": "https://www.cliffsnotes.com",
+    "domain": "cliffsnotes.com",
+    "category": "cheating",
+    "risk_score": 0.95,
+    "label_id": 7
+  },
+  {
+    "url": "web.whatsapp.com",
+    "domain": "web.whatsapp.com",
+    "category": "social_media",
+    "risk_score": 0.45,
+    "label_id": 4
+  },
+  {
+    "url": "https://www.britannica.com/some-page",
+    "domain": "britannica.com",
+    "category": "educational",
+    "risk_score": 0.1,
+    "label_id": 1
+  },
+  {
+    "url": "store.steampowered.com",
+    "domain": "store.steampowered.com",
+    "category": "entertainment",
+    "risk_score": 0.6,
+    "label_id": 5
+  },
+  {
+    "url": "http://replit.com",
+    "domain": "replit.com",
+    "category": "code_hosting",
+    "risk_score": 0.35,
+    "label_id": 3
+  },
+  {
+    "url": "https://character.ai",
+    "domain": "character.ai",
+    "category": "ai_tool",
+    "risk_score": 0.9,
+    "label_id": 6
+  },
+  {
+    "url": "https://respondus.com",
+    "domain": "respondus.com",
+    "category": "exam_platform",
+    "risk_score": 0.0,
+    "label_id": 0
+  },
+  {
+    "url": "https://facebook.com/groups",
+    "domain": "facebook.com",
+    "category": "social_media",
+    "risk_score": 0.45,
+    "label_id": 4
+  },
+  {
+    "url": "www.twitch.tv/directory",
+    "domain": "twitch.tv",
+    "category": "entertainment",
+    "risk_score": 0.6,
+    "label_id": 5
+  },
+  {
+    "url": "https://photomath.com",
+    "domain": "photomath.com",
+    "category": "ai_tool",
+    "risk_score": 0.9,
+    "label_id": 6
+  },
+  {
+    "url": "https://www.studocu.com",
+    "domain": "studocu.com",
+    "category": "cheating",
+    "risk_score": 0.95,
+    "label_id": 7
+  },
+  {
+    "url": "https://www.bartleby.com/solution-answer",
+    "domain": "bartleby.com",
+    "category": "cheating",
+    "risk_score": 0.95,
+    "label_id": 7
+  },
+  {
+    "url": "http://snapchat.com",
+    "domain": "snapchat.com",
+    "category": "entertainment",
+    "risk_score": 0.6,
+    "label_id": 5
+  },
+  {
+    "url": "https://anthropic.com",
+    "domain": "anthropic.com",
+    "category": "ai_tool",
+    "risk_score": 0.9,
+    "label_id": 6
+  },
+  {
+    "url": "www.replicate.com",
+    "domain": "replicate.com",
+    "category": "ai_tool",
+    "risk_score": 0.9,
+    "label_id": 6
+  },
+  {
+    "url": "https://huggingface.co/chat/path/to/page",
+    "domain": "huggingface.co",
+    "category": "ai_tool",
+    "risk_score": 0.9,
+    "label_id": 6
+  },
+  {
+    "url": "www.github.com/search",
+    "domain": "github.com",
+    "category": "code_hosting",
+    "risk_score": 0.35,
+    "label_id": 3
+  },
+  {
+    "url": "https://www.telegram.org/some-page",
+    "domain": "telegram.org",
+    "category": "social_media",
+    "risk_score": 0.45,
+    "label_id": 4
+  },
+  {
+    "url": "https://phind.com",
+    "domain": "phind.com",
+    "category": "ai_tool",
+    "risk_score": 0.9,
+    "label_id": 6
+  },
+  {
+    "url": "http://numerade.com/ask",
+    "domain": "numerade.com",
+    "category": "cheating",
+    "risk_score": 0.95,
+    "label_id": 7
+  },
+  {
+    "url": "www.x.com",
+    "domain": "x.com",
+    "category": "entertainment",
+    "risk_score": 0.6,
+    "label_id": 5
+  },
+  {
+    "url": "https://moodle.org/path/to/page",
+    "domain": "moodle.org",
+    "category": "exam_platform",
+    "risk_score": 0.0,
+    "label_id": 0
+  },
+  {
+    "url": "https://www.exam.google.com",
+    "domain": "exam.google.com",
+    "category": "exam_platform",
+    "risk_score": 0.0,
+    "label_id": 0
+  },
+  {
+    "url": "www.messenger.com",
+    "domain": "messenger.com",
+    "category": "social_media",
+    "risk_score": 0.45,
+    "label_id": 4
+  },
+  {
+    "url": "https://www.hastebin.com/some-page",
+    "domain": "hastebin.com",
+    "category": "code_hosting",
+    "risk_score": 0.35,
+    "label_id": 3
+  },
+  {
+    "url": "https://enotes.com/path/to/page",
+    "domain": "enotes.com",
+    "category": "cheating",
+    "risk_score": 0.95,
+    "label_id": 7
+  },
+  {
+    "url": "https://quizlet.com",
+    "domain": "quizlet.com",
+    "category": "cheating",
+    "risk_score": 0.95,
+    "label_id": 7
+  },
+  {
+    "url": "http://soundcloud.com",
+    "domain": "soundcloud.com",
+    "category": "entertainment",
+    "risk_score": 0.6,
+    "label_id": 5
+  },
+  {
+    "url": "https://quizlet.com/flashcards/path/to/page",
+    "domain": "quizlet.com",
+    "category": "cheating",
+    "risk_score": 0.95,
+    "label_id": 7
+  },
+  {
+    "url": "https://turnitin.com",
+    "domain": "turnitin.com",
+    "category": "exam_platform",
+    "risk_score": 0.0,
+    "label_id": 0
+  },
+  {
+    "url": "https://www.chegg.com/some-page",
+    "domain": "chegg.com",
+    "category": "cheating",
+    "risk_score": 0.95,
+    "label_id": 7
+  },
+  {
+    "url": "https://www.discord.com",
+    "domain": "discord.com",
+    "category": "entertainment",
+    "risk_score": 0.6,
+    "label_id": 5
+  },
+  {
+    "url": "https://developer.mozilla.org/en-US/docs",
+    "domain": "developer.mozilla.org",
+    "category": "educational",
+    "risk_score": 0.1,
+    "label_id": 1
+  },
+  {
+    "url": "https://www.photomath.com/practice/some-page",
+    "domain": "photomath.com",
+    "category": "cheating",
+    "risk_score": 0.95,
+    "label_id": 7
+  },
+  {
+    "url": "https://quora.com/path/to/page",
+    "domain": "quora.com",
+    "category": "social_media",
+    "risk_score": 0.45,
+    "label_id": 4
+  },
+  {
+    "url": "https://www.chat.openai.com",
+    "domain": "chat.openai.com",
+    "category": "ai_tool",
+    "risk_score": 0.9,
+    "label_id": 6
+  },
+  {
+    "url": "https://www.phind.com/some-page",
+    "domain": "phind.com",
+    "category": "ai_tool",
+    "risk_score": 0.9,
+    "label_id": 6
+  },
+  {
+    "url": "https://www.tutor.com/some-page",
+    "domain": "tutor.com",
+    "category": "cheating",
+    "risk_score": 0.95,
+    "label_id": 7
+  },
+  {
+    "url": "codepen.io",
+    "domain": "codepen.io",
+    "category": "code_hosting",
+    "risk_score": 0.35,
+    "label_id": 3
+  },
+  {
+    "url": "https://tutorialspoint.com",
+    "domain": "tutorialspoint.com",
+    "category": "educational",
+    "risk_score": 0.1,
+    "label_id": 1
+  },
+  {
+    "url": "https://moodle.org",
+    "domain": "moodle.org",
+    "category": "exam_platform",
+    "risk_score": 0.0,
+    "label_id": 0
+  },
+  {
+    "url": "https://exam.google.com/path/to/page",
+    "domain": "exam.google.com",
+    "category": "exam_platform",
+    "risk_score": 0.0,
+    "label_id": 0
+  },
+  {
+    "url": "https://brave.com/search",
+    "domain": "brave.com",
+    "category": "search_engine",
+    "risk_score": 0.15,
+    "label_id": 2
+  },
+  {
+    "url": "https://mathsisfun.com",
+    "domain": "mathsisfun.com",
+    "category": "educational",
+    "risk_score": 0.1,
+    "label_id": 1
+  },
+  {
+    "url": "https://pinterest.com",
+    "domain": "pinterest.com",
+    "category": "entertainment",
+    "risk_score": 0.6,
+    "label_id": 5
+  },
+  {
+    "url": "https://bing.com",
+    "domain": "bing.com",
+    "category": "search_engine",
+    "risk_score": 0.15,
+    "label_id": 2
+  },
+  {
+    "url": "www.numerade.com",
+    "domain": "numerade.com",
+    "category": "cheating",
+    "risk_score": 0.95,
+    "label_id": 7
+  },
+  {
+    "url": "https://www.moodle.org",
+    "domain": "moodle.org",
+    "category": "exam_platform",
+    "risk_score": 0.0,
+    "label_id": 0
+  },
+  {
+    "url": "https://canvas.instructure.com/path/to/page",
+    "domain": "canvas.instructure.com",
+    "category": "exam_platform",
+    "risk_score": 0.0,
+    "label_id": 0
+  },
+  {
+    "url": "https://facebook.com/groups",
+    "domain": "facebook.com",
+    "category": "social_media",
+    "risk_score": 0.45,
+    "label_id": 4
+  },
+  {
+    "url": "https://www.primevideo.com",
+    "domain": "primevideo.com",
+    "category": "entertainment",
+    "risk_score": 0.6,
+    "label_id": 5
+  },
+  {
+    "url": "https://bard.google.com",
+    "domain": "bard.google.com",
+    "category": "ai_tool",
+    "risk_score": 0.9,
+    "label_id": 6
+  },
+  {
+    "url": "www.examsoft.com",
+    "domain": "examsoft.com",
+    "category": "exam_platform",
+    "risk_score": 0.0,
+    "label_id": 0
+  },
+  {
+    "url": "www.bing.com/chat",
+    "domain": "bing.com",
+    "category": "ai_tool",
+    "risk_score": 0.9,
+    "label_id": 6
+  },
+  {
+    "url": "https://poe.com",
+    "domain": "poe.com",
+    "category": "ai_tool",
+    "risk_score": 0.9,
+    "label_id": 6
+  },
+  {
+    "url": "tiktok.com/foryou",
+    "domain": "tiktok.com",
+    "category": "entertainment",
+    "risk_score": 0.6,
+    "label_id": 5
+  },
+  {
+    "url": "twitter.com",
+    "domain": "twitter.com",
+    "category": "entertainment",
+    "risk_score": 0.6,
+    "label_id": 5
+  },
+  {
+    "url": "https://boredpanda.com",
+    "domain": "boredpanda.com",
+    "category": "entertainment",
+    "risk_score": 0.6,
+    "label_id": 5
+  },
+  {
+    "url": "https://youtube.com/watch/path/to/page",
+    "domain": "youtube.com",
+    "category": "entertainment",
+    "risk_score": 0.6,
+    "label_id": 5
+  },
+  {
+    "url": "https://essaybot.com",
+    "domain": "essaybot.com",
+    "category": "cheating",
+    "risk_score": 0.95,
+    "label_id": 7
+  },
+  {
+    "url": "www.anthropic.com",
+    "domain": "anthropic.com",
+    "category": "ai_tool",
+    "risk_score": 0.9,
+    "label_id": 6
+  },
+  {
+    "url": "mit.edu",
+    "domain": "mit.edu",
+    "category": "educational",
+    "risk_score": 0.1,
+    "label_id": 1
+  },
+  {
+    "url": "slader.com",
+    "domain": "slader.com",
+    "category": "cheating",
+    "risk_score": 0.95,
+    "label_id": 7
+  },
+  {
+    "url": "https://photomath.com/path/to/page",
+    "domain": "photomath.com",
+    "category": "ai_tool",
+    "risk_score": 0.9,
+    "label_id": 6
+  },
+  {
+    "url": "https://web.whatsapp.com",
+    "domain": "web.whatsapp.com",
+    "category": "social_media",
+    "risk_score": 0.45,
+    "label_id": 4
+  },
+  {
+    "url": "https://anthropic.com",
+    "domain": "anthropic.com",
+    "category": "ai_tool",
+    "risk_score": 0.9,
+    "label_id": 6
+  },
+  {
+    "url": "https://studocu.com",
+    "domain": "studocu.com",
+    "category": "cheating",
+    "risk_score": 0.95,
+    "label_id": 7
+  },
+  {
+    "url": "https://www.kick.com/some-page",
+    "domain": "kick.com",
+    "category": "entertainment",
+    "risk_score": 0.6,
+    "label_id": 5
+  },
+  {
+    "url": "https://www.signal.org",
+    "domain": "signal.org",
+    "category": "social_media",
+    "risk_score": 0.45,
+    "label_id": 4
+  },
+  {
+    "url": "http://coursera.org",
+    "domain": "coursera.org",
+    "category": "educational",
+    "risk_score": 0.1,
+    "label_id": 1
+  },
+  {
+    "url": "https://www.quillbot.com",
+    "domain": "quillbot.com",
+    "category": "ai_tool",
+    "risk_score": 0.9,
+    "label_id": 6
+  },
+  {
+    "url": "https://youtube.com/path/to/page",
+    "domain": "youtube.com",
+    "category": "entertainment",
+    "risk_score": 0.6,
+    "label_id": 5
+  },
+  {
+    "url": "https://grammarly.com/ai",
+    "domain": "grammarly.com",
+    "category": "ai_tool",
+    "risk_score": 0.9,
+    "label_id": 6
+  },
+  {
+    "url": "https://netflix.com/browse/path/to/page",
+    "domain": "netflix.com",
+    "category": "entertainment",
+    "risk_score": 0.6,
+    "label_id": 5
+  },
+  {
+    "url": "https://bing.com/path/to/page",
+    "domain": "bing.com",
+    "category": "search_engine",
+    "risk_score": 0.15,
+    "label_id": 2
+  },
+  {
+    "url": "https://www.cohere.com/some-page",
+    "domain": "cohere.com",
+    "category": "ai_tool",
+    "risk_score": 0.9,
+    "label_id": 6
+  },
+  {
+    "url": "https://chegg.com",
+    "domain": "chegg.com",
+    "category": "cheating",
+    "risk_score": 0.95,
+    "label_id": 7
+  },
+  {
+    "url": "https://linkedin.com/messaging",
+    "domain": "linkedin.com",
+    "category": "social_media",
+    "risk_score": 0.45,
+    "label_id": 4
+  },
+  {
+    "url": "www.snapchat.com",
+    "domain": "snapchat.com",
+    "category": "entertainment",
+    "risk_score": 0.6,
+    "label_id": 5
+  },
+  {
+    "url": "http://stanford.edu",
+    "domain": "stanford.edu",
+    "category": "educational",
+    "risk_score": 0.1,
+    "label_id": 1
+  },
+  {
+    "url": "https://teams.microsoft.com",
+    "domain": "teams.microsoft.com",
+    "category": "social_media",
+    "risk_score": 0.45,
+    "label_id": 4
+  },
+  {
+    "url": "https://www.telegram.org",
+    "domain": "telegram.org",
+    "category": "social_media",
+    "risk_score": 0.45,
+    "label_id": 4
+  },
+  {
+    "url": "http://openai.com",
+    "domain": "openai.com",
+    "category": "ai_tool",
+    "risk_score": 0.9,
+    "label_id": 6
+  },
+  {
+    "url": "https://bartleby.com/solution-answer",
+    "domain": "bartleby.com",
+    "category": "cheating",
+    "risk_score": 0.95,
+    "label_id": 7
+  },
+  {
+    "url": "https://imgur.com",
+    "domain": "imgur.com",
+    "category": "entertainment",
+    "risk_score": 0.6,
+    "label_id": 5
+  },
+  {
+    "url": "https://instagram.com/reels",
+    "domain": "instagram.com",
+    "category": "entertainment",
+    "risk_score": 0.6,
+    "label_id": 5
+  },
+  {
+    "url": "https://www.classroom.google.com",
+    "domain": "classroom.google.com",
+    "category": "exam_platform",
+    "risk_score": 0.0,
+    "label_id": 0
+  },
+  {
+    "url": "http://developer.mozilla.org/en-US/docs",
+    "domain": "developer.mozilla.org",
+    "category": "educational",
+    "risk_score": 0.1,
+    "label_id": 1
+  },
+  {
+    "url": "https://stackblitz.com/path/to/page",
+    "domain": "stackblitz.com",
+    "category": "code_hosting",
+    "risk_score": 0.35,
+    "label_id": 3
+  },
+  {
+    "url": "https://google.com/search",
+    "domain": "google.com",
+    "category": "search_engine",
+    "risk_score": 0.15,
+    "label_id": 2
+  },
+  {
+    "url": "http://x.com",
+    "domain": "x.com",
+    "category": "entertainment",
+    "risk_score": 0.6,
+    "label_id": 5
+  },
+  {
+    "url": "https://poe.com",
+    "domain": "poe.com",
+    "category": "ai_tool",
+    "risk_score": 0.9,
+    "label_id": 6
+  },
+  {
+    "url": "https://www.sparknotes.com",
+    "domain": "sparknotes.com",
+    "category": "cheating",
+    "risk_score": 0.95,
+    "label_id": 7
+  },
+  {
+    "url": "http://perplexity.ai/search",
+    "domain": "perplexity.ai",
+    "category": "ai_tool",
+    "risk_score": 0.9,
+    "label_id": 6
+  },
+  {
+    "url": "www.hastebin.com",
+    "domain": "hastebin.com",
+    "category": "code_hosting",
+    "risk_score": 0.35,
+    "label_id": 3
+  },
+  {
+    "url": "http://jsfiddle.net",
+    "domain": "jsfiddle.net",
+    "category": "code_hosting",
+    "risk_score": 0.35,
+    "label_id": 3
+  },
+  {
+    "url": "https://slack.com",
+    "domain": "slack.com",
+    "category": "social_media",
+    "risk_score": 0.45,
+    "label_id": 4
+  },
+  {
+    "url": "https://www.aistudio.google.com",
+    "domain": "aistudio.google.com",
+    "category": "ai_tool",
+    "risk_score": 0.9,
+    "label_id": 6
+  },
+  {
+    "url": "https://proctoru.com",
+    "domain": "proctoru.com",
+    "category": "exam_platform",
+    "risk_score": 0.0,
+    "label_id": 0
+  },
+  {
+    "url": "http://cliffsnotes.com",
+    "domain": "cliffsnotes.com",
+    "category": "cheating",
+    "risk_score": 0.95,
+    "label_id": 7
+  },
+  {
+    "url": "http://khanacademy.org",
+    "domain": "khanacademy.org",
+    "category": "educational",
+    "risk_score": 0.1,
+    "label_id": 1
+  },
+  {
+    "url": "www.canvas.instructure.com",
+    "domain": "canvas.instructure.com",
+    "category": "exam_platform",
+    "risk_score": 0.0,
+    "label_id": 0
+  },
+  {
+    "url": "github.com/search",
+    "domain": "github.com",
+    "category": "code_hosting",
+    "risk_score": 0.35,
+    "label_id": 3
+  },
+  {
+    "url": "https://linkedin.com",
+    "domain": "linkedin.com",
+    "category": "social_media",
+    "risk_score": 0.45,
+    "label_id": 4
+  },
+  {
+    "url": "https://britannica.com",
+    "domain": "britannica.com",
+    "category": "educational",
+    "risk_score": 0.1,
+    "label_id": 1
+  },
+  {
+    "url": "http://linkedin.com",
+    "domain": "linkedin.com",
+    "category": "social_media",
+    "risk_score": 0.45,
+    "label_id": 4
+  },
+  {
+    "url": "https://mit.edu",
+    "domain": "mit.edu",
+    "category": "educational",
+    "risk_score": 0.1,
+    "label_id": 1
+  },
+  {
+    "url": "https://britannica.com",
+    "domain": "britannica.com",
+    "category": "educational",
+    "risk_score": 0.1,
+    "label_id": 1
+  },
+  {
+    "url": "https://www.boredpanda.com/some-page",
+    "domain": "boredpanda.com",
+    "category": "entertainment",
+    "risk_score": 0.6,
+    "label_id": 5
+  },
+  {
+    "url": "https://gemini.google.com",
+    "domain": "gemini.google.com",
+    "category": "ai_tool",
+    "risk_score": 0.9,
+    "label_id": 6
+  },
+  {
+    "url": "https://disneyplus.com/path/to/page",
+    "domain": "disneyplus.com",
+    "category": "entertainment",
+    "risk_score": 0.6,
+    "label_id": 5
+  },
+  {
+    "url": "https://crunchyroll.com",
+    "domain": "crunchyroll.com",
+    "category": "entertainment",
+    "risk_score": 0.6,
+    "label_id": 5
+  },
+  {
+    "url": "https://learn.microsoft.com",
+    "domain": "learn.microsoft.com",
+    "category": "educational",
+    "risk_score": 0.1,
+    "label_id": 1
+  },
+  {
+    "url": "www.reddit.com/r/popular",
+    "domain": "reddit.com",
+    "category": "entertainment",
+    "risk_score": 0.6,
+    "label_id": 5
+  },
+  {
+    "url": "https://claude.ai",
+    "domain": "claude.ai",
+    "category": "ai_tool",
+    "risk_score": 0.9,
+    "label_id": 6
+  },
+  {
+    "url": "www.teams.microsoft.com",
+    "domain": "teams.microsoft.com",
+    "category": "social_media",
+    "risk_score": 0.45,
+    "label_id": 4
+  },
+  {
+    "url": "https://youtube.com",
+    "domain": "youtube.com",
+    "category": "entertainment",
+    "risk_score": 0.6,
+    "label_id": 5
+  },
+  {
+    "url": "grammarly.com/ai",
+    "domain": "grammarly.com",
+    "category": "ai_tool",
+    "risk_score": 0.9,
+    "label_id": 6
+  },
+  {
+    "url": "www.scholar.google.com",
+    "domain": "scholar.google.com",
+    "category": "educational",
+    "risk_score": 0.1,
+    "label_id": 1
+  },
+  {
+    "url": "https://huggingface.co/chat",
+    "domain": "huggingface.co",
+    "category": "ai_tool",
+    "risk_score": 0.9,
+    "label_id": 6
+  },
+  {
+    "url": "http://symbolab.com",
+    "domain": "symbolab.com",
+    "category": "ai_tool",
+    "risk_score": 0.9,
+    "label_id": 6
+  },
+  {
+    "url": "https://www.primevideo.com/some-page",
+    "domain": "primevideo.com",
+    "category": "entertainment",
+    "risk_score": 0.6,
+    "label_id": 5
+  },
+  {
+    "url": "https://www.tome.app/some-page",
+    "domain": "tome.app",
+    "category": "ai_tool",
+    "risk_score": 0.9,
+    "label_id": 6
+  },
+  {
+    "url": "http://brainly.in",
+    "domain": "brainly.in",
+    "category": "cheating",
+    "risk_score": 0.95,
+    "label_id": 7
+  },
+  {
+    "url": "https://purplemath.com/path/to/page",
+    "domain": "purplemath.com",
+    "category": "educational",
+    "risk_score": 0.1,
+    "label_id": 1
+  },
+  {
+    "url": "www.huggingface.co/chat",
+    "domain": "huggingface.co",
+    "category": "ai_tool",
+    "risk_score": 0.9,
+    "label_id": 6
+  },
+  {
+    "url": "khanacademy.org",
+    "domain": "khanacademy.org",
+    "category": "educational",
+    "risk_score": 0.1,
+    "label_id": 1
+  },
+  {
+    "url": "https://copilot.microsoft.com",
+    "domain": "copilot.microsoft.com",
+    "category": "ai_tool",
+    "risk_score": 0.9,
+    "label_id": 6
+  },
+  {
+    "url": "https://character.ai",
+    "domain": "character.ai",
+    "category": "ai_tool",
+    "risk_score": 0.9,
+    "label_id": 6
+  },
+  {
+    "url": "http://9gag.com",
+    "domain": "9gag.com",
+    "category": "entertainment",
+    "risk_score": 0.6,
+    "label_id": 5
+  },
+  {
+    "url": "www.proctoru.com",
+    "domain": "proctoru.com",
+    "category": "exam_platform",
+    "risk_score": 0.0,
+    "label_id": 0
+  },
+  {
+    "url": "www.aistudio.google.com",
+    "domain": "aistudio.google.com",
+    "category": "ai_tool",
+    "risk_score": 0.9,
+    "label_id": 6
+  },
+  {
+    "url": "https://web.telegram.org",
+    "domain": "web.telegram.org",
+    "category": "social_media",
+    "risk_score": 0.45,
+    "label_id": 4
+  },
+  {
+    "url": "https://twitter.com/path/to/page",
+    "domain": "twitter.com",
+    "category": "entertainment",
+    "risk_score": 0.6,
+    "label_id": 5
+  },
+  {
+    "url": "poe.com",
+    "domain": "poe.com",
+    "category": "ai_tool",
+    "risk_score": 0.9,
+    "label_id": 6
+  },
+  {
+    "url": "https://facebook.com/messenger/path/to/page",
+    "domain": "facebook.com",
+    "category": "social_media",
+    "risk_score": 0.45,
+    "label_id": 4
+  },
+  {
+    "url": "https://hulu.com/path/to/page",
+    "domain": "hulu.com",
+    "category": "entertainment",
+    "risk_score": 0.6,
+    "label_id": 5
+  },
+  {
+    "url": "https://tutor.com",
+    "domain": "tutor.com",
+    "category": "cheating",
+    "risk_score": 0.95,
+    "label_id": 7
+  },
+  {
+    "url": "https://www.replit.com/some-page",
+    "domain": "replit.com",
+    "category": "code_hosting",
+    "risk_score": 0.35,
+    "label_id": 3
+  },
+  {
+    "url": "http://cohere.com/chat",
+    "domain": "cohere.com",
+    "category": "ai_tool",
+    "risk_score": 0.9,
+    "label_id": 6
+  },
+  {
+    "url": "https://discord.com/path/to/page",
+    "domain": "discord.com",
+    "category": "entertainment",
+    "risk_score": 0.6,
+    "label_id": 5
+  },
+  {
+    "url": "www.coursehero.com/tutors",
+    "domain": "coursehero.com",
+    "category": "cheating",
+    "risk_score": 0.95,
+    "label_id": 7
+  },
+  {
+    "url": "https://jsfiddle.net",
+    "domain": "jsfiddle.net",
+    "category": "code_hosting",
+    "risk_score": 0.35,
+    "label_id": 3
+  },
+  {
+    "url": "http://google.com",
+    "domain": "google.com",
+    "category": "search_engine",
+    "risk_score": 0.15,
+    "label_id": 2
+  },
+  {
+    "url": "https://coursera.org",
+    "domain": "coursera.org",
+    "category": "educational",
+    "risk_score": 0.1,
+    "label_id": 1
+  },
+  {
+    "url": "http://crunchyroll.com",
+    "domain": "crunchyroll.com",
+    "category": "entertainment",
+    "risk_score": 0.6,
+    "label_id": 5
+  },
+  {
+    "url": "https://docs.oracle.com",
+    "domain": "docs.oracle.com",
+    "category": "educational",
+    "risk_score": 0.1,
+    "label_id": 1
+  },
+  {
+    "url": "https://proctorio.com",
+    "domain": "proctorio.com",
+    "category": "exam_platform",
+    "risk_score": 0.0,
+    "label_id": 0
+  },
+  {
+    "url": "www.pastebin.com",
+    "domain": "pastebin.com",
+    "category": "code_hosting",
+    "risk_score": 0.35,
+    "label_id": 3
+  },
+  {
+    "url": "https://www.quora.com",
+    "domain": "quora.com",
+    "category": "social_media",
+    "risk_score": 0.45,
+    "label_id": 4
+  },
+  {
+    "url": "https://www.chat.mistral.ai",
+    "domain": "chat.mistral.ai",
+    "category": "ai_tool",
+    "risk_score": 0.9,
+    "label_id": 6
+  },
+  {
+    "url": "https://www.proctoru.com",
+    "domain": "proctoru.com",
+    "category": "exam_platform",
+    "risk_score": 0.0,
+    "label_id": 0
+  },
+  {
+    "url": "https://web.telegram.org",
+    "domain": "web.telegram.org",
+    "category": "social_media",
+    "risk_score": 0.45,
+    "label_id": 4
+  },
+  {
+    "url": "http://writesonic.com",
+    "domain": "writesonic.com",
+    "category": "ai_tool",
+    "risk_score": 0.9,
+    "label_id": 6
+  },
+  {
+    "url": "http://bitbucket.org",
+    "domain": "bitbucket.org",
+    "category": "code_hosting",
+    "risk_score": 0.35,
+    "label_id": 3
+  },
+  {
+    "url": "https://purplemath.com",
+    "domain": "purplemath.com",
+    "category": "educational",
+    "risk_score": 0.1,
+    "label_id": 1
+  },
+  {
+    "url": "https://www.twitter.com/some-page",
+    "domain": "twitter.com",
+    "category": "entertainment",
+    "risk_score": 0.6,
+    "label_id": 5
+  },
+  {
+    "url": "https://twitch.tv/directory",
+    "domain": "twitch.tv",
+    "category": "entertainment",
+    "risk_score": 0.6,
+    "label_id": 5
+  },
+  {
+    "url": "https://www.deepseek.com",
+    "domain": "deepseek.com",
+    "category": "ai_tool",
+    "risk_score": 0.9,
+    "label_id": 6
+  },
+  {
+    "url": "http://disneyplus.com",
+    "domain": "disneyplus.com",
+    "category": "entertainment",
+    "risk_score": 0.6,
+    "label_id": 5
+  },
+  {
+    "url": "www.openai.com",
+    "domain": "openai.com",
+    "category": "ai_tool",
+    "risk_score": 0.9,
+    "label_id": 6
+  },
+  {
+    "url": "https://quizlet.com/flashcards",
+    "domain": "quizlet.com",
+    "category": "cheating",
+    "risk_score": 0.95,
+    "label_id": 7
+  },
+  {
+    "url": "phind.com",
+    "domain": "phind.com",
+    "category": "ai_tool",
+    "risk_score": 0.9,
+    "label_id": 6
+  },
+  {
+    "url": "https://studocu.com/document",
+    "domain": "studocu.com",
+    "category": "cheating",
+    "risk_score": 0.95,
+    "label_id": 7
+  },
+  {
+    "url": "www.tiktok.com",
+    "domain": "tiktok.com",
+    "category": "entertainment",
+    "risk_score": 0.6,
+    "label_id": 5
+  },
+  {
+    "url": "https://www.numerade.com",
+    "domain": "numerade.com",
+    "category": "cheating",
+    "risk_score": 0.95,
+    "label_id": 7
+  },
+  {
+    "url": "https://udacity.com/path/to/page",
+    "domain": "udacity.com",
+    "category": "educational",
+    "risk_score": 0.1,
+    "label_id": 1
+  },
+  {
+    "url": "https://www.enotes.com/some-page",
+    "domain": "enotes.com",
+    "category": "cheating",
+    "risk_score": 0.95,
+    "label_id": 7
+  },
+  {
+    "url": "http://essaytyper.com",
+    "domain": "essaytyper.com",
+    "category": "cheating",
+    "risk_score": 0.95,
+    "label_id": 7
+  },
+  {
+    "url": "https://developer.mozilla.org/en-US/docs",
+    "domain": "developer.mozilla.org",
+    "category": "educational",
+    "risk_score": 0.1,
+    "label_id": 1
+  },
+  {
+    "url": "http://kick.com",
+    "domain": "kick.com",
+    "category": "entertainment",
+    "risk_score": 0.6,
+    "label_id": 5
+  },
+  {
+    "url": "https://facebook.com",
+    "domain": "facebook.com",
+    "category": "entertainment",
+    "risk_score": 0.6,
+    "label_id": 5
+  },
+  {
+    "url": "https://hastebin.com",
+    "domain": "hastebin.com",
+    "category": "code_hosting",
+    "risk_score": 0.35,
+    "label_id": 3
+  },
+  {
+    "url": "https://codesandbox.io/path/to/page",
+    "domain": "codesandbox.io",
+    "category": "code_hosting",
+    "risk_score": 0.35,
+    "label_id": 3
+  },
+  {
+    "url": "https://jasper.ai",
+    "domain": "jasper.ai",
+    "category": "ai_tool",
+    "risk_score": 0.9,
+    "label_id": 6
+  },
+  {
+    "url": "https://www.mathway.com/some-page",
+    "domain": "mathway.com",
+    "category": "ai_tool",
+    "risk_score": 0.9,
+    "label_id": 6
+  },
+  {
+    "url": "http://facebook.com/messenger",
+    "domain": "facebook.com",
+    "category": "social_media",
+    "risk_score": 0.45,
+    "label_id": 4
+  },
+  {
+    "url": "udacity.com",
+    "domain": "udacity.com",
+    "category": "educational",
+    "risk_score": 0.1,
+    "label_id": 1
+  },
+  {
+    "url": "https://store.steampowered.com/path/to/page",
+    "domain": "store.steampowered.com",
+    "category": "entertainment",
+    "risk_score": 0.6,
+    "label_id": 5
+  },
+  {
+    "url": "https://www.store.steampowered.com",
+    "domain": "store.steampowered.com",
+    "category": "entertainment",
+    "risk_score": 0.6,
+    "label_id": 5
+  },
+  {
+    "url": "https://tiktok.com/foryou",
+    "domain": "tiktok.com",
+    "category": "entertainment",
+    "risk_score": 0.6,
+    "label_id": 5
+  },
+  {
+    "url": "https://scholar.google.com",
+    "domain": "scholar.google.com",
+    "category": "educational",
+    "risk_score": 0.1,
+    "label_id": 1
+  },
+  {
+    "url": "https://www.wyzant.com",
+    "domain": "wyzant.com",
+    "category": "cheating",
+    "risk_score": 0.95,
+    "label_id": 7
+  },
+  {
+    "url": "https://github.com/search",
+    "domain": "github.com",
+    "category": "code_hosting",
+    "risk_score": 0.35,
+    "label_id": 3
+  },
+  {
+    "url": "https://coursehero.com/path/to/page",
+    "domain": "coursehero.com",
+    "category": "cheating",
+    "risk_score": 0.95,
+    "label_id": 7
+  },
+  {
+    "url": "https://www.groq.com",
+    "domain": "groq.com",
+    "category": "ai_tool",
+    "risk_score": 0.9,
+    "label_id": 6
+  },
+  {
+    "url": "https://bing.com/chat",
+    "domain": "bing.com",
+    "category": "ai_tool",
+    "risk_score": 0.9,
+    "label_id": 6
+  },
+  {
+    "url": "https://replit.com",
+    "domain": "replit.com",
+    "category": "code_hosting",
+    "risk_score": 0.35,
+    "label_id": 3
+  },
+  {
+    "url": "www.you.com",
+    "domain": "you.com",
+    "category": "ai_tool",
+    "risk_score": 0.9,
+    "label_id": 6
+  },
+  {
+    "url": "www.quillbot.com",
+    "domain": "quillbot.com",
+    "category": "ai_tool",
+    "risk_score": 0.9,
+    "label_id": 6
+  },
+  {
+    "url": "https://developer.mozilla.org",
+    "domain": "developer.mozilla.org",
+    "category": "educational",
+    "risk_score": 0.1,
+    "label_id": 1
+  },
+  {
+    "url": "gitlab.com",
+    "domain": "gitlab.com",
+    "category": "code_hosting",
+    "risk_score": 0.35,
+    "label_id": 3
+  },
+  {
+    "url": "https://photomath.com/practice",
+    "domain": "photomath.com",
+    "category": "cheating",
+    "risk_score": 0.95,
+    "label_id": 7
+  },
+  {
+    "url": "https://tutor.com/path/to/page",
+    "domain": "tutor.com",
+    "category": "cheating",
+    "risk_score": 0.95,
+    "label_id": 7
+  },
+  {
+    "url": "http://linkedin.com/messaging",
+    "domain": "linkedin.com",
+    "category": "social_media",
+    "risk_score": 0.45,
+    "label_id": 4
+  },
+  {
+    "url": "www.gemini.google.com",
+    "domain": "gemini.google.com",
+    "category": "ai_tool",
+    "risk_score": 0.9,
+    "label_id": 6
+  },
+  {
+    "url": "https://yahoo.com",
+    "domain": "yahoo.com",
+    "category": "search_engine",
+    "risk_score": 0.15,
+    "label_id": 2
+  },
+  {
+    "url": "https://researchgate.net",
+    "domain": "researchgate.net",
+    "category": "educational",
+    "risk_score": 0.1,
+    "label_id": 1
+  },
+  {
+    "url": "https://deepseek.com",
+    "domain": "deepseek.com",
+    "category": "ai_tool",
+    "risk_score": 0.9,
+    "label_id": 6
+  },
+  {
+    "url": "https://www.copilot.microsoft.com/some-page",
+    "domain": "copilot.microsoft.com",
+    "category": "ai_tool",
+    "risk_score": 0.9,
+    "label_id": 6
+  },
+  {
+    "url": "https://www.mit.edu",
+    "domain": "mit.edu",
+    "category": "educational",
+    "risk_score": 0.1,
+    "label_id": 1
+  },
+  {
+    "url": "https://socratic.org",
+    "domain": "socratic.org",
+    "category": "cheating",
+    "risk_score": 0.95,
+    "label_id": 7
+  },
+  {
+    "url": "https://cppreference.com",
+    "domain": "cppreference.com",
+    "category": "educational",
+    "risk_score": 0.1,
+    "label_id": 1
+  },
+  {
+    "url": "https://labs.google.com/ai",
+    "domain": "labs.google.com",
+    "category": "ai_tool",
+    "risk_score": 0.9,
+    "label_id": 6
+  },
+  {
+    "url": "https://www.tutorialspoint.com/some-page",
+    "domain": "tutorialspoint.com",
+    "category": "educational",
+    "risk_score": 0.1,
+    "label_id": 1
+  },
+  {
+    "url": "www.duckduckgo.com",
+    "domain": "duckduckgo.com",
+    "category": "search_engine",
+    "risk_score": 0.15,
+    "label_id": 2
+  },
+  {
+    "url": "https://kick.com",
+    "domain": "kick.com",
+    "category": "entertainment",
+    "risk_score": 0.6,
+    "label_id": 5
+  },
+  {
+    "url": "http://duckduckgo.com",
+    "domain": "duckduckgo.com",
+    "category": "search_engine",
+    "risk_score": 0.15,
+    "label_id": 2
+  },
+  {
+    "url": "https://www.numerade.com/ask/some-page",
+    "domain": "numerade.com",
+    "category": "cheating",
+    "risk_score": 0.95,
+    "label_id": 7
+  },
+  {
+    "url": "https://x.com",
+    "domain": "x.com",
+    "category": "entertainment",
+    "risk_score": 0.6,
+    "label_id": 5
+  },
+  {
+    "url": "https://gradescope.com",
+    "domain": "gradescope.com",
+    "category": "exam_platform",
+    "risk_score": 0.0,
+    "label_id": 0
+  }
+]

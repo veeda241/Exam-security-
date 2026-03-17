@@ -14,30 +14,37 @@ SCREENSHOTS_DIR = UPLOAD_DIR / "screenshots"
 WEBCAM_DIR = UPLOAD_DIR / "webcam"
 
 # Database configuration - Supabase PostgreSQL
-SUPABASE_URL = os.getenv("SUPABASE_URL", "https://fpnopsvzvfqwvyqmhgei.supabase.co")
-SUPABASE_KEY = os.getenv("SUPABASE_KEY", "sb_publishable_qUw5vPnm8pRAlAZCc5pm5w_kKUzfCw6")
-SUPABASE_DB_PASSWORD = os.getenv("SUPABASE_DB_PASSWORD", "Vyasxdxd@17")
+# Set these via environment variables (never hardcode secrets)
+SUPABASE_URL = os.getenv("SUPABASE_URL", "")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY", "")
+SUPABASE_DB_PASSWORD = os.getenv("SUPABASE_DB_PASSWORD", "")
 
 # Supabase PostgreSQL connection (Direct connection - port 5432)
 PG_USER = os.getenv("PG_USER", "postgres")
 PG_PASSWORD = os.getenv("PG_PASSWORD", SUPABASE_DB_PASSWORD)
-PG_HOST = os.getenv("PG_HOST", "db.fpnopsvzvfqwvyqmhgei.supabase.co")
+PG_HOST = os.getenv("PG_HOST", "")
 PG_PORT = os.getenv("PG_PORT", "5432")
 PG_DB = os.getenv("PG_DB", "postgres")
 
-# Database mode: default to SQLite for local development
-# Set USE_SUPABASE=true to use remote Supabase PostgreSQL instead
-if os.getenv("USE_SUPABASE", "false").lower() == "true":
-    DATABASE_URL = os.getenv(
-        "DATABASE_URL",
-        f"postgresql+asyncpg://{PG_USER}:{quote_plus(PG_PASSWORD)}@{PG_HOST}:{PG_PORT}/{PG_DB}"
-    )
+# Database mode: use DATABASE_URL if set, else Supabase config, else SQLite
+if os.getenv("DATABASE_URL"):
+    DATABASE_URL = os.getenv("DATABASE_URL")
+    # Render uses postgres:// but SQLAlchemy needs postgresql+asyncpg://
+    if DATABASE_URL.startswith("postgres://"):
+        DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql+asyncpg://", 1)
+    elif DATABASE_URL.startswith("postgresql://"):
+        DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://", 1)
+elif PG_HOST:
+    DATABASE_URL = f"postgresql+asyncpg://{PG_USER}:{quote_plus(PG_PASSWORD)}@{PG_HOST}:{PG_PORT}/{PG_DB}"
 else:
     DATABASE_URL = f"sqlite+aiosqlite:///{BASE_DIR}/examguard.db"
 
 # API Configuration
 API_HOST = os.getenv("API_HOST", "0.0.0.0")
 API_PORT = int(os.getenv("API_PORT", "8000"))
+
+# CORS - comma-separated allowed origins (use * for dev)
+CORS_ORIGINS = os.getenv("CORS_ORIGINS", "*").split(",")
 
 # Capture settings
 SCREENSHOT_INTERVAL_SECONDS = 3

@@ -1,0 +1,147 @@
+[
+  {
+    "text": "ChatGPT - OpenAI",
+    "category": "ai_tool",
+    "risk": 0.95
+  },
+  {
+    "text": "Ask me anything - Claude AI Assistant",
+    "category": "ai_tool",
+    "risk": 0.9
+  },
+  {
+    "text": "Gemini - Google AI",
+    "category": "ai_tool",
+    "risk": 0.9
+  },
+  {
+    "text": "Perplexity AI - Ask anything",
+    "category": "ai_tool",
+    "risk": 0.9
+  },
+  {
+    "text": "Write code with GitHub Copilot",
+    "category": "ai_tool",
+    "risk": 0.85
+  },
+  {
+    "text": "WolframAlpha computational knowledge engine",
+    "category": "ai_tool",
+    "risk": 0.85
+  },
+  {
+    "text": "Try our AI homework helper",
+    "category": "ai_tool",
+    "risk": 0.9
+  },
+  {
+    "text": "Get instant AI answers",
+    "category": "ai_tool",
+    "risk": 0.9
+  },
+  {
+    "text": "Chegg Study - Homework Help",
+    "category": "cheating",
+    "risk": 0.95
+  },
+  {
+    "text": "Course Hero - Study Resources",
+    "category": "cheating",
+    "risk": 0.95
+  },
+  {
+    "text": "Get homework answers - Brainly",
+    "category": "cheating",
+    "risk": 0.95
+  },
+  {
+    "text": "Step-by-step textbook solutions - Bartleby",
+    "category": "cheating",
+    "risk": 0.9
+  },
+  {
+    "text": "Quizlet flashcards and study sets",
+    "category": "cheating",
+    "risk": 0.8
+  },
+  {
+    "text": "Upload your assignment for expert help",
+    "category": "cheating",
+    "risk": 0.95
+  },
+  {
+    "text": "View the full answer and unlock step-by-step solutions",
+    "category": "cheating",
+    "risk": 0.9
+  },
+  {
+    "text": "Get unstuck with Numerade video answers",
+    "category": "cheating",
+    "risk": 0.9
+  },
+  {
+    "text": "Python 3 Official Documentation",
+    "category": "educational",
+    "risk": 0.05
+  },
+  {
+    "text": "MDN Web Docs - JavaScript Reference",
+    "category": "educational",
+    "risk": 0.05
+  },
+  {
+    "text": "Khan Academy - Free Online Learning",
+    "category": "educational",
+    "risk": 0.05
+  },
+  {
+    "text": "Google Search Results",
+    "category": "search_engine",
+    "risk": 0.1
+  },
+  {
+    "text": "Canvas Learning Management System",
+    "category": "exam_platform",
+    "risk": 0.0
+  },
+  {
+    "text": "Google Forms - Create your exam",
+    "category": "exam_platform",
+    "risk": 0.0
+  },
+  {
+    "text": "Moodle - Online Learning Platform",
+    "category": "exam_platform",
+    "risk": 0.0
+  },
+  {
+    "text": "YouTube - Watch Videos Online",
+    "category": "entertainment",
+    "risk": 0.6
+  },
+  {
+    "text": "Netflix - Watch TV Shows Online",
+    "category": "entertainment",
+    "risk": 0.7
+  },
+  {
+    "text": "Reddit - The Front Page of the Internet",
+    "category": "entertainment",
+    "risk": 0.5
+  },
+  {
+    "text": "Discord - Chat for Communities",
+    "category": "entertainment",
+    "risk": 0.55
+  },
+  {
+    "text": "Spotify - Music for Everyone",
+    "category": "entertainment",
+    "risk": 0.5
+  },
+  {
+    "text": "Twitch - Live Streaming",
+    "category": "entertainment",
+    "risk": 0.6
+  }
+]

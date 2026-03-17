@@ -1,0 +1,1042 @@
+[
+  {
+    "text1": "A linked list stores data in nodes where each node points to the next.",
+    "text2": "A linked list stores data in nodes where each node points to the next.",
+    "similarity": 1.0
+  },
+  {
+    "text1": "the industrial revolution transformed manufacturing from hand production to machine-based processes.",
+    "text2": "manufacturing shifted from hand production to machine-based processes during the industrial revolution.",
+    "similarity": 0.93
+  },
+  {
+    "text1": "global warming is caused by greenhouse gas emissions from human activities.",
+    "text2": "the increase in methane and co2 levels is directly linked to industrial processes and deforestation.",
+    "similarity": 0.5
+  },
+  {
+    "text1": "DNA replication is a semiconservative process where each strand serves as a template for the new strand.",
+    "text2": "DNA replication is a semiconservative process where each strand serves as a template for the new strand.",
+    "similarity": 1.0
+  },
+  {
+    "text1": "shakespeare wrote romeo and juliet as a tragedy about two star-crossed lovers from feuding families.",
+    "text2": "romeo and juliet, written by shakespeare, is a tragic story of two star-crossed lovers from rival families.",
+    "similarity": 0.94
+  },
+  {
+    "text1": "Vaccines work by training the immune system to recognize pathogens.",
+    "text2": "Vaccines work by training the immune system to recognize pathogens.",
+    "similarity": 1.0
+  },
+  {
+    "text1": "Igneous rocks are formed from cooling lava.",
+    "text2": "Supply and demand determine market prices.",
+    "similarity": 0.02
+  },
+  {
+    "text1": "According to Wikipedia, the population of France is 67 million.",
+    "text2": "According to Wikipedia, the population of France is 67 million.",
+    "similarity": 1.0
+  },
+  {
+    "text1": "The cell membrane is a selectively permeable barrier that controls what enters and exits the cell.",
+    "text2": "The cell membrane is a selectively permeable barrier that controls what enters and exits the cell.",
+    "similarity": 1.0
+  },
+  {
+    "text1": "Normalization in databases reduces redundancy.",
+    "text2": "Normalization in databases reduces redundancy.",
+    "similarity": 1.0
+  },
+  {
+    "text1": "In Python, a list is a mutable sequence, meaning elements can be changed after creation.",
+    "text2": "In Python, a list is a mutable sequence, meaning elements can be changed after creation.",
+    "similarity": 1.0
+  },
+  {
+    "text1": "About three billion base pairs make up the DNA sequence in the human genome.",
+    "text2": "The human genome contains approximately 3 billion base pairs of DNA.",
+    "similarity": 0.84
+  },
+  {
+    "text1": "Osmosis is the movement of water molecules through a semipermeable membrane from an area of low solute concentration to high.",
+    "text2": "Osmosis is the movement of water molecules through a semipermeable membrane from an area of low solute concentration to high.",
+    "similarity": 1.0
+  },
+  {
+    "text1": "Certainly! Here is a comprehensive overview of photosynthesis. Photosynthesis is a biological process.",
+    "text2": "Photosynthesis is the process by which plants convert sunlight into energy.",
+    "similarity": 0.65
+  },
+  {
+    "text1": "Martin Luther King Jr. led nonviolent protests demanding equal rights for African Americans.",
+    "text2": "The civil rights movement fought against racial segregation in America.",
+    "similarity": 0.42
+  },
+  {
+    "text1": "A linked list stores data in nodes where each node points to the next.",
+    "text2": "Unlike arrays, linked lists use pointers to connect elements sequentially in memory.",
+    "similarity": 0.55
+  },
+  {
+    "text1": "An operating system manages computer hardware and software resources.",
+    "text2": "The Nile is the longest river in Africa.",
+    "similarity": 0.03
+  },
+  {
+    "text1": "Recursion is when a function calls itself to solve a smaller version of the same problem.",
+    "text2": "A recursive approach involves a function solving smaller subproblems by invoking itself repeatedly.",
+    "similarity": 0.78
+  },
+  {
+    "text1": "The human genome contains approximately 3 billion base pairs of DNA.",
+    "text2": "The human genome contains approximately 3 billion base pairs of DNA.",
+    "similarity": 1.0
+  },
+  {
+    "text1": "The French Revolution began in 1789.",
+    "text2": "The French Revolution began in 1789.",
+    "similarity": 1.0
+  },
+  {
+    "text1": "Romeo and Juliet, written by Shakespeare, is a tragic story of two star-crossed lovers from rival families.",
+    "text2": "Shakespeare wrote Romeo and Juliet as a tragedy about two star-crossed lovers from feuding families.",
+    "similarity": 0.94
+  },
+  {
+    "text1": "The Theory of Relativity changed our understanding of space, time, and gravity.",
+    "text2": "Einstein's relativity fundamentally altered how scientists think about gravity, space, and time.",
+    "similarity": 0.75
+  },
+  {
+    "text1": "object-oriented programming is based on the concept of objects which can contain data and code.",
+    "text2": "oop relies on objects that hold both code and data to structure software.",
+    "similarity": 0.9
+  },
+  {
+    "text1": "Each DNA strand acts as a template for a new strand in the semiconservative replication process.",
+    "text2": "DNA replication is a semiconservative process where each strand serves as a template for the new strand.",
+    "similarity": 0.93
+  },
+  {
+    "text1": "mitochondria produce atp.",
+    "text2": "the supreme court has nine justices.",
+    "similarity": 0.03
+  },
+  {
+    "text1": "antibiotics kill bacteria by disrupting their cell walls.",
+    "text2": "the stock market crashed in october 1929.",
+    "similarity": 0.04
+  },
+  {
+    "text1": "Barbarian invasions and internal corruption led to the decline of Rome.",
+    "text2": "The Roman Empire fell due to a combination of military, economic, and political factors.",
+    "similarity": 0.48
+  },
+  {
+    "text1": "Rising prices of goods and services across the economy over time is what economists call inflation.",
+    "text2": "Inflation occurs when the general price level of goods and services rises over time.",
+    "similarity": 0.77
+  },
+  {
+    "text1": "The population of France is approximately 67 million.",
+    "text2": "According to Wikipedia, the population of France is 67 million.",
+    "similarity": 0.8
+  },
+  {
+    "text1": "The civil rights movement fought against racial segregation in America.",
+    "text2": "Martin Luther King Jr. led nonviolent protests demanding equal rights for African Americans.",
+    "similarity": 0.42
+  },
+  {
+    "text1": "The stock market crashed in October 1929.",
+    "text2": "Antibiotics kill bacteria by disrupting their cell walls.",
+    "similarity": 0.04
+  },
+  {
+    "text1": "Tectonic plates move due to convection currents in the mantle.",
+    "text2": "Tectonic plates move due to convection currents in the mantle.",
+    "similarity": 1.0
+  },
+  {
+    "text1": "Object-oriented programming is based on the concept of objects which can contain data and code.",
+    "text2": "OOP relies on objects that hold both code and data to structure software.",
+    "similarity": 0.9
+  },
+  {
+    "text1": "The Industrial Revolution transformed manufacturing from hand production to machine-based processes.",
+    "text2": "Manufacturing shifted from hand production to machine-based processes during the Industrial Revolution.",
+    "similarity": 0.93
+  },
+  {
+    "text1": "as an ai language model, i can explain that gravity is a fundamental force of nature.",
+    "text2": "gravity is one of the four fundamental forces governing the universe.",
+    "similarity": 0.6
+  },
+  {
+    "text1": "Inflation occurs when the general price level of goods and services rises over time.",
+    "text2": "Inflation occurs when the general price level of goods and services rises over time.",
+    "similarity": 1.0
+  },
+  {
+    "text1": "Water molecules travel across semipermeable membranes from low to high solute concentration through osmosis.",
+    "text2": "Osmosis is the movement of water molecules through a semipermeable membrane from an area of low solute concentration to high.",
+    "similarity": 0.83
+  },
+  {
+    "text1": "DNA replication is a semiconservative process where each strand serves as a template for the new strand.",
+    "text2": "Each DNA strand acts as a template for a new strand in the semiconservative replication process.",
+    "similarity": 0.93
+  },
+  {
+    "text1": "binary search has a time complexity of o(log n) as it halves the search space in each step.",
+    "text2": "with o(log n) time complexity, binary search divides the search space in half each iteration.",
+    "similarity": 0.93
+  },
+  {
+    "text1": "i believe the main theme of hamlet is indecision and its consequences.",
+    "text2": "hamlet explores the complexity of revenge and madness through its protagonist.",
+    "similarity": 0.5
+  },
+  {
+    "text1": "Gravity is one of the four fundamental forces governing the universe.",
+    "text2": "As an AI language model, I can explain that gravity is a fundamental force of nature.",
+    "similarity": 0.6
+  },
+  {
+    "text1": "Shakespeare was born in Stratford-upon-Avon.",
+    "text2": "A binary tree has at most two child nodes.",
+    "similarity": 0.04
+  },
+  {
+    "text1": "Photosynthesis produces glucose and oxygen from carbon dioxide and water.",
+    "text2": "Photosynthesis produces glucose and oxygen from carbon dioxide and water.",
+    "similarity": 1.0
+  },
+  {
+    "text1": "The speed of light is approximately 300 million meters per second.",
+    "text2": "Democracy is a form of government where citizens vote for their leaders.",
+    "similarity": 0.02
+  },
+  {
+    "text1": "The Theory of Relativity changed our understanding of space, time, and gravity.",
+    "text2": "The Theory of Relativity changed our understanding of space, time, and gravity.",
+    "similarity": 1.0
+  },
+  {
+    "text1": "The Amazon rainforest is the largest tropical forest on Earth.",
+    "text2": "HTML is a markup language for creating web pages.",
+    "similarity": 0.02
+  },
+  {
+    "text1": "The speed of light is approximately 300 million meters per second.",
+    "text2": "The speed of light is approximately 300 million meters per second.",
+    "similarity": 1.0
+  },
+  {
+    "text1": "Unlike arrays, linked lists use pointers to connect elements sequentially in memory.",
+    "text2": "A linked list stores data in nodes where each node points to the next.",
+    "similarity": 0.55
+  },
+  {
+    "text1": "the french revolution was caused by social inequality and economic crisis.",
+    "text2": "key factors in the french revolution included poor harvests and high taxes on the third estate.",
+    "similarity": 0.6
+  },
+  {
+    "text1": "the french revolution began in 1789 when the bastille was stormed by angry parisian citizens.",
+    "text2": "in 1789, angry citizens of paris stormed the bastille, marking the start of the french revolution.",
+    "similarity": 0.94
+  },
+  {
+    "text1": "The powerhouse of the cell is the mitochondria which creates most of the ATP supply.",
+    "text2": "The mitochondria is the powerhouse of the cell generating most of the cell supply of ATP.",
+    "similarity": 0.92
+  },
+  {
+    "text1": "The Nile is the longest river in Africa.",
+    "text2": "An operating system manages computer hardware and software resources.",
+    "similarity": 0.03
+  },
+  {
+    "text1": "Machine learning is a subset of AI that enables systems to learn from data without being explicitly programmed.",
+    "text2": "A branch of artificial intelligence, machine learning allows systems to learn from data without explicit programming.",
+    "similarity": 0.91
+  },
+  {
+    "text1": "A branch of artificial intelligence, machine learning allows systems to learn from data without explicit programming.",
+    "text2": "Machine learning is a subset of AI that enables systems to learn from data without being explicitly programmed.",
+    "similarity": 0.91
+  },
+  {
+    "text1": "The Supreme Court has nine justices.",
+    "text2": "Mitochondria produce ATP.",
+    "similarity": 0.03
+  },
+  {
+    "text1": "The French Revolution began in 1789 when the Bastille was stormed by angry Parisian citizens.",
+    "text2": "The French Revolution began in 1789 when the Bastille was stormed by angry Parisian citizens.",
+    "similarity": 1.0
+  },
+  {
+    "text1": "sure! let me break down the concept of recursion for you. recursion is a programming technique.",
+    "text2": "recursion is a method where a function calls itself to solve a problem.",
+    "similarity": 0.7
+  },
+  {
+    "text1": "Object-oriented programming is based on the concept of objects which can contain data and code.",
+    "text2": "Object-oriented programming is based on the concept of objects which can contain data and code.",
+    "similarity": 1.0
+  },
+  {
+    "text1": "a linked list stores data in nodes where each node points to the next.",
+    "text2": "unlike arrays, linked lists use pointers to connect elements sequentially in memory.",
+    "similarity": 0.55
+  },
+  {
+    "text1": "The French Revolution began in 1789 when the Bastille was stormed by angry Parisian citizens.",
+    "text2": "In 1789, angry citizens of Paris stormed the Bastille, marking the start of the French Revolution.",
+    "similarity": 0.94
+  },
+  {
+    "text1": "As an AI language model, I can explain that gravity is a fundamental force of nature.",
+    "text2": "Gravity is one of the four fundamental forces governing the universe.",
+    "similarity": 0.6
+  },
+  {
+    "text1": "World War II ended in 1945 with the surrender of Germany and Japan.",
+    "text2": "The year 1945 saw the conclusion of WWII as both Germany and Japan surrendered to the Allied forces.",
+    "similarity": 0.76
+  },
+  {
+    "text1": "Democracy is a form of government where citizens vote for their leaders.",
+    "text2": "The speed of light is approximately 300 million meters per second.",
+    "similarity": 0.02
+  },
+  {
+    "text1": "As stated in the Chegg solution, the derivative of x squared is 2x.",
+    "text2": "The derivative of x squared is 2x.",
+    "similarity": 0.85
+  },
+  {
+    "text1": "the mitochondria is the powerhouse of the cell generating most of the cell supply of atp.",
+    "text2": "the powerhouse of the cell is the mitochondria which creates most of the atp supply.",
+    "similarity": 0.92
+  },
+  {
+    "text1": "a stack is a lifo data structure where elements are added and removed from the top.",
+    "text2": "elements in a stack follow last-in-first-out ordering, always operating from the top of the structure.",
+    "similarity": 0.8
+  },
+  {
+    "text1": "as stated in the chegg solution, the derivative of x squared is 2x.",
+    "text2": "the derivative of x squared is 2x.",
+    "similarity": 0.85
+  },
+  {
+    "text1": "The French Revolution was caused by social inequality and economic crisis.",
+    "text2": "Key factors in the French Revolution included poor harvests and high taxes on the third estate.",
+    "similarity": 0.6
+  },
+  {
+    "text1": "The Fibonacci sequence starts with 0 and 1.",
+    "text2": "Tectonic plates move due to convection currents in the mantle.",
+    "similarity": 0.03
+  },
+  {
+    "text1": "The Great Depression was a severe worldwide economic depression that took place mostly during the 1930s.",
+    "text2": "The Great Depression was a severe worldwide economic depression that took place mostly during the 1930s.",
+    "similarity": 1.0
+  },
+  {
+    "text1": "The French Revolution was caused by social inequality and economic crisis.",
+    "text2": "The French Revolution was caused by social inequality and economic crisis.",
+    "similarity": 1.0
+  },
+  {
+    "text1": "normalization in databases reduces redundancy.",
+    "text2": "we use normalization to ensure data integrity and minimize duplicate data.",
+    "similarity": 0.55
+  },
+  {
+    "text1": "Manufacturing shifted from hand production to machine-based processes during the Industrial Revolution.",
+    "text2": "The Industrial Revolution transformed manufacturing from hand production to machine-based processes.",
+    "similarity": 0.93
+  },
+  {
+    "text1": "I believe the main theme of Hamlet is indecision and its consequences.",
+    "text2": "I believe the main theme of Hamlet is indecision and its consequences.",
+    "similarity": 1.0
+  },
+  {
+    "text1": "The water cycle involves evaporation, condensation, precipitation, and collection.",
+    "text2": "Evaporation, condensation, precipitation, and collection are the stages of the water cycle.",
+    "similarity": 0.96
+  },
+  {
+    "text1": "TCP is a reliable transport protocol that guarantees packet delivery.",
+    "text2": "TCP is a reliable transport protocol that guarantees packet delivery.",
+    "similarity": 1.0
+  },
+  {
+    "text1": "F equals ma is the equation representing Newton's second law of motion.",
+    "text2": "Newton's second law states that force is equal to mass times acceleration.",
+    "similarity": 0.8
+  },
+  {
+    "text1": "The cell membrane is a selectively permeable barrier that controls what enters and exits the cell.",
+    "text2": "A selectively permeable barrier, the cell membrane regulates substances entering and leaving the cell.",
+    "similarity": 0.95
+  },
+  {
+    "text1": "vaccines work by training the immune system to recognize pathogens.",
+    "text2": "immunization introduces weakened antigens to build the body's defense against diseases.",
+    "similarity": 0.52
+  },
+  {
+    "text1": "The Supreme Court's decision in Marbury v. Madison established the principle of judicial review.",
+    "text2": "The Supreme Court's decision in Marbury v. Madison established the principle of judicial review.",
+    "similarity": 1.0
+  },
+  {
+    "text1": "the supreme court's decision in marbury v. madison established the principle of judicial review.",
+    "text2": "marbury v. madison was the supreme court case that established the judicial review principle.",
+    "similarity": 0.95
+  },
+  {
+    "text1": "Photosynthesis is the process used by plants to convert light energy into chemical energy.",
+    "text2": "Plants convert light energy to chemical energy through a process called photosynthesis.",
+    "similarity": 0.95
+  },
+  {
+    "text1": "osmosis is the movement of water molecules through a semipermeable membrane from an area of low solute concentration to high.",
+    "text2": "water molecules travel across semipermeable membranes from low to high solute concentration through osmosis.",
+    "similarity": 0.83
+  },
+  {
+    "text1": "Based on the answer found on Brainly, the chemical formula for water is H2O.",
+    "text2": "The chemical formula for water is H2O.",
+    "similarity": 0.85
+  },
+  {
+    "text1": "Plants release oxygen as a byproduct when they make food using sunlight.",
+    "text2": "Photosynthesis produces glucose and oxygen from carbon dioxide and water.",
+    "similarity": 0.45
+  },
+  {
+    "text1": "Binary search has a time complexity of O(log n) as it halves the search space in each step.",
+    "text2": "Binary search has a time complexity of O(log n) as it halves the search space in each step.",
+    "similarity": 1.0
+  },
+  {
+    "text1": "Global warming is caused by greenhouse gas emissions from human activities.",
+    "text2": "Global warming is caused by greenhouse gas emissions from human activities.",
+    "similarity": 1.0
+  },
+  {
+    "text1": "Einstein's relativity fundamentally altered how scientists think about gravity, space, and time.",
+    "text2": "The Theory of Relativity changed our understanding of space, time, and gravity.",
+    "similarity": 0.75
+  },
+  {
+    "text1": "The American Civil War took place from 1861 to 1865.",
+    "text2": "I copied this from the study guide: the civil war lasted from 1861 to 1865.",
+    "similarity": 0.78
+  },
+  {
+    "text1": "the speed of light is approximately 300 million meters per second.",
+    "text2": "democracy is a form of government where citizens vote for their leaders.",
+    "similarity": 0.02
+  },
+  {
+    "text1": "Marbury v. Madison was the Supreme Court case that established the judicial review principle.",
+    "text2": "The Supreme Court's decision in Marbury v. Madison established the principle of judicial review.",
+    "similarity": 0.95
+  },
+  {
+    "text1": "based on the answer found on brainly, the chemical formula for water is h2o.",
+    "text2": "the chemical formula for water is h2o.",
+    "similarity": 0.85
+  },
+  {
+    "text1": "machine learning is a subset of ai that enables systems to learn from data without being explicitly programmed.",
+    "text2": "a branch of artificial intelligence, machine learning allows systems to learn from data without explicit programming.",
+    "similarity": 0.91
+  },
+  {
+    "text1": "ChatGPT says that machine learning is a subset of artificial intelligence.",
+    "text2": "ChatGPT says that machine learning is a subset of artificial intelligence.",
+    "similarity": 1.0
+  },
+  {
+    "text1": "A recursive approach involves a function solving smaller subproblems by invoking itself repeatedly.",
+    "text2": "Recursion is when a function calls itself to solve a smaller version of the same problem.",
+    "similarity": 0.78
+  },
+  {
+    "text1": "The Roman Empire fell due to a combination of military, economic, and political factors.",
+    "text2": "The Roman Empire fell due to a combination of military, economic, and political factors.",
+    "similarity": 1.0
+  },
+  {
+    "text1": "chatgpt says that machine learning is a subset of artificial intelligence.",
+    "text2": "machine learning is a subset of artificial intelligence.",
+    "similarity": 0.82
+  },
+  {
+    "text1": "The human genome contains approximately 3 billion base pairs of DNA.",
+    "text2": "About three billion base pairs make up the DNA sequence in the human genome.",
+    "similarity": 0.84
+  },
+  {
+    "text1": "recursion is when a function calls itself to solve a smaller version of the same problem.",
+    "text2": "a recursive approach involves a function solving smaller subproblems by invoking itself repeatedly.",
+    "similarity": 0.78
+  },
+  {
+    "text1": "Sure! Let me break down the concept of recursion for you. Recursion is a programming technique.",
+    "text2": "Sure! Let me break down the concept of recursion for you. Recursion is a programming technique.",
+    "similarity": 1.0
+  },
+  {
+    "text1": "The Supreme Court's decision in Marbury v. Madison established the principle of judicial review.",
+    "text2": "Marbury v. Madison was the Supreme Court case that established the judicial review principle.",
+    "similarity": 0.95
+  },
+  {
+    "text1": "Igneous rocks are formed from cooling lava.",
+    "text2": "Igneous rocks are formed from cooling lava.",
+    "similarity": 1.0
+  },
+  {
+    "text1": "Hamlet explores the complexity of revenge and madness through its protagonist.",
+    "text2": "I believe the main theme of Hamlet is indecision and its consequences.",
+    "similarity": 0.5
+  },
+  {
+    "text1": "Great question! The answer involves understanding cellular respiration.",
+    "text2": "Cellular respiration converts glucose into ATP energy in cells.",
+    "similarity": 0.4
+  },
+  {
+    "text1": "i copied this from the study guide: the civil war lasted from 1861 to 1865.",
+    "text2": "the american civil war took place from 1861 to 1865.",
+    "similarity": 0.78
+  },
+  {
+    "text1": "great question! the answer involves understanding cellular respiration.",
+    "text2": "cellular respiration converts glucose into atp energy in cells.",
+    "similarity": 0.4
+  },
+  {
+    "text1": "I copied this from the study guide: the civil war lasted from 1861 to 1865.",
+    "text2": "The American Civil War took place from 1861 to 1865.",
+    "similarity": 0.78
+  },
+  {
+    "text1": "A stack is a LIFO data structure where elements are added and removed from the top.",
+    "text2": "Elements in a stack follow last-in-first-out ordering, always operating from the top of the structure.",
+    "similarity": 0.8
+  },
+  {
+    "text1": "Evaporation, condensation, precipitation, and collection are the stages of the water cycle.",
+    "text2": "The water cycle involves evaporation, condensation, precipitation, and collection.",
+    "similarity": 0.96
+  },
+  {
+    "text1": "From the course textbook page 142, mitosis has four main phases.",
+    "text2": "From the course textbook page 142, mitosis has four main phases.",
+    "similarity": 1.0
+  },
+  {
+    "text1": "Great question! The answer involves understanding cellular respiration.",
+    "text2": "Great question! The answer involves understanding cellular respiration.",
+    "similarity": 1.0
+  },
+  {
+    "text1": "The civil rights movement fought against racial segregation in America.",
+    "text2": "The civil rights movement fought against racial segregation in America.",
+    "similarity": 1.0
+  },
+  {
+    "text1": "As stated in the Chegg solution, the derivative of x squared is 2x.",
+    "text2": "As stated in the Chegg solution, the derivative of x squared is 2x.",
+    "similarity": 1.0
+  },
+  {
+    "text1": "The French Revolution began in 1789.",
+    "text2": "Python uses indentation to define code blocks.",
+    "similarity": 0.05
+  },
+  {
+    "text1": "newton's second law states that force is equal to mass times acceleration.",
+    "text2": "f equals ma is the equation representing newton's second law of motion.",
+    "similarity": 0.8
+  },
+  {
+    "text1": "world war ii ended in 1945 with the surrender of germany and japan.",
+    "text2": "the year 1945 saw the conclusion of wwii as both germany and japan surrendered to the allied forces.",
+    "similarity": 0.76
+  },
+  {
+    "text1": "A binary tree has at most two child nodes.",
+    "text2": "Shakespeare was born in Stratford-upon-Avon.",
+    "similarity": 0.04
+  },
+  {
+    "text1": "the water cycle involves evaporation, condensation, precipitation, and collection.",
+    "text2": "evaporation, condensation, precipitation, and collection are the stages of the water cycle.",
+    "similarity": 0.96
+  },
+  {
+    "text1": "HTML is a markup language for creating web pages.",
+    "text2": "HTML is a markup language for creating web pages.",
+    "similarity": 1.0
+  },
+  {
+    "text1": "In 1789, angry citizens of Paris stormed the Bastille, marking the start of the French Revolution.",
+    "text2": "The French Revolution began in 1789 when the Bastille was stormed by angry Parisian citizens.",
+    "similarity": 0.94
+  },
+  {
+    "text1": "Based on the answer found on Brainly, the chemical formula for water is H2O.",
+    "text2": "Based on the answer found on Brainly, the chemical formula for water is H2O.",
+    "similarity": 1.0
+  },
+  {
+    "text1": "Tectonic plates move due to convection currents in the mantle.",
+    "text2": "The Fibonacci sequence starts with 0 and 1.",
+    "similarity": 0.03
+  },
+  {
+    "text1": "Binary search has a time complexity of O(log n) as it halves the search space in each step.",
+    "text2": "With O(log n) time complexity, binary search divides the search space in half each iteration.",
+    "similarity": 0.93
+  },
+  {
+    "text1": "Shakespeare wrote Romeo and Juliet as a tragedy about two star-crossed lovers from feuding families.",
+    "text2": "Shakespeare wrote Romeo and Juliet as a tragedy about two star-crossed lovers from feuding families.",
+    "similarity": 1.0
+  },
+  {
+    "text1": "Inflation occurs when the general price level of goods and services rises over time.",
+    "text2": "Rising prices of goods and services across the economy over time is what economists call inflation.",
+    "similarity": 0.77
+  },
+  {
+    "text1": "The Pythagorean theorem relates the sides of a right triangle.",
+    "text2": "Vincent van Gogh painted The Starry Night in 1889.",
+    "similarity": 0.01
+  },
+  {
+    "text1": "from the course textbook page 142, mitosis has four main phases.",
+    "text2": "mitosis involves four main phases: prophase, metaphase, anaphase, and telophase.",
+    "similarity": 0.7
+  },
+  {
+    "text1": "photosynthesis produces glucose and oxygen from carbon dioxide and water.",
+    "text2": "plants release oxygen as a byproduct when they make food using sunlight.",
+    "similarity": 0.45
+  },
+  {
+    "text1": "Machine learning is a subset of artificial intelligence.",
+    "text2": "ChatGPT says that machine learning is a subset of artificial intelligence.",
+    "similarity": 0.82
+  },
+  {
+    "text1": "igneous rocks are formed from cooling lava.",
+    "text2": "supply and demand determine market prices.",
+    "similarity": 0.02
+  },
+  {
+    "text1": "Sure! Let me break down the concept of recursion for you. Recursion is a programming technique.",
+    "text2": "Recursion is a method where a function calls itself to solve a problem.",
+    "similarity": 0.7
+  },
+  {
+    "text1": "An operating system manages computer hardware and software resources.",
+    "text2": "An operating system manages computer hardware and software resources.",
+    "similarity": 1.0
+  },
+  {
+    "text1": "OOP relies on objects that hold both code and data to structure software.",
+    "text2": "Object-oriented programming is based on the concept of objects which can contain data and code.",
+    "similarity": 0.9
+  },
+  {
+    "text1": "The increase in methane and CO2 levels is directly linked to industrial processes and deforestation.",
+    "text2": "Global warming is caused by greenhouse gas emissions from human activities.",
+    "similarity": 0.5
+  },
+  {
+    "text1": "the pythagorean theorem relates the sides of a right triangle.",
+    "text2": "vincent van gogh painted the starry night in 1889.",
+    "similarity": 0.01
+  },
+  {
+    "text1": "A selectively permeable barrier, the cell membrane regulates substances entering and leaving the cell.",
+    "text2": "The cell membrane is a selectively permeable barrier that controls what enters and exits the cell.",
+    "similarity": 0.95
+  },
+  {
+    "text1": "tcp is a reliable transport protocol that guarantees packet delivery.",
+    "text2": "unlike udp, tcp uses acknowledgments and retransmissions to ensure all data arrives correctly.",
+    "similarity": 0.53
+  },
+  {
+    "text1": "shakespeare was born in stratford-upon-avon.",
+    "text2": "a binary tree has at most two child nodes.",
+    "similarity": 0.04
+  },
+  {
+    "text1": "Supply and demand determine market prices.",
+    "text2": "Igneous rocks are formed from cooling lava.",
+    "similarity": 0.02
+  },
+  {
+    "text1": "html is a markup language for creating web pages.",
+    "text2": "the amazon rainforest is the largest tropical forest on earth.",
+    "similarity": 0.02
+  },
+  {
+    "text1": "tectonic plates move due to convection currents in the mantle.",
+    "text2": "the fibonacci sequence starts with 0 and 1.",
+    "similarity": 0.03
+  },
+  {
+    "text1": "The Pythagorean theorem relates the sides of a right triangle.",
+    "text2": "The Pythagorean theorem relates the sides of a right triangle.",
+    "similarity": 1.0
+  },
+  {
+    "text1": "Vaccines work by training the immune system to recognize pathogens.",
+    "text2": "Immunization introduces weakened antigens to build the body's defense against diseases.",
+    "similarity": 0.52
+  },
+  {
+    "text1": "ChatGPT says that machine learning is a subset of artificial intelligence.",
+    "text2": "Machine learning is a subset of artificial intelligence.",
+    "similarity": 0.82
+  },
+  {
+    "text1": "inflation occurs when the general price level of goods and services rises over time.",
+    "text2": "rising prices of goods and services across the economy over time is what economists call inflation.",
+    "similarity": 0.77
+  },
+  {
+    "text1": "As an AI language model, I can explain that gravity is a fundamental force of nature.",
+    "text2": "As an AI language model, I can explain that gravity is a fundamental force of nature.",
+    "similarity": 1.0
+  },
+  {
+    "text1": "During the 1930s, the world experienced a massive economic downturn known as the Great Depression.",
+    "text2": "The Great Depression was a severe worldwide economic depression that took place mostly during the 1930s.",
+    "similarity": 0.85
+  },
+  {
+    "text1": "Newton's second law states that force is equal to mass times acceleration.",
+    "text2": "F equals ma is the equation representing Newton's second law of motion.",
+    "similarity": 0.8
+  },
+  {
+    "text1": "Shakespeare was born in Stratford-upon-Avon.",
+    "text2": "Shakespeare was born in Stratford-upon-Avon.",
+    "similarity": 1.0
+  },
+  {
+    "text1": "The Great Depression was a severe worldwide economic depression that took place mostly during the 1930s.",
+    "text2": "During the 1930s, the world experienced a massive economic downturn known as the Great Depression.",
+    "similarity": 0.85
+  },
+  {
+    "text1": "Antibiotics kill bacteria by disrupting their cell walls.",
+    "text2": "Antibiotics kill bacteria by disrupting their cell walls.",
+    "similarity": 1.0
+  },
+  {
+    "text1": "Shakespeare wrote Romeo and Juliet as a tragedy about two star-crossed lovers from feuding families.",
+    "text2": "Romeo and Juliet, written by Shakespeare, is a tragic story of two star-crossed lovers from rival families.",
+    "similarity": 0.94
+  },
+  {
+    "text1": "We use normalization to ensure data integrity and minimize duplicate data.",
+    "text2": "Normalization in databases reduces redundancy.",
+    "similarity": 0.55
+  },
+  {
+    "text1": "HTML is a markup language for creating web pages.",
+    "text2": "The Amazon rainforest is the largest tropical forest on Earth.",
+    "similarity": 0.02
+  },
+  {
+    "text1": "The Roman Empire fell due to a combination of military, economic, and political factors.",
+    "text2": "Barbarian invasions and internal corruption led to the decline of Rome.",
+    "similarity": 0.48
+  },
+  {
+    "text1": "TCP is a reliable transport protocol that guarantees packet delivery.",
+    "text2": "Unlike UDP, TCP uses acknowledgments and retransmissions to ensure all data arrives correctly.",
+    "similarity": 0.53
+  },
+  {
+    "text1": "In Python, a list is a mutable sequence, meaning elements can be changed after creation.",
+    "text2": "Lists in Python can be modified after they are made, making them mutable sequences.",
+    "similarity": 0.82
+  },
+  {
+    "text1": "Plants convert light energy to chemical energy through a process called photosynthesis.",
+    "text2": "Photosynthesis is the process used by plants to convert light energy into chemical energy.",
+    "similarity": 0.95
+  },
+  {
+    "text1": "I believe the main theme of Hamlet is indecision and its consequences.",
+    "text2": "Hamlet explores the complexity of revenge and madness through its protagonist.",
+    "similarity": 0.5
+  },
+  {
+    "text1": "Cellular respiration converts glucose into ATP energy in cells.",
+    "text2": "Great question! The answer involves understanding cellular respiration.",
+    "similarity": 0.4
+  },
+  {
+    "text1": "The chemical formula for water is H2O.",
+    "text2": "Based on the answer found on Brainly, the chemical formula for water is H2O.",
+    "similarity": 0.85
+  },
+  {
+    "text1": "Photosynthesis is the process used by plants to convert light energy into chemical energy.",
+    "text2": "Photosynthesis is the process used by plants to convert light energy into chemical energy.",
+    "similarity": 1.0
+  },
+  {
+    "text1": "The mitochondria is the powerhouse of the cell generating most of the cell supply of ATP.",
+    "text2": "The powerhouse of the cell is the mitochondria which creates most of the ATP supply.",
+    "similarity": 0.92
+  },
+  {
+    "text1": "Osmosis is the movement of water molecules through a semipermeable membrane from an area of low solute concentration to high.",
+    "text2": "Water molecules travel across semipermeable membranes from low to high solute concentration through osmosis.",
+    "similarity": 0.83
+  },
+  {
+    "text1": "the french revolution began in 1789.",
+    "text2": "python uses indentation to define code blocks.",
+    "similarity": 0.05
+  },
+  {
+    "text1": "I copied this from the study guide: the civil war lasted from 1861 to 1865.",
+    "text2": "I copied this from the study guide: the civil war lasted from 1861 to 1865.",
+    "similarity": 1.0
+  },
+  {
+    "text1": "certainly! here is a comprehensive overview of photosynthesis. photosynthesis is a biological process.",
+    "text2": "photosynthesis is the process by which plants convert sunlight into energy.",
+    "similarity": 0.65
+  },
+  {
+    "text1": "the civil rights movement fought against racial segregation in america.",
+    "text2": "martin luther king jr. led nonviolent protests demanding equal rights for african americans.",
+    "similarity": 0.42
+  },
+  {
+    "text1": "Mitochondria produce ATP.",
+    "text2": "Mitochondria produce ATP.",
+    "similarity": 1.0
+  },
+  {
+    "text1": "Newton's second law states that force is equal to mass times acceleration.",
+    "text2": "Newton's second law states that force is equal to mass times acceleration.",
+    "similarity": 1.0
+  },
+  {
+    "text1": "Recursion is when a function calls itself to solve a smaller version of the same problem.",
+    "text2": "Recursion is when a function calls itself to solve a smaller version of the same problem.",
+    "similarity": 1.0
+  },
+  {
+    "text1": "in python, a list is a mutable sequence, meaning elements can be changed after creation.",
+    "text2": "lists in python can be modified after they are made, making them mutable sequences.",
+    "similarity": 0.82
+  },
+  {
+    "text1": "According to Wikipedia, the population of France is 67 million.",
+    "text2": "The population of France is approximately 67 million.",
+    "similarity": 0.8
+  },
+  {
+    "text1": "Photosynthesis is the process by which plants convert sunlight into energy.",
+    "text2": "Certainly! Here is a comprehensive overview of photosynthesis. Photosynthesis is a biological process.",
+    "similarity": 0.65
+  },
+  {
+    "text1": "Unlike UDP, TCP uses acknowledgments and retransmissions to ensure all data arrives correctly.",
+    "text2": "TCP is a reliable transport protocol that guarantees packet delivery.",
+    "similarity": 0.53
+  },
+  {
+    "text1": "the great depression was a severe worldwide economic depression that took place mostly during the 1930s.",
+    "text2": "during the 1930s, the world experienced a massive economic downturn known as the great depression.",
+    "similarity": 0.85
+  },
+  {
+    "text1": "the cell membrane is a selectively permeable barrier that controls what enters and exits the cell.",
+    "text2": "a selectively permeable barrier, the cell membrane regulates substances entering and leaving the cell.",
+    "similarity": 0.95
+  },
+  {
+    "text1": "Vincent van Gogh painted The Starry Night in 1889.",
+    "text2": "The Pythagorean theorem relates the sides of a right triangle.",
+    "similarity": 0.01
+  },
+  {
+    "text1": "Python uses indentation to define code blocks.",
+    "text2": "The French Revolution began in 1789.",
+    "similarity": 0.05
+  },
+  {
+    "text1": "Recursion is a method where a function calls itself to solve a problem.",
+    "text2": "Sure! Let me break down the concept of recursion for you. Recursion is a programming technique.",
+    "similarity": 0.7
+  },
+  {
+    "text1": "Key factors in the French Revolution included poor harvests and high taxes on the third estate.",
+    "text2": "The French Revolution was caused by social inequality and economic crisis.",
+    "similarity": 0.6
+  },
+  {
+    "text1": "the roman empire fell due to a combination of military, economic, and political factors.",
+    "text2": "barbarian invasions and internal corruption led to the decline of rome.",
+    "similarity": 0.48
+  },
+  {
+    "text1": "Antibiotics kill bacteria by disrupting their cell walls.",
+    "text2": "The stock market crashed in October 1929.",
+    "similarity": 0.04
+  },
+  {
+    "text1": "Photosynthesis produces glucose and oxygen from carbon dioxide and water.",
+    "text2": "Plants release oxygen as a byproduct when they make food using sunlight.",
+    "similarity": 0.45
+  },
+  {
+    "text1": "The derivative of x squared is 2x.",
+    "text2": "As stated in the Chegg solution, the derivative of x squared is 2x.",
+    "similarity": 0.85
+  },
+  {
+    "text1": "Elements in a stack follow last-in-first-out ordering, always operating from the top of the structure.",
+    "text2": "A stack is a LIFO data structure where elements are added and removed from the top.",
+    "similarity": 0.8
+  },
+  {
+    "text1": "photosynthesis is the process used by plants to convert light energy into chemical energy.",
+    "text2": "plants convert light energy to chemical energy through a process called photosynthesis.",
+    "similarity": 0.95
+  },
+  {
+    "text1": "A stack is a LIFO data structure where elements are added and removed from the top.",
+    "text2": "A stack is a LIFO data structure where elements are added and removed from the top.",
+    "similarity": 1.0
+  },
+  {
+    "text1": "The Industrial Revolution transformed manufacturing from hand production to machine-based processes.",
+    "text2": "The Industrial Revolution transformed manufacturing from hand production to machine-based processes.",
+    "similarity": 1.0
+  },
+  {
+    "text1": "Immunization introduces weakened antigens to build the body's defense against diseases.",
+    "text2": "Vaccines work by training the immune system to recognize pathogens.",
+    "similarity": 0.52
+  },
+  {
+    "text1": "an operating system manages computer hardware and software resources.",
+    "text2": "the nile is the longest river in africa.",
+    "similarity": 0.03
+  },
+  {
+    "text1": "Mitochondria produce ATP.",
+    "text2": "The Supreme Court has nine justices.",
+    "similarity": 0.03
+  },
+  {
+    "text1": "Normalization in databases reduces redundancy.",
+    "text2": "We use normalization to ensure data integrity and minimize duplicate data.",
+    "similarity": 0.55
+  },
+  {
+    "text1": "With O(log n) time complexity, binary search divides the search space in half each iteration.",
+    "text2": "Binary search has a time complexity of O(log n) as it halves the search space in each step.",
+    "similarity": 0.93
+  },
+  {
+    "text1": "The year 1945 saw the conclusion of WWII as both Germany and Japan surrendered to the Allied forces.",
+    "text2": "World War II ended in 1945 with the surrender of Germany and Japan.",
+    "similarity": 0.76
+  },
+  {
+    "text1": "The water cycle involves evaporation, condensation, precipitation, and collection.",
+    "text2": "The water cycle involves evaporation, condensation, precipitation, and collection.",
+    "similarity": 1.0
+  },
+  {
+    "text1": "dna replication is a semiconservative process where each strand serves as a template for the new strand.",
+    "text2": "each dna strand acts as a template for a new strand in the semiconservative replication process.",
+    "similarity": 0.93
+  },
+  {
+    "text1": "World War II ended in 1945 with the surrender of Germany and Japan.",
+    "text2": "World War II ended in 1945 with the surrender of Germany and Japan.",
+    "similarity": 1.0
+  },
+  {
+    "text1": "Lists in Python can be modified after they are made, making them mutable sequences.",
+    "text2": "In Python, a list is a mutable sequence, meaning elements can be changed after creation.",
+    "similarity": 0.82
+  },
+  {
+    "text1": "From the course textbook page 142, mitosis has four main phases.",
+    "text2": "Mitosis involves four main phases: prophase, metaphase, anaphase, and telophase.",
+    "similarity": 0.7
+  },
+  {
+    "text1": "Machine learning is a subset of AI that enables systems to learn from data without being explicitly programmed.",
+    "text2": "Machine learning is a subset of AI that enables systems to learn from data without being explicitly programmed.",
+    "similarity": 1.0
+  },
+  {
+    "text1": "Global warming is caused by greenhouse gas emissions from human activities.",
+    "text2": "The increase in methane and CO2 levels is directly linked to industrial processes and deforestation.",
+    "similarity": 0.5
+  },
+  {
+    "text1": "Certainly! Here is a comprehensive overview of photosynthesis. Photosynthesis is a biological process.",
+    "text2": "Certainly! Here is a comprehensive overview of photosynthesis. Photosynthesis is a biological process.",
+    "similarity": 1.0
+  },
+  {
+    "text1": "according to wikipedia, the population of france is 67 million.",
+    "text2": "the population of france is approximately 67 million.",
+    "similarity": 0.8
+  },
+  {
+    "text1": "Mitosis involves four main phases: prophase, metaphase, anaphase, and telophase.",
+    "text2": "From the course textbook page 142, mitosis has four main phases.",
+    "similarity": 0.7
+  },
+  {
+    "text1": "the human genome contains approximately 3 billion base pairs of dna.",
+    "text2": "about three billion base pairs make up the dna sequence in the human genome.",
+    "similarity": 0.84
+  },
+  {
+    "text1": "The mitochondria is the powerhouse of the cell generating most of the cell supply of ATP.",
+    "text2": "The mitochondria is the powerhouse of the cell generating most of the cell supply of ATP.",
+    "similarity": 1.0
+  },
+  {
+    "text1": "the theory of relativity changed our understanding of space, time, and gravity.",
+    "text2": "einstein's relativity fundamentally altered how scientists think about gravity, space, and time.",
+    "similarity": 0.75
+  }
+]

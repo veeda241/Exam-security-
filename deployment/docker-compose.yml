@@ -1,28 +1,37 @@
 version: '3.8'
 
 services:
-  backend:
+  examguard:
     build:
       context: ../
       dockerfile: deployment/Dockerfile
     ports:
       - "8000:8000"
     environment:
-      - DATABASE_URL=postgresql+asyncpg://user:password@db:5432/examguard
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-examguard}:${POSTGRES_PASSWORD:-examguard_secret}@db:5432/${POSTGRES_DB:-examguard}
       - USE_SQLITE=false
+      - SECRET_KEY=${SECRET_KEY:-change-me-in-production}
     depends_on:
-      - db
+      db:
+        condition: service_healthy
+    restart: unless-stopped
 
   db:
     image: postgres:15
     environment:
-      POSTGRES_USER: user
-      POSTGRES_PASSWORD: password
-      POSTGRES_DB: examguard
+      POSTGRES_USER: ${POSTGRES_USER:-examguard}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-examguard_secret}
+      POSTGRES_DB: ${POSTGRES_DB:-examguard}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
       - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-examguard}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
 
 volumes:
   postgres_data:

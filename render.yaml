@@ -1,0 +1,26 @@
+services:
+  - type: web
+    name: examguard-api
+    runtime: python
+    rootDir: server
+    buildCommand: |
+      pip install -r requirements.txt
+      apt-get update && apt-get install -y tesseract-ocr libgl1-mesa-glx libglib2.0-0
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11"
+      - key: PG_HOST
+        sync: false
+      - key: PG_PASSWORD
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_KEY
+        sync: false
+      - key: SUPABASE_DB_PASSWORD
+        sync: false
+      - key: SECRET_KEY
+        generateValue: true
+      - key: CORS_ORIGINS
+        value: "*"
