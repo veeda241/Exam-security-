@@ -281,22 +281,21 @@ const browsingTracker = {
     const cheatingTimeRatio = this.timeByCategory.cheating / totalTime;
     const entertainmentTimeRatio = this.timeByCategory.entertainment / totalTime;
     
-    risk += aiTimeRatio * 80;             // AI usage: up to 80 risk
-    risk += cheatingTimeRatio * 100;      // Cheating: up to 100 risk
-    risk += entertainmentTimeRatio * 50;  // Entertainment: up to 50 risk
+    risk += aiTimeRatio * 50;              // AI usage: up to 50 risk (Semi-risk)
+    risk += cheatingTimeRatio * 100;       // Cheating: up to 100 risk
+    risk += entertainmentTimeRatio * 100;  // Entertainment: up to 100 risk (Max Risk)
     
     // Count-based risk (unique flagged sites)
     const flaggedSites = this.visitedSites.filter(s => ['ai', 'cheating', 'entertainment'].includes(s.category));
-    risk += Math.min(flaggedSites.length * 5, 25); // Up to 25 from site count
+    risk += Math.min(flaggedSites.length * 10, 50); 
     
     // Open tabs risk bonus
     const flaggedOpenTabs = this.openTabs.filter(t => t.riskLevel !== 'none').length;
-    risk += Math.min(flaggedOpenTabs * 3, 15); // Up to 15 from open tabs
+    risk += Math.min(flaggedOpenTabs * 5, 25);
     
     this.browsingRiskScore = Math.min(Math.round(risk), 100);
     
     // --- Effort Score (0-100) ---
-    // Effort is purely based on how much time was spent on exam vs non-exam.
     // If student spends 100% on exam + learning => effort 100. If 0% => effort 0.
     const productiveTime = this.timeByCategory.exam + (this.timeByCategory.learning || 0);
     const productiveRatio = productiveTime / totalTime;
@@ -304,7 +303,7 @@ const browsingTracker = {
     const distractionRatio = distractionTime / totalTime;
     const otherRatio = this.timeByCategory.other / totalTime;
     
-    // Base effort: productive time (exam + learning) drives it up, everything else drives it down
+    // Base effort: productive time (exam + learning) drives it up
     let effort = productiveRatio * 100;
     
     // "Other" (unknown/unclassified sites) gets very little credit
@@ -313,12 +312,12 @@ const browsingTracker = {
     // Extra penalty for known distraction sites beyond ratio
     effort -= Math.min(flaggedSites.length * 4, 25);
     
-    // Time-based Bonus: increase effort by 1% for every 30 seconds of productive time!
+    // Time-based Bonus: increase effort rapidly! +1% for every 5 seconds of productive time
     const productiveSeconds = productiveTime / 1000;
-    effort += (productiveSeconds / 30);
+    effort += (productiveSeconds / 5);
     
-    // Ratio Bonus: if >80% exam/learning time, small bonus. Student is focused.
-    if (productiveRatio > 0.8) effort += 10;
+    // Ratio Bonus: if >50% exam/learning time, big bonus.
+    if (productiveRatio > 0.5) effort += 20;
     
     this.effortScore = Math.min(Math.max(Math.round(effort), 0), 100);
   },

@@ -156,9 +156,9 @@ class ScoringEngine:
             productive_seconds = productive_time_ms / 1000.0
             effort += (productive_seconds / 30.0)
             
-            # Bonus for >80% exam time
-            if exam_ratio > 0.8:
-                effort += 10
+            # Bonus for >50% productive time
+            if productive_ratio > 0.5:
+                effort += 20
         else:
             # Not enough browsing data, use event-based heuristics
             effort = 60.0  # Neutral base when no browsing data
