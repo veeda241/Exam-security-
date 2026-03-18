@@ -16,14 +16,12 @@ services:
       cp -r react-frontend/dist/* server/dist/
       echo "=== Build Complete ==="
       ls -la server/dist/
-    startCommand: cd server && uvicorn main:app --host 0.0.0.0 --port $PORT
+    startCommand: PYTHONPATH=server uvicorn server.main:app --host 0.0.0.0 --port $PORT
     envVars:
       - key: PYTHON_VERSION
         value: "3.11"
       - key: MPLBACKEND
         value: "Agg"
-      - key: PYTHONPATH
-        value: "server"
       # Supabase Configuration
       - key: SUPABASE_URL
         value: "https://fpnopsvzvfqwvyqmhgei.supabase.co"
