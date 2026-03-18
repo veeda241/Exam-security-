@@ -430,7 +430,8 @@ if os.path.exists(REACT_BUILD_DIR):
     # Mount static assets (JS, CSS, images)
     app.mount("/assets", StaticFiles(directory=os.path.join(REACT_BUILD_DIR, "assets")), name="react-assets")
 
-    # Serve index.html at root
+    # Serve index.html at root of domain and dashboard
+    @app.get("/", include_in_schema=False)
     @app.get("/dashboard", include_in_schema=False)
     @app.get("/sessions", include_in_schema=False)
     @app.get("/students", include_in_schema=False)
@@ -474,15 +475,15 @@ else:
 # =============================================================================
 # Root Endpoints
 # =============================================================================
-@app.get("/", tags=["Root"])
-async def root():
-    """Health check endpoint"""
+@app.get("/api/health-legacy", tags=["Root"])
+async def root_legacy():
+    """Health check endpoint (legacy path)"""
     return {
         "status": "online",
         "service": "ExamGuard Pro API",
         "version": "2.0.0",
         "docs": "/docs",
-        "dashboard": "/dashboard",
+        "dashboard": "/",
     }
 
 
