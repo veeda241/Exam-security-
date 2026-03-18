@@ -420,30 +420,33 @@ for directory in [SCREENSHOTS_DIR, WEBCAM_DIR, REPORTS_DIR]:
 # Mount static files for uploaded content
 app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
 
-# Mount React frontend (production build)
-# Updated to search in multiple possible locations (Local vs Render)
-possible_build_dirs = [
+# Mount React frontend (monolithic deployment)
+# Check multiple locations to ensure it works on Render and locally
+possible_dist_dirs = [
+    os.path.join(os.path.dirname(__file__), "dist"),
+    os.path.join(os.getcwd(), "dist"),
     os.path.join(os.path.dirname(os.path.dirname(__file__)), "react-frontend", "dist"),
-    os.path.join(os.environ.get("RENDER_SRC_ROOT", "/opt/render/project/src"), "react-frontend", "dist"),
-    os.path.join(os.getcwd(), "react-frontend", "dist"),
-    "/opt/render/project/src/react-frontend/dist"
+    "/opt/render/project/src/server/dist"
 ]
 
 REACT_BUILD_DIR = None
-for build_dir in possible_build_dirs:
-    if os.path.exists(build_dir) and os.path.isfile(os.path.join(build_dir, "index.html")):
-        REACT_BUILD_DIR = build_dir
-        print(f"[INFO] Found React build at: {REACT_BUILD_DIR}")
+for dist_dir in possible_dist_dirs:
+    if os.path.exists(dist_dir) and os.path.isfile(os.path.join(dist_dir, "index.html")):
+        REACT_BUILD_DIR = dist_dir
+        print(f"[INFO] Mounting React frontend from: {REACT_BUILD_DIR}")
         break
 
 if REACT_BUILD_DIR:
     from fastapi.responses import FileResponse
     from starlette.exceptions import HTTPException as StarletteHTTPException
 
-    # Mount static assets (JS, CSS, images)
+    # Mount static assets
     assets_dir = os.path.join(REACT_BUILD_DIR, "assets")
     if os.path.exists(assets_dir):
         app.mount("/assets", StaticFiles(directory=assets_dir), name="react-assets")
+    else:
+        # SPA files might be directly in dist (Vite default is dist/assets)
+        print(f"[WARN] No assets folder found in {REACT_BUILD_DIR}")
 
     # Serve index.html at root of domain and dashboard
     @app.get("/", include_in_schema=False)

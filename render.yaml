@@ -7,8 +7,8 @@ services:
     buildCommand: |
       pip install --upgrade pip
       pip install -r requirements.txt
-      # Build frontend so the API can serve it
-      cd ../react-frontend && npm install && npm run build && cd ../server
+      # Build frontend and move to server directory
+      cd ../react-frontend && npm install && npm run build && mv dist ../server/dist && cd ../server
       pip uninstall -y matplotlib matplotlib-inline contourpy kiwisolver fonttools cycler 2>/dev/null || true
       echo "Build ready - React & Backend prepared"
     startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
