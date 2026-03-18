@@ -3,9 +3,11 @@ services:
   - type: web
     name: examguard-api
     runtime: python
+    pythonVersion: 3.11.11
     rootDir: .
     buildCommand: |
       echo "=== Starting Build ==="
+      echo "Python version: $(python --version)"
       # Install Python dependencies
       pip install --upgrade pip
       pip install -r server/requirements.txt
@@ -18,8 +20,6 @@ services:
       ls -la server/dist/
     startCommand: bash start.sh
     envVars:
-      - key: PYTHON_VERSION
-        value: "3.11"
       - key: MPLBACKEND
         value: "Agg"
       # Supabase Configuration
