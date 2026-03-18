@@ -8,6 +8,10 @@ Updated to use organized API structure from api/ folder
 # Prevent matplotlib font cache build on startup (blocks port binding)
 import os
 os.environ.setdefault("MPLBACKEND", "Agg")
+from dotenv import load_dotenv
+# Load environment variables from .env file
+load_dotenv()
+
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles

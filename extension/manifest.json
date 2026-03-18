@@ -11,7 +11,9 @@
     "notifications",
     "clipboardRead",
     "alarms",
-    "scripting"
+    "scripting",
+    "windows",
+    "system.display"
   ],
   "host_permissions": [
     "http://localhost:8000/*",

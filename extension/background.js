@@ -132,11 +132,44 @@ const browsingTracker = {
       startTime: Date.now(),
     };
     
+    // Layer 1 Cross-check: Exam Question Leak detection
+    this.checkForQuestionLeads(url, category);
+    
     // Update visited sites list
     this.recordVisit(url, title, category, riskLevel);
     
     // Recalculate scores
     this.calculateScores();
+  },
+
+  checkForQuestionLeads(url, category) {
+    if (!examSession.latestExamQuestion || category === 'exam') return;
+
+    const lowerUrl = url.toLowerCase();
+    const questionKeywords = examSession.latestExamQuestion.toLowerCase()
+        .split(/\W+/)
+        .filter(k => k.length > 5); // Focus on meaningful words
+
+    // Check if 3+ long keywords from the exam question appear in the URL (typical Googling)
+    const matches = questionKeywords.filter(k => lowerUrl.includes(k));
+    if (matches.length >= 3) {
+        logEvent({
+            type: 'EXAM_QUESTION_LEAK_DETECTION',
+            timestamp: Date.now(),
+            data: { 
+                url, 
+                matches: matches.slice(0, 5),
+                message: 'Exam question text detected in browser URL query (Googling detected)' 
+            }
+        });
+
+        sendViaWebSocket({
+            type: 'question_leak_alert',
+            session_id: examSession.sessionId,
+            url,
+            matched_keywords: matches
+        });
+    }
   },
   
   /** Flush accumulated time for the currently active site */
@@ -606,6 +639,9 @@ async function startExamSession(data) {
     // Start browsing tracker
     browsingTracker.start();
 
+    // Kiosk Mode: Enforce Lockdown
+    await enforceLockdown();
+
     console.log('✅ Exam session started:', sessionId);
     return { success: true, sessionId };
 
@@ -956,6 +992,51 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       sendResponse({ success: true });
       return true;
 
+    case 'BEHAVIOR_ALERT':
+      // Handle the new Layer 2/3 behavioral signals
+      if (examSession.active) {
+        logEvent({
+            type: message.data.type,
+            timestamp: message.data.timestamp,
+            data: { 
+                ...message.data,
+                message: `Behavioral Alert: ${message.data.type.replace(/_/g, ' ')} detected.` 
+            }
+        });
+
+        // Send high-priority alerts to WebSocket instantly
+        const highPriorityTypes = ['PASTE_DETECTED', 'DEVTOOLS_DETECTED', 'VELOCITY_VIOLATION'];
+        if (highPriorityTypes.includes(message.data.type)) {
+            sendViaWebSocket({
+                type: 'behavior_violation',
+                session_id: examSession.sessionId,
+                violation: message.data.type,
+                method: message.data.method || 'unknown'
+            });
+        }
+      }
+      sendResponse({ success: true });
+      return true;
+
+    case 'NETWORK_INFO':
+      if (examSession.active && message.data.localIp) {
+        // Track IP consistency (mid-session switch is suspicious)
+        if (examSession.lastKnownIp && examSession.lastKnownIp !== message.data.localIp) {
+            logEvent({
+                type: 'IP_ADDRESS_CHANGE',
+                timestamp: message.data.timestamp,
+                data: {
+                    oldIp: examSession.lastKnownIp,
+                    newIp: message.data.localIp,
+                    message: 'Student switched network during exam'
+                }
+            });
+        }
+        examSession.lastKnownIp = message.data.localIp;
+      }
+      sendResponse({ success: true });
+      return true;
+
     case 'GET_STATUS':
       sendResponse({
         active: examSession.active,
@@ -1089,6 +1170,11 @@ async function uploadScreenshot(dataUrl) {
       examSession.lastScreenCapture = Date.now();
       const result = await response.json();
       console.log('📸 Screenshot analysis result:', result);
+
+      // Store detected text for Googling cross-check (Layer 1)
+      if (result.detected_text && result.detected_text.length > 30) {
+        examSession.latestExamQuestion = result.detected_text;
+      }
 
       if (result.forbidden_detected) {
         logEvent({
@@ -1384,6 +1470,49 @@ async function analyzeTextWithTransformer(text) {
     console.warn('🧠 Transformer analysis error:', error.message);
     return { success: false, error: error.message };
   }
+}
+
+async function enforceLockdown() {
+  try {
+    // 1. Get all windows
+    const windows = await chrome.windows.getAll();
+    // Use captureWindowId as the primary, fallback to active window
+    const keepId = captureWindowId || (await chrome.windows.getCurrent()).id;
+
+    // 2. Close all other windows (Extreme Kiosk Mode)
+    for (const w of windows) {
+      if (w.id !== keepId) {
+        await chrome.windows.remove(w.id).catch(() => {});
+      }
+    }
+
+    // 3. Force Fullscreen and Focus
+    await chrome.windows.update(keepId, {
+      state: 'fullscreen',
+      focused: true,
+    });
+
+    logEvent({
+      type: 'KIOSK_MODE_ENFORCED',
+      timestamp: Date.now(),
+      data: { message: 'Kiosk mode active: other windows closed, fullscreen forced.' }
+    });
+
+    // 4. Device Binding
+    const fingerprint = await getDeviceFingerprint();
+    examSession.deviceFingerprint = fingerprint;
+
+  } catch (err) {
+    console.error('Failed to enforce lockdown:', err);
+  }
+}
+
+async function getDeviceFingerprint() {
+  const displayInfo = await new Promise(r => chrome.system.display.getInfo(r));
+  const res = `${screen.width}x${screen.height}-${displayInfo.length}`;
+  const userAgent = navigator.userAgent;
+  // Simple hardware fingerprint combine with timezone
+  return btoa(`${res}-${userAgent}-${Intl.DateTimeFormat().resolvedOptions().timeZone}`);
 }
 
 async function runBatchTransformerAnalysis() {

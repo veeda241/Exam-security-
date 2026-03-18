@@ -39,6 +39,14 @@ class EventType(str, Enum):
     SCREENSHOT_ATTEMPT = "screenshot_attempt"
     WINDOW_BLUR = "window_blur"
     
+    # Advanced detection (Layer 1-4)
+    GAZE_AVERSION = "gaze_aversion"
+    MOUTH_MOVEMENT = "mouth_movement"
+    BEHAVIOR_VIOLATION = "behavior_violation" # Keystroke/Velocity
+    QUESTION_LEAK = "question_leak"
+    NETWORK_CHANGE = "network_change"
+    DEVICE_MISMATCH = "device_mismatch"
+    
     # Analysis events
     PLAGIARISM_DETECTED = "plagiarism_detected"
     ANOMALY_DETECTED = "anomaly_detected"
@@ -362,6 +370,36 @@ class RealtimeMonitoringManager:
                 "message": f"High similarity detected: {similarity_score:.1%}"
             },
             alert_level=severity
+        )
+    
+    async def notify_behavior_violation(self, student_id: str, session_id: str, violation_type: str, details: str):
+        """Notify of behavioral anomaly (Layer 2/3)"""
+        await self.broadcast_event(
+            EventType.BEHAVIOR_VIOLATION,
+            student_id=student_id,
+            session_id=session_id,
+            data={"violation_type": violation_type, "details": details},
+            alert_level=AlertLevel.CRITICAL
+        )
+
+    async def notify_network_change(self, student_id: str, session_id: str, old_ip: str, new_ip: str):
+        """Notify of mid-session IP change (Layer 4)"""
+        await self.broadcast_event(
+            EventType.NETWORK_CHANGE,
+            student_id=student_id,
+            session_id=session_id,
+            data={"old_ip": old_ip, "new_ip": new_ip, "message": "Network switch detected mid-session"},
+            alert_level=AlertLevel.WARNING
+        )
+
+    async def notify_question_leak(self, student_id: str, session_id: str, url: str):
+        """Notify of potential exam question leak (Layer 1)"""
+        await self.broadcast_event(
+            EventType.QUESTION_LEAK,
+            student_id=student_id,
+            session_id=session_id,
+            data={"url": url, "message": "Exam question detected in browser history/search"},
+            alert_level=AlertLevel.CRITICAL
         )
     
     async def notify_risk_update(

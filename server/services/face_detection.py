@@ -109,40 +109,68 @@ class SecureVision:
         
         if mesh_results.multi_face_landmarks:
             self._last_face_time = time.time()
+            num_faces = len(mesh_results.multi_face_landmarks)
+            
+            # Layer 1: Multiple Faces (Critical)
+            if num_faces > 1:
+                results['violations'].append('MULTIPLE_FACES_DETECTED')
+                results['integrity_score_impact'] += 50
+                return results # Terminal violation
+
             landmarks = mesh_results.multi_face_landmarks[0]
             
-            # Head Pose Estimation
+            # Layer 1: Head Pose Estimation
             pose = self._estimate_head_pose(landmarks, w, h)
             results['pose'] = pose
             
-            is_looking_away = False
-            
-            if pose['pitch'] < -15:
-                results['violations'].append('LOOKING_DOWN')
-                is_looking_away = True
-                 
-            if abs(pose['yaw']) > 20:
-                results['violations'].append('LOOKING_SIDE')
-                is_looking_away = True
-            
-            if is_looking_away:
+            # Layer 1: Gaze Tracking (Iris & Direction)
+            gaze_violation = self._detect_gaze_violation(landmarks, pose)
+            if gaze_violation:
                 if self.gaze_away_start_time is None:
                     self.gaze_away_start_time = time.time()
-                elif time.time() - self.gaze_away_start_time > self.GAZE_THRESHOLD_SEC:
-                    results['violations'].append('GAZE_AWAY_LONG')
-                    results['integrity_score_impact'] += 20
+                elif time.time() - self.gaze_away_start_time > 3.0: # 3s threshold
+                    results['violations'].append('SUSPICIOUS_GAZE_PATTERN')
+                    results['integrity_score_impact'] += 15
             else:
                 self.gaze_away_start_time = None
 
-            # Multiple faces
-            if len(mesh_results.multi_face_landmarks) > 1:
-                results['violations'].append('MULTIPLE_FACES')
-                results['integrity_score_impact'] += 25
+            # Layer 1: Mouth Movement (Speaking/Reading Aloud)
+            if self._detect_mouth_movement(landmarks):
+                results['violations'].append('SPEAKING_DETECTED')
+                results['integrity_score_impact'] += 10
         else:
-            results['violations'].append('FACE_NOT_FOUND')
-            results['integrity_score_impact'] += 15
+            elapsed = time.time() - self._last_face_time
+            if elapsed > self.FACE_ABSENT_THRESHOLD_SEC:
+                results['violations'].append('FACE_ABSENT_VIOLATION')
+                results['integrity_score_impact'] += 20
 
         return results
+
+    def _detect_gaze_violation(self, landmarks, pose):
+        """Advanced gaze check: Left/Right/Up/Down + Vector check"""
+        # Simple pose thresholds
+        if abs(pose['yaw']) > 25: return True  # Looking side
+        if pose['pitch'] < -20: return True    # Looking down at phone/desk
+        
+        # Iris Position Check (Landmarks for eyes)
+        # Right Eye: 468 (iris), Left Eye: 473 (iris)
+        # Comparing iris relative to eye corners
+        re_iris = landmarks.landmark[468]
+        le_iris = landmarks.landmark[473]
+        
+        # If iris is pushed too far to one side
+        if re_iris.x < 0.45 or re_iris.x > 0.55: return True
+        return False
+
+    def _detect_mouth_movement(self, landmarks):
+        """Check for speech patterns via lip landmarks"""
+        # Upper lip: 13, Lower lip: 14
+        upper = landmarks.landmark[13].y
+        lower = landmarks.landmark[14].y
+        dist = abs(upper - lower)
+        
+        # If mouth is consistently open/moving (0.015 is normalized units)
+        return dist > 0.02
 
     # -----------------------------------------------------------------
     #  OpenCV Haar Cascade backend  (face presence + multiple faces)

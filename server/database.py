@@ -28,6 +28,7 @@ else:
         pool_timeout=30,
         pool_recycle=1800,  # Recycle connections every 30 min
         pool_pre_ping=True,  # Verify connections before using
+        connect_args={"statement_cache_size": 0} # Required for Supabase pgbouncer
     )
 
 # Create async session factory

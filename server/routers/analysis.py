@@ -259,12 +259,14 @@ async def process_analysis_data(
         factors=analysis_record.result_data.keys()
     )
     
-    # Build response with phone detection flag
+    # Build response with phone detection and OCR text
     response = {
         "status": "processed", 
         "risk_score": session.risk_score,
         "face_detected": analysis_record.face_detected if hasattr(analysis_record, 'face_detected') else True,
         "confidence": analysis_record.face_confidence if hasattr(analysis_record, 'face_confidence') else 1.0,
+        "detected_text": analysis_record.detected_text,
+        "vision_violations": vision_results['violations'] if 'vision_results' in locals() else []
     }
     
     # Add phone detection info if webcam was processed
