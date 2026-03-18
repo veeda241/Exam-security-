@@ -7,6 +7,8 @@ pydantic>=2.0.0
 email-validator>=2.0.0
 python-multipart>=0.0.6
 pillow>=10.0.0
+# ExamGuard Pro - Environment Variables
+python-dotenv>=1.0.0
 
 # Database (PostgreSQL async driver for Supabase/Railway)
 asyncpg>=0.29.0
