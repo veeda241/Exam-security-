@@ -421,14 +421,29 @@ for directory in [SCREENSHOTS_DIR, WEBCAM_DIR, REPORTS_DIR]:
 app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
 
 # Mount React frontend (production build)
-# Updated to point to the actual latest build folder
-REACT_BUILD_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "react-frontend", "dist")
-if os.path.exists(REACT_BUILD_DIR):
+# Updated to search in multiple possible locations (Local vs Render)
+possible_build_dirs = [
+    os.path.join(os.path.dirname(os.path.dirname(__file__)), "react-frontend", "dist"),
+    os.path.join(os.environ.get("RENDER_SRC_ROOT", "/opt/render/project/src"), "react-frontend", "dist"),
+    os.path.join(os.getcwd(), "react-frontend", "dist"),
+    "/opt/render/project/src/react-frontend/dist"
+]
+
+REACT_BUILD_DIR = None
+for build_dir in possible_build_dirs:
+    if os.path.exists(build_dir) and os.path.isfile(os.path.join(build_dir, "index.html")):
+        REACT_BUILD_DIR = build_dir
+        print(f"[INFO] Found React build at: {REACT_BUILD_DIR}")
+        break
+
+if REACT_BUILD_DIR:
     from fastapi.responses import FileResponse
     from starlette.exceptions import HTTPException as StarletteHTTPException
 
     # Mount static assets (JS, CSS, images)
-    app.mount("/assets", StaticFiles(directory=os.path.join(REACT_BUILD_DIR, "assets")), name="react-assets")
+    assets_dir = os.path.join(REACT_BUILD_DIR, "assets")
+    if os.path.exists(assets_dir):
+        app.mount("/assets", StaticFiles(directory=assets_dir), name="react-assets")
 
     # Serve index.html at root of domain and dashboard
     @app.get("/", include_in_schema=False)
