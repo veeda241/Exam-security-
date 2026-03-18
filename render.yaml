@@ -1,52 +1,49 @@
 services:
-  # ========== Backend API ==========
+  # ========== Unified Backend + Frontend (Monolithic) ==========
   - type: web
     name: examguard-api
     runtime: python
-    rootDir: server
+    rootDir: .
     buildCommand: |
+      echo "=== Starting Build ==="
+      # Install Python dependencies
       pip install --upgrade pip
-      pip install -r requirements.txt
-      # Build frontend and move to server directory
-      cd ../react-frontend && npm install && npm run build && mv dist ../server/dist && cd ../server
-      pip uninstall -y matplotlib matplotlib-inline contourpy kiwisolver fonttools cycler 2>/dev/null || true
-      echo "Build ready - React & Backend prepared"
-    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+      pip install -r server/requirements.txt
+      # Build frontend
+      cd react-frontend && npm install && npm run build && cd ..
+      # Copy frontend build to server/dist
+      mkdir -p server/dist
+      cp -r react-frontend/dist/* server/dist/
+      echo "=== Build Complete ==="
+      ls -la server/dist/
+    startCommand: cd server && uvicorn main:app --host 0.0.0.0 --port $PORT
     envVars:
       - key: PYTHON_VERSION
         value: "3.11"
       - key: MPLBACKEND
         value: "Agg"
-      - key: PG_HOST
-        sync: false
-      - key: PG_PASSWORD
-        sync: false
+      - key: PYTHONPATH
+        value: "server"
+      # Supabase Configuration
       - key: SUPABASE_URL
-        sync: false
+        value: "https://fpnopsvzvfqwvyqmhgei.supabase.co"
       - key: SUPABASE_KEY
+        value: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZwbm9wc3Z6dmZxd3Z5cW1oZ2VpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI1NDc4ODUsImV4cCI6MjA4ODEyMzg4NX0.OxJ9mXUJndY3QCjG_nYN5tLdEnyigJ265IrpxQB0dsU"
+      # PostgreSQL Configuration (Supabase Pooler)
+      - key: PG_HOST
+        value: "aws-1-ap-northeast-1.pooler.supabase.com"
+      - key: PG_PORT
+        value: "6543"
+      - key: PG_USER
+        value: "postgres.fpnopsvzvfqwvyqmhgei"
+      - key: PG_DB
+        value: "postgres"
+      - key: PG_PASSWORD
         sync: false
       - key: SUPABASE_DB_PASSWORD
         sync: false
+      # Security
       - key: SECRET_KEY
         generateValue: true
       - key: CORS_ORIGINS
         value: "*"
-
-  # ========== Frontend Dashboard ==========
-  - type: web
-    name: examguard-dashboard
-    runtime: static
-    rootDir: react-frontend
-    buildCommand: npm install && npm run build
-    staticPublishPath: dist
-    headers:
-      - path: /*
-        name: Cache-Control
-        value: public, max-age=0, must-revalidate
-    routes:
-      - type: rewrite
-        source: /*
-        destination: /index.html
-    envVars:
-      - key: VITE_API_URL
-        value: https://examguard-api.onrender.com
