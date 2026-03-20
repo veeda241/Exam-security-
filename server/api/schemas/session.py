@@ -12,6 +12,7 @@ class SessionCreate(BaseModel):
     """Schema for creating a new exam session"""
     student_id: str = Field(..., description="Student's unique identifier")
     student_name: str = Field(..., min_length=1, max_length=255, description="Student's name")
+    student_email: Optional[str] = Field(None, description="Student's email address")
     exam_id: str = Field(..., description="Exam identifier")
     
     class Config:
@@ -52,13 +53,13 @@ class SessionSummary(BaseModel):
     exam_id: str
     started_at: str
     ended_at: Optional[str] = None
-    risk_score: float = 0.0
-    risk_level: str = "safe"
-    engagement_score: float = 100.0
-    content_relevance: float = 100.0
-    effort_alignment: float = 100.0
-    status: str = "active"
-    stats: Dict[str, Any] = {}
+    risk_score: Optional[float] = 0.0
+    risk_level: Optional[str] = "safe"
+    engagement_score: Optional[float] = 100.0
+    content_relevance: Optional[float] = 100.0
+    effort_alignment: Optional[float] = 100.0
+    status: Optional[str] = "active"
+    stats: Optional[Dict[str, Any]] = {}
     
     class Config:
         json_schema_extra = {

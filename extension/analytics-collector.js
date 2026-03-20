@@ -12,7 +12,7 @@
 
 class AdvancedAnalyticsCollector {
     constructor(options = {}) {
-        this.serverUrl = options.serverUrl || 'https://exam-security.onrender.com';
+        this.serverUrl = options.serverUrl || 'http://localhost:8000';
         this.studentId = options.studentId || 'unknown';
         this.sessionId = options.sessionId || this.generateSessionId();
         

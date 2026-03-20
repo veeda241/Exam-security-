@@ -1,197 +1,91 @@
-# ExamGuard Pro
+# ExamGuard Pro - AI-Powered Proctoring System
 
-AI-powered exam proctoring system with real-time monitoring, face detection, OCR analysis, NLP-based plagiarism detection, and automated risk scoring.
+ExamGuard Pro is an advanced, real-time exam monitoring and proctoring system that leverages AI to ensure academic integrity. It features multi-modal analysis including face detection, eye gaze tracking, OCR-based content monitoring, and NLP-based plagiarism detection.
 
-## Tech Stack
+## 🚀 Key Features
+
+- **Real-Time Monitoring**: Tab switches, window blurring, and copy/paste event tracking.
+- **AI-Driven Analysis**:
+  - **Face Detection**: MediaPipe-powered presence verification.
+  - **Gaze Tracking**: Monitors eye movement for suspicious patterns.
+  - **OCR Analysis**: Detects forbidden content (e.g., ChatGPT, Chegg) from screen captures.
+  - **Object Detection**: YOLOv8-based detection of unauthorized devices (phones, tablets).
+  - **Text Similarity**: NLP-based comparison for plagiarism detection.
+- **Dynamic Risk Scoring**: Weighted event scoring with live risk levels (Safe, Review, Suspicious).
+- **Interactive Dashboard**: Real-time WebSocket updates, student performance metrics, and session timelines.
+- **Robust Reporting**: Automated PDF report generation with detailed violation logs.
+
+## 🛠 Tech Stack
 
 | Layer | Technology |
 |-------|-----------|
-| Backend | FastAPI, SQLAlchemy (async), PostgreSQL / SQLite |
-| Frontend | React 19, Vite, React Router v7 |
-| AI/ML | MediaPipe, YOLOv8, Tesseract OCR, Sentence-Transformers |
-| Extension | Chrome Manifest V3 |
-| Deployment | Docker, Docker Compose |
+| **Backend** | FastAPI, Python 3.10+, Supabase (PostgreSQL) |
+| **Database** | Supabase (Cloud Database & Real-time) |
+| **Frontend** | React 19, Vite, Tailwind CSS, Lucide Icons |
+| **AI/ML** | MediaPipe, YOLOv8, Tesseract OCR, Sentence-Transformers |
+| **Extension** | Chrome Manifest V3, WebRTC |
+| **Deployment** | Render, Docker |
 
-## Project Structure
+## 📂 Project Structure
 
-```
+```text
 ├── server/                  # FastAPI backend
-│   ├── api/                 # Organized API endpoints
-│   ├── auth/                # JWT authentication
-│   ├── models/              # SQLAlchemy models
-│   ├── routers/             # Route handlers
-│   ├── scoring/             # Risk score engine
-│   ├── services/            # ML services (16 modules)
-│   │   ├── face_detection   # MediaPipe face mesh
-│   │   ├── gaze_tracking    # Eye gaze analysis
-│   │   ├── ocr              # Tesseract screenshot analysis
-│   │   ├── similarity       # Text plagiarism detection
-│   │   ├── anomaly          # Behavior anomaly detection
-│   │   ├── object_detection # YOLOv8 object detection
-│   │   ├── biometrics       # Biometric verification
-│   │   ├── pipeline         # Real-time analysis pipeline
-│   │   └── realtime         # WebSocket event manager
-│   ├── tasks/               # Background task queue
-│   └── utils/               # Shared utilities
-├── react-frontend/          # React dashboard (Vite)
-│   └── src/components/      # Dashboard, Sessions, Alerts,
-│                            # Analytics, Reports, Students
-├── extension/               # Chrome extension (Manifest V3)
-│   ├── background.js        # Service worker
-│   ├── content.js           # Page monitoring
-│   ├── webcam.js            # Webcam capture
-│   └── popup/               # Extension popup UI
-├── transformer/             # Custom NLP model
-│   ├── model/               # Transformer architecture
-│   ├── data/                # Tokenizer & datasets
-│   ├── checkpoints/         # Trained model weights
-│   ├── train_examguard.py   # Model training
-│   └── train_similarity.py  # Similarity model training
-└── deployment/              # Docker configuration
-    ├── Dockerfile           # Multi-stage build (Node + Python)
-    ├── docker-compose.yml   # Backend + PostgreSQL
-    └── .env.example         # Environment template
+│   ├── api/                 # API endpoints & Pydantic schemas
+│   ├── auth/                # JWT Authentication & Supabase integration
+│   ├── services/            # AI Pipeline (Face, OCR, NLP, Vision)
+│   ├── main.py              # Application entry point
+│   └── supabase_client.py    # Supabase connection manager
+├── react-frontend/          # React Dashboard (Vite)
+│   ├── src/components/      # Analytics, Dashboard, Alerts, Reports
+│   └── src/context/         # Global AppState & Real-time context
+├── extension/               # Chrome Extension (Manifest V3)
+│   ├── background.js        # Core logic & backend synchronization
+│   ├── content.js           # Page monitoring & event capture
+│   └── webcam.js            # Video processing & frame capture
+└── deployment/              # Deployment configurations
 ```
 
-## Quick Start
+## ⚙️ Setup & Installation
 
-### Local Development
+### 1. Prerequisites
+- Python 3.10+
+- Node.js 18+
+- Supabase Account (URL & Keys)
+- Tesseract OCR installed locally (for dev)
 
+### 2. Backend Setup
 ```bash
-# 1. Backend
 cd server
 python -m venv .venv
-.venv\Scripts\activate        # Windows
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 pip install -r requirements.txt
-python -m uvicorn main:app --host 0.0.0.0 --port 8000
+# Create a .env file with your SUPABASE_URL and SUPABASE_KEY
+python main.py
+```
 
-# 2. Frontend (separate terminal)
+### 3. Frontend Setup
+```bash
 cd react-frontend
 npm install
-npm run dev                   # http://localhost:3000
+npm run dev
 ```
 
-### Docker Deployment (Self-hosted)
+### 4. Chrome Extension
+1. Open `chrome://extensions` in your browser.
+2. Enable **Developer mode**.
+3. Click **Load unpacked** and select the `extension/` directory.
+4. Configure the `BACKEND_URL` in `extension/background.js` if necessary.
 
-```bash
-cd deployment
-copy .env.example .env        # Edit with production secrets
-docker-compose --env-file .env up --build -d
-```
+## 🚢 Deployment (Render)
 
-### Render Deployment (Recommended for Remote Access)
+1. Connect your repository to **Render**.
+2. Create a **Web Service** for the `server/` directory.
+3. Configure **Environment Variables**:
+   - `SUPABASE_URL`: Your project URL.
+   - `SUPABASE_KEY`: Your service role or anon key.
+   - `SECRET_KEY`: Random string for JWT.
+4. Use the following build command: `pip install -r requirements.txt`.
+5. Start command: `uvicorn main:app --host 0.0.0.0 --port $PORT`.
 
-1. **Push to GitHub** — Push this repo to a GitHub repository
-
-2. **Create a Render Web Service**
-   - Go to [render.com](https://render.com) → **New** → **Web Service**
-   - Connect your GitHub repo
-   - Set **Root Directory** to `server`
-   - Set **Build Command**: `chmod +x build.sh && ./build.sh`
-   - Set **Start Command**: `uvicorn main:app --host 0.0.0.0 --port $PORT`
-   - Choose **Python 3** runtime
-
-3. **Add Environment Variables** in Render dashboard:
-   | Variable | Value |
-   |----------|-------|
-   | `PG_HOST` | `db.fpnopsvzvfqwvyqmhgei.supabase.co` |
-   | `PG_PASSWORD` | Your Supabase DB password |
-   | `SUPABASE_URL` | `https://fpnopsvzvfqwvyqmhgei.supabase.co` |
-   | `SUPABASE_KEY` | Your Supabase anon key |
-   | `SUPABASE_DB_PASSWORD` | Your Supabase DB password |
-   | `SECRET_KEY` | Generate a random string |
-   | `CORS_ORIGINS` | `*` |
-
-4. **Deploy** — Render builds and gives you a URL like `https://examguard-api.onrender.com`
-
-5. **Update Chrome Extension** — In `extension/background.js`, change:
-   ```js
-   API_BASE: 'https://examguard-api.onrender.com/api',
-   WS_URL: 'wss://examguard-api.onrender.com/ws/student',
-   ```
-
-6. **Update React Frontend** — In `react-frontend/src/config.js`, the URLs auto-detect in production. For local dev pointing to Render:
-   ```js
-   export const API_BASE = 'https://examguard-api.onrender.com/api';
-   ```
-
-Access points after deployment:
-- **API** — `https://examguard-api.onrender.com`
-- **API Docs** — `https://examguard-api.onrender.com/docs`
-- **WebSocket** — `wss://examguard-api.onrender.com/ws/dashboard`
-
-### Chrome Extension
-
-1. Open `chrome://extensions`
-2. Enable **Developer mode**
-3. Click **Load unpacked** → select the `extension/` folder
-4. Click the ExamGuard icon → enter exam session details
-
-> For production, update `API_BASE` and `WS_URL` in `extension/background.js` to your server domain.
-
-## Features
-
-### Real-Time Monitoring
-- Tab switch & window blur detection
-- Copy/paste event tracking
-- Periodic screenshot capture (3s interval)
-- Webcam frame capture (5s interval)
-- WebSocket-based live dashboard updates
-
-### AI Analysis Pipeline
-- **Face Detection** — MediaPipe face mesh for presence verification
-- **Gaze Tracking** — Eye movement analysis for engagement scoring
-- **OCR Analysis** — Tesseract-based forbidden content detection (ChatGPT, Chegg, etc.)
-- **Object Detection** — YOLOv8 for unauthorized device detection
-- **Text Similarity** — Sentence-transformer plagiarism detection
-- **Anomaly Detection** — ML-based suspicious behavior identification
-- **Audio Analysis** — Environment sound monitoring
-- **Browser Forensics** — Domain categorization & browsing pattern analysis
-
-### Risk Scoring
-- Weighted event scoring with dynamic risk levels (Safe / Review / Suspicious)
-- Cumulative risk analysis with timeline visualization
-- Per-student and per-session risk breakdowns
-
-### Reporting
-- PDF report generation with risk timelines
-- JSON data export
-- Session analytics and trend charts
-
-## API Overview
-
-| Endpoint | Description |
-|----------|-------------|
-| `POST /api/auth/login` | JWT authentication |
-| `GET /api/students` | List students |
-| `POST /api/sessions` | Create exam session |
-| `POST /api/events` | Log monitoring event |
-| `POST /api/uploads/screenshot` | Upload screenshot for OCR |
-| `POST /api/uploads/webcam` | Upload webcam frame |
-| `GET /api/analysis/{session_id}` | Get AI analysis results |
-| `GET /api/reports/{session_id}` | Generate session report |
-| `WS /ws/dashboard` | Dashboard real-time events |
-| `WS /ws/student/{id}` | Student monitoring channel |
-
-Full interactive docs available at `/docs` when the server is running.
-
-## Environment Variables
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `DATABASE_URL` | — | Full DB connection string (auto-detected on Render) |
-| `PG_HOST` | — | Supabase PostgreSQL host |
-| `PG_USER` | `postgres` | PostgreSQL username |
-| `PG_PASSWORD` | — | PostgreSQL password |
-| `PG_DB` | `postgres` | PostgreSQL database name |
-| `SUPABASE_URL` | — | Supabase project URL |
-| `SUPABASE_KEY` | — | Supabase anon/public key |
-| `SUPABASE_DB_PASSWORD` | — | Supabase database password |
-| `SECRET_KEY` | — | App secret for sessions |
-| `CORS_ORIGINS` | `*` | Comma-separated allowed origins |
-
-> If no `DATABASE_URL` or `PG_HOST` is set, falls back to local SQLite (`examguard.db`).
-
-## License
-
-MIT
+## 📄 License
+This project is licensed under the MIT License.

@@ -43,7 +43,7 @@ class StudentResponse(BaseModel):
     email: Optional[str] = None
     department: Optional[str] = None
     year: Optional[str] = None
-    created_at: datetime
+    created_at: Optional[datetime] = None
 
     class Config:
         from_attributes = True
@@ -57,14 +57,14 @@ class StudentSummary(BaseModel):
     department: Optional[str] = None
     year: Optional[str] = None
     latest_session_id: Optional[str] = None
-    risk_score: float = 0.0
-    engagement_score: float = 0.0
-    effort_alignment: float = 0.0
-    content_relevance: float = 0.0
-    tab_switch_count: int = 0
-    forbidden_site_count: int = 0
-    copy_count: int = 0
-    status: str = "inactive"  # inactive, safe, review, suspicious
+    risk_score: Optional[float] = 0.0
+    engagement_score: Optional[float] = 0.0
+    effort_alignment: Optional[float] = 0.0
+    content_relevance: Optional[float] = 0.0
+    tab_switch_count: Optional[int] = 0
+    forbidden_site_count: Optional[int] = 0
+    copy_count: Optional[int] = 0
+    status: Optional[str] = "inactive"  # inactive, safe, review, suspicious
     
     class Config:
         json_schema_extra = {

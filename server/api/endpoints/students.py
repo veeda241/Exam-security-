@@ -1,153 +1,110 @@
-"""
-ExamGuard Pro - Students Endpoint
-API routes for student management
-"""
-
-from fastapi import APIRouter, HTTPException, Depends
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from fastapi import APIRouter, HTTPException
 from typing import List
 
-from database import get_db
-from models.student import Student
+from supabase_client import get_supabase
 from api.schemas import StudentCreate, StudentUpdate, StudentResponse
 
 router = APIRouter()
-
+supabase = get_supabase()
 
 @router.post("/", response_model=StudentResponse)
-async def create_student(
-    student_data: StudentCreate,
-    db: AsyncSession = Depends(get_db)
-):
-    """Create a new student"""
-    
-    # Check if id already exists if provided
-    if student_data.id:
-        result = await db.execute(select(Student).where(Student.id == student_data.id))
-        if result.scalar_one_or_none():
-            raise HTTPException(status_code=400, detail="Student ID already registered")
+async def create_student(student_data: StudentCreate):
+    """Create a new student via Supabase"""
+    try:
+        # Check if id already exists if provided
+        if student_data.id:
+            res = supabase.table("students").select("id").eq("id", student_data.id).execute()
+            if res.data:
+                raise HTTPException(status_code=400, detail="Student ID already registered")
+                
+        # Check if email already exists
+        if student_data.email:
+            res = supabase.table("students").select("id").eq("email", student_data.email).execute()
+            if res.data:
+                raise HTTPException(status_code=400, detail="Email already registered")
+        
+        # Create student
+        student_args = {
+            "name": student_data.name,
+            "email": student_data.email,
+            "department": student_data.department,
+            "year": student_data.year
+        }
+        
+        if student_data.id:
+            student_args["id"] = student_data.id
             
-    # Check if email already exists
-    if student_data.email:
-        result = await db.execute(
-            select(Student).where(Student.email == student_data.email)
-        )
-        existing = result.scalar_one_or_none()
+        res = supabase.table("students").insert(student_args).execute()
         
-        if existing:
-            raise HTTPException(status_code=400, detail="Email already registered")
-    
-    # Create student
-    student_args = {
-        "name": student_data.name,
-        "email": student_data.email,
-        "department": student_data.department,
-        "year": student_data.year
-    }
-    
-    if student_data.id:
-        student_args["id"] = student_data.id
-        
-    new_student = Student(**student_args)
-    
-    db.add(new_student)
-    await db.commit()
-    await db.refresh(new_student)
-    
-    return new_student
+        if not res.data:
+            raise HTTPException(status_code=500, detail="Failed to create student")
+            
+        return res.data[0]
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/", response_model=List[StudentResponse])
-async def list_students(
-    skip: int = 0,
-    limit: int = 100,
-    db: AsyncSession = Depends(get_db)
-):
-    """Get all students with pagination"""
-    
-    result = await db.execute(
-        select(Student)
-        .offset(skip)
-        .limit(limit)
-        .order_by(Student.created_at.desc())
-    )
-    students = result.scalars().all()
-    
-    return students
+async def list_students(limit: int = 100):
+    """Get all students from Supabase"""
+    try:
+        res = supabase.table("students").select("*").limit(limit).order("created_at", desc=True).execute()
+        return res.data
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/{student_id}", response_model=StudentResponse)
-async def get_student(
-    student_id: str,
-    db: AsyncSession = Depends(get_db)
-):
-    """Get a specific student by ID"""
-    
-    result = await db.execute(
-        select(Student).where(Student.id == student_id)
-    )
-    student = result.scalar_one_or_none()
-    
-    if not student:
-        raise HTTPException(status_code=404, detail="Student not found")
-    
-    return student
+async def get_student(student_id: str):
+    """Get a specific student by ID from Supabase"""
+    try:
+        res = supabase.table("students").select("*").eq("id", student_id).execute()
+        if not res.data:
+            raise HTTPException(status_code=404, detail="Student not found")
+        return res.data[0]
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.put("/{student_id}", response_model=StudentResponse)
-async def update_student(
-    student_id: str,
-    student_data: StudentUpdate,
-    db: AsyncSession = Depends(get_db)
-):
-    """Update student information"""
-    
-    result = await db.execute(
-        select(Student).where(Student.id == student_id)
-    )
-    student = result.scalar_one_or_none()
-    
-    if not student:
-        raise HTTPException(status_code=404, detail="Student not found")
-    
-    # Update fields if provided
-    if student_data.name is not None:
-        student.name = student_data.name
-    if student_data.email is not None:
-        # Check email uniqueness
-        email_check = await db.execute(
-            select(Student).where(
-                Student.email == student_data.email,
-                Student.id != student_id
-            )
-        )
-        if email_check.scalar_one_or_none():
-            raise HTTPException(status_code=400, detail="Email already in use")
-        student.email = student_data.email
-    
-    await db.commit()
-    await db.refresh(student)
-    
-    return student
+async def update_student(student_id: str, student_data: StudentUpdate):
+    """Update student information in Supabase"""
+    try:
+        # Check if student exists
+        res = supabase.table("students").select("*").eq("id", student_id).execute()
+        if not res.data:
+            raise HTTPException(status_code=404, detail="Student not found")
+        
+        updates = {}
+        if student_data.name is not None:
+            updates["name"] = student_data.name
+        if student_data.email is not None:
+            # Check uniqueness
+            email_check = supabase.table("students").select("id").eq("email", student_data.email).neq("id", student_id).execute()
+            if email_check.data:
+                raise HTTPException(status_code=400, detail="Email already in use")
+            updates["email"] = student_data.email
+            
+        if not updates:
+            return res.data[0]
+            
+        update_res = supabase.table("students").update(updates).eq("id", student_id).execute()
+        return update_res.data[0]
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.delete("/{student_id}")
-async def delete_student(
-    student_id: str,
-    db: AsyncSession = Depends(get_db)
-):
-    """Delete a student"""
-    
-    result = await db.execute(
-        select(Student).where(Student.id == student_id)
-    )
-    student = result.scalar_one_or_none()
-    
-    if not student:
-        raise HTTPException(status_code=404, detail="Student not found")
-    
-    await db.delete(student)
-    await db.commit()
-    
-    return {"message": "Student deleted successfully", "id": student_id}
+async def delete_student(student_id: str):
+    """Delete a student from Supabase"""
+    try:
+        res = supabase.table("students").delete().eq("id", student_id).execute()
+        return {"message": "Student deleted successfully", "id": student_id}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

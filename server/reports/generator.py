@@ -27,13 +27,13 @@ REPORTS_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "uploads"
 os.makedirs(REPORTS_DIR, exist_ok=True)
 
 
-async def generate_pdf_report(session, events: List) -> str:
+async def generate_pdf_report(session: dict, events: List[dict]) -> str:
     """
     Generate a PDF report for an exam session
     
     Args:
-        session: ExamSession object
-        events: List of Event objects
+        session: ExamSession dictionary (from Supabase)
+        events: List of Event dictionaries
         
     Returns:
         Path to generated PDF file
@@ -44,7 +44,8 @@ async def generate_pdf_report(session, events: List) -> str:
     
     # Create PDF filename
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    filename = f"report_{session.id[:8]}_{timestamp}.pdf"
+    session_id = str(session.get("id", "unknown"))
+    filename = f"report_{session_id[:8]}_{timestamp}.pdf"
     filepath = os.path.join(REPORTS_DIR, filename)
     
     # Create document
@@ -91,12 +92,22 @@ async def generate_pdf_report(session, events: List) -> str:
     # Session Info
     content.append(Paragraph("Session Information", heading_style))
     
+    started_at_str = session.get("started_at")
+    ended_at_str = session.get("ended_at")
+    
+    def format_date(dt_str):
+        if not dt_str: return "N/A"
+        try:
+            return datetime.fromisoformat(dt_str.replace('Z', '+00:00')).strftime("%Y-%m-%d %H:%M:%S")
+        except:
+            return str(dt_str)
+
     session_data = [
-        ["Student Name:", session.student_name],
-        ["Student ID:", session.student_id],
-        ["Exam ID:", session.exam_id],
-        ["Started At:", session.started_at.strftime("%Y-%m-%d %H:%M:%S") if session.started_at else "N/A"],
-        ["Ended At:", session.ended_at.strftime("%Y-%m-%d %H:%M:%S") if session.ended_at else "In Progress"],
+        ["Student Name:", str(session.get("student_name", "N/A"))],
+        ["Student ID:", str(session.get("student_id", "N/A"))],
+        ["Exam ID:", str(session.get("exam_id", "N/A"))],
+        ["Started At:", format_date(started_at_str)],
+        ["Ended At:", format_date(ended_at_str) if ended_at_str else "In Progress"],
     ]
     
     session_table = Table(session_data, colWidths=[2*inch, 4*inch])
@@ -116,21 +127,22 @@ async def generate_pdf_report(session, events: List) -> str:
     # Risk Score
     content.append(Paragraph("AI Analysis & Risk Assessment", heading_style))
     
+    risk_level = session.get("risk_level", "low").lower()
     # Determine risk color
-    if session.risk_level == "suspicious":
+    if risk_level == "suspicious":
         risk_color = colors.HexColor('#ef4444')
-    elif session.risk_level == "review":
+    elif risk_level == "review":
         risk_color = colors.HexColor('#f59e0b')
     else:
         risk_color = colors.HexColor('#22c55e')
     
     risk_data = [
         ["Metric", "Score / Value"],
-        ["Risk Score:", f"{session.risk_score:.1f} / 100"],
-        ["Risk Level:", session.risk_level.upper()],
-        ["Engagement Score:", f"{getattr(session, 'engagement_score', 0):.1f}%"],
-        ["Content Relevance:", f"{getattr(session, 'content_relevance', 0):.1f}%"],
-        ["Effort Alignment:", f"{getattr(session, 'effort_alignment', 0):.1f}%"],
+        ["Risk Score:", f"{float(session.get('risk_score', 0)):.1f} / 100"],
+        ["Risk Level:", risk_level.upper()],
+        ["Engagement Score:", f"{float(session.get('engagement_score', 0)):.1f}%"],
+        ["Content Relevance:", f"{float(session.get('content_relevance', 0)):.1f}%"],
+        ["Effort Alignment:", f"{float(session.get('effort_alignment', 0)):.1f}%"],
     ]
     
     risk_table = Table(risk_data, colWidths=[2.5*inch, 3.5*inch])
@@ -153,11 +165,11 @@ async def generate_pdf_report(session, events: List) -> str:
     
     stats_data = [
         ["Event Type", "Count", "Risk Weight"],
-        ["Tab Switches", str(session.tab_switch_count), "+10 each"],
-        ["Copy/Paste Events", str(session.copy_count), "+15 each"],
-        ["Face Absences", str(session.face_absence_count), "+20 each"],
-        ["Forbidden Sites", str(session.forbidden_site_count), "+40 each"],
-        ["Total Events", str(session.total_events), "-"],
+        ["Tab Switches", str(session.get("tab_switch_count", 0)), "+10 each"],
+        ["Copy/Paste Events", str(session.get("copy_count", 0)), "+15 each"],
+        ["Face Absences", str(session.get("face_absence_count", 0)), "+20 each"],
+        ["Forbidden Sites", str(session.get("forbidden_site_count", 0)), "+40 each"],
+        ["Total Events", str(session.get("total_events", 0)), "-"],
     ]
     
     stats_table = Table(stats_data, colWidths=[2.5*inch, 1.5*inch, 2*inch])
@@ -182,13 +194,21 @@ async def generate_pdf_report(session, events: List) -> str:
         timeline_data = [["Time", "Event Type", "Details"]]
         
         for event in events[-20:]:  # Last 20 events
-            time_str = event.timestamp.strftime("%H:%M:%S") if event.timestamp else "N/A"
-            details = ""
-            if event.data:
-                if isinstance(event.data, dict):
-                    details = event.data.get("url", event.data.get("keyword", ""))[:40]
+            ev_ts = event.get("timestamp")
+            time_str = "N/A"
+            if ev_ts:
+                try:
+                    time_str = datetime.fromisoformat(ev_ts.replace('Z', '+00:00')).strftime("%H:%M:%S")
+                except:
+                    time_str = str(ev_ts)
             
-            timeline_data.append([time_str, event.event_type, details])
+            details = ""
+            ev_data = event.get("data")
+            if ev_data:
+                if isinstance(ev_data, dict):
+                    details = str(ev_data.get("url", ev_data.get("keyword", "")))[:40]
+            
+            timeline_data.append([time_str, event.get("event_type", "Unknown"), details])
         
         timeline_table = Table(timeline_data, colWidths=[1.2*inch, 2*inch, 2.8*inch])
         timeline_table.setStyle(TableStyle([
@@ -217,11 +237,12 @@ async def generate_pdf_report(session, events: List) -> str:
     return filepath
 
 
-async def _generate_text_report(session, events: List) -> str:
+async def _generate_text_report(session: dict, events: List[dict]) -> str:
     """Fallback text report when ReportLab is not available"""
     
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    filename = f"report_{session.id[:8]}_{timestamp}.txt"
+    session_id = str(session.get("id", "unknown"))
+    filename = f"report_{session_id[:8]}_{timestamp}.txt"
     filepath = os.path.join(REPORTS_DIR, filename)
     
     with open(filepath, 'w') as f:
@@ -231,24 +252,24 @@ async def _generate_text_report(session, events: List) -> str:
         
         f.write("SESSION INFORMATION\n")
         f.write("-" * 40 + "\n")
-        f.write(f"Student Name: {session.student_name}\n")
-        f.write(f"Student ID:   {session.student_id}\n")
-        f.write(f"Exam ID:      {session.exam_id}\n")
-        f.write(f"Started At:   {session.started_at}\n")
-        f.write(f"Ended At:     {session.ended_at or 'In Progress'}\n\n")
+        f.write(f"Student Name: {session.get('student_name', 'N/A')}\n")
+        f.write(f"Student ID:   {session.get('student_id', 'N/A')}\n")
+        f.write(f"Exam ID:      {session.get('exam_id', 'N/A')}\n")
+        f.write(f"Started At:   {session.get('started_at', 'N/A')}\n")
+        f.write(f"Ended At:     {session.get('ended_at', 'In Progress')}\n\n")
         
         f.write("RISK ASSESSMENT\n")
         f.write("-" * 40 + "\n")
-        f.write(f"Risk Score:   {session.risk_score:.1f} / 100\n")
-        f.write(f"Risk Level:   {session.risk_level.upper()}\n\n")
+        f.write(f"Risk Score:   {float(session.get('risk_score', 0)):.1f} / 100\n")
+        f.write(f"Risk Level:   {str(session.get('risk_level', 'low')).upper()}\n\n")
         
         f.write("EVENT STATISTICS\n")
         f.write("-" * 40 + "\n")
-        f.write(f"Tab Switches:    {session.tab_switch_count}\n")
-        f.write(f"Copy Events:     {session.copy_count}\n")
-        f.write(f"Face Absences:   {session.face_absence_count}\n")
-        f.write(f"Forbidden Sites: {session.forbidden_site_count}\n")
-        f.write(f"Total Events:    {session.total_events}\n\n")
+        f.write(f"Tab Switches:    {session.get('tab_switch_count', 0)}\n")
+        f.write(f"Copy Events:     {session.get('copy_count', 0)}\n")
+        f.write(f"Face Absences:   {session.get('face_absence_count', 0)}\n")
+        f.write(f"Forbidden Sites: {session.get('forbidden_site_count', 0)}\n")
+        f.write(f"Total Events:    {session.get('total_events', 0)}\n\n")
         
         f.write("=" * 60 + "\n")
         f.write(f"Generated: {datetime.now()}\n")

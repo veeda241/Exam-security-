@@ -4,11 +4,11 @@
  */
 
 // ==================== CONFIGURATION ====================
-const BACKEND_URL = 'https://exam-security.onrender.com';
+const BACKEND_URL = 'http://localhost:8000';
 
 const CONFIG = {
     API_BASE: `${BACKEND_URL}/api`,
-    HEALTH_CHECK_INTERVAL: 5000,
+    HEALTH_CHECK_INTERVAL: 4000, // Slightly faster check
 };
 
 // ==================== DOM ELEMENTS ====================

@@ -18,7 +18,7 @@ class EventCreate(BaseModel):
 class EventData(BaseModel):
     """Schema for event data in batch operations"""
     type: str = Field(..., description="Event type")
-    timestamp: int = Field(..., description="Client JS timestamp")
+    timestamp: Optional[int] = Field(None, description="Client JS timestamp")
     data: Optional[Dict[str, Any]] = Field(default=None, description="Event-specific data")
     id: Optional[str] = Field(default=None, description="Client-generated event ID")
     

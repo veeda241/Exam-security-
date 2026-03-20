@@ -37,6 +37,8 @@ class AnalysisRequest(BaseModel):
     webcam_image: Optional[str] = None # Base64
     screen_image: Optional[str] = None # Base64
     clipboard_text: Optional[str] = None
+    is_dom_capture: Optional[bool] = False
+    source_url: Optional[str] = None
     timestamp: int
 
 class DashboardStats(BaseModel):
@@ -101,7 +103,8 @@ async def process_analysis_data(
     analysis_record = AnalysisResult(
         session_id=session.id,
         timestamp=datetime.utcnow(),
-        analysis_type="MULTI_MODAL",
+        analysis_type="DOM_CONTENT" if getattr(analysis_request, 'is_dom_capture', False) else "MULTI_MODAL",
+        source_url=getattr(analysis_request, 'source_url', None),
         result_data={}
     )
     

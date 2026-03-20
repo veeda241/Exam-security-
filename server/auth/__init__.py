@@ -3,8 +3,8 @@ ExamGuard Pro - Authentication Module
 JWT-based authentication with role-based access control
 """
 
-from auth.models import User, UserRole, RefreshToken
-from auth.schemas import (
+from .models import User, UserRole, RefreshToken
+from .schemas import (
     UserCreate,
     UserLogin,
     UserResponse,
@@ -12,7 +12,7 @@ from auth.schemas import (
     AuthResponse,
     MessageResponse,
 )
-from auth.utils import (
+from .utils import (
     hash_password,
     verify_password,
     create_access_token,
@@ -20,7 +20,7 @@ from auth.utils import (
     verify_access_token,
     verify_refresh_token,
 )
-from auth.dependencies import (
+from .dependencies import (
     get_current_user,
     get_current_user_optional,
     get_admin_user,
@@ -30,8 +30,8 @@ from auth.dependencies import (
     verify_extension_api_key,
     get_api_key_or_user,
 )
-from auth.service import AuthService
-from auth.router import router as auth_router
+from .service import AuthService
+from .router import router as auth_router
 
 
 __all__ = [

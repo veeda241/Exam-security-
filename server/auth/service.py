@@ -1,14 +1,8 @@
-"""
-ExamGuard Pro - Authentication Service
-Business logic for authentication operations
-"""
-
 from datetime import datetime, timedelta
-from typing import Optional, Tuple
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, or_
+from typing import Optional, Tuple, Dict, Any
 
-from auth.models import User, UserRole, RefreshToken
+from supabase_client import get_supabase
+from auth.models import UserRole
 from auth.schemas import UserCreate, UserLogin, UserResponse, Token, AuthResponse
 from auth.utils import (
     hash_password,
@@ -23,148 +17,118 @@ from auth.config import (
     REFRESH_TOKEN_EXPIRE_DAYS,
 )
 
+supabase = get_supabase()
 
 class AuthService:
-    """Authentication service for user management"""
+    """Authentication service for user management via Supabase"""
     
-    def __init__(self, db: AsyncSession):
-        self.db = db
-    
-    # =========================================================================
-    # User Registration
-    # =========================================================================
+    def __init__(self, db=None):
+        # db parameter kept for signature compatibility during transition
+        pass
     
     async def register(
         self,
         user_data: UserCreate,
         role: UserRole = UserRole.STUDENT
-    ) -> User:
-        """
-        Register a new user.
+    ) -> Dict[str, Any]:
+        """Register a new user in Supabase."""
         
-        Args:
-            user_data: User registration data
-            role: User role (default: STUDENT)
-            
-        Returns:
-            Created user
-            
-        Raises:
-            ValueError: If email or username already exists
-        """
         # Check if email exists
-        result = await self.db.execute(
-            select(User).where(User.email == user_data.email)
-        )
-        if result.scalar_one_or_none():
+        res = supabase.table("users").select("id").eq("email", user_data.email).execute()
+        if res.data:
             raise ValueError("Email already registered")
         
         # Check if username exists
-        result = await self.db.execute(
-            select(User).where(User.username == user_data.username.lower())
-        )
-        if result.scalar_one_or_none():
+        res = supabase.table("users").select("id").eq("username", user_data.username.lower()).execute()
+        if res.data:
             raise ValueError("Username already taken")
         
         # Create user
-        user = User(
-            email=user_data.email,
-            username=user_data.username.lower(),
-            hashed_password=hash_password(user_data.password),
-            full_name=user_data.full_name,
-            role=role,
-            is_active=True,
-            is_verified=False,  # Requires email verification
-            password_changed_at=datetime.utcnow(),
-        )
+        user = {
+            "email": user_data.email,
+            "username": user_data.username.lower(),
+            "hashed_password": hash_password(user_data.password),
+            "full_name": user_data.full_name,
+            "role": role.value,
+            "is_active": True,
+            "is_verified": False,
+            "failed_login_attempts": 0,
+            "password_changed_at": datetime.utcnow().isoformat(),
+            "created_at": datetime.utcnow().isoformat(),
+            "updated_at": datetime.utcnow().isoformat()
+        }
         
-        self.db.add(user)
-        await self.db.flush()
-        await self.db.refresh(user)
-        
-        return user
-    
-    # =========================================================================
-    # User Login
-    # =========================================================================
+        res = supabase.table("users").insert(user).execute()
+        if not res.data:
+            raise ValueError("Failed to create user")
+            
+        return res.data[0]
     
     async def authenticate(
         self,
         login_data: UserLogin,
         ip_address: Optional[str] = None,
         user_agent: Optional[str] = None
-    ) -> Tuple[User, Token]:
-        """
-        Authenticate a user and return tokens.
+    ) -> Tuple[Dict[str, Any], Token]:
+        """Authenticate user and return tokens via Supabase."""
         
-        Args:
-            login_data: Login credentials
-            ip_address: Client IP address
-            user_agent: Client user agent
-            
-        Returns:
-            Tuple of (user, tokens)
-            
-        Raises:
-            ValueError: If credentials are invalid or account is locked
-        """
         # Find user by username or email
-        result = await self.db.execute(
-            select(User).where(
-                or_(
-                    User.username == login_data.username.lower(),
-                    User.email == login_data.username.lower()
-                )
-            )
-        )
-        user = result.scalar_one_or_none()
-        
-        if user is None:
+        res = supabase.table("users").select("*").or_(f"username.eq.{login_data.username.lower()},email.eq.{login_data.username.lower()}").execute()
+        if not res.data:
             raise ValueError("Invalid credentials")
+            
+        user = res.data[0]
         
         # Check if account is locked
-        if user.is_locked:
-            minutes_remaining = (user.locked_until - datetime.utcnow()).seconds // 60
-            raise ValueError(f"Account is locked. Try again in {minutes_remaining} minutes")
+        locked_until_str = user.get("locked_until")
+        if locked_until_str:
+            locked_until = datetime.fromisoformat(locked_until_str.replace('Z', '+00:00'))
+            if datetime.utcnow().replace(tzinfo=locked_until.tzinfo) < locked_until:
+                minutes_remaining = (locked_until - datetime.utcnow().replace(tzinfo=locked_until.tzinfo)).seconds // 60
+                raise ValueError(f"Account is locked. Try again in {minutes_remaining} minutes")
         
         # Check if account is active
-        if not user.is_active:
+        if not user.get("is_active", True):
             raise ValueError("Account is disabled")
         
         # Verify password
-        if not verify_password(login_data.password, user.hashed_password):
-            # Increment failed attempts
-            user.failed_login_attempts += 1
+        if not verify_password(login_data.password, user.get("hashed_password")):
+            attempts = user.get("failed_login_attempts", 0) + 1
+            update_data = {"failed_login_attempts": attempts}
             
-            if user.failed_login_attempts >= MAX_LOGIN_ATTEMPTS:
-                user.locked_until = datetime.utcnow() + timedelta(minutes=LOGIN_LOCKOUT_MINUTES)
-                await self.db.commit()
+            if attempts >= MAX_LOGIN_ATTEMPTS:
+                lock_time = datetime.utcnow() + timedelta(minutes=LOGIN_LOCKOUT_MINUTES)
+                update_data["locked_until"] = lock_time.isoformat()
+                supabase.table("users").update(update_data).eq("id", user["id"]).execute()
                 raise ValueError(f"Account locked due to too many failed attempts. Try again in {LOGIN_LOCKOUT_MINUTES} minutes")
             
-            await self.db.commit()
+            supabase.table("users").update(update_data).eq("id", user["id"]).execute()
             raise ValueError("Invalid credentials")
         
-        # Successful login - reset failed attempts
-        user.failed_login_attempts = 0
-        user.locked_until = None
-        user.last_login = datetime.utcnow()
+        # Successful login
+        update_data = {
+            "failed_login_attempts": 0,
+            "locked_until": None,
+            "last_login": datetime.utcnow().isoformat()
+        }
+        supabase.table("users").update(update_data).eq("id", user["id"]).execute()
         
         # Create tokens
         access_token, refresh_token, expires_in = create_tokens(
-            user.id, user.username, user.role.value
+            user["id"], user["username"], user["role"]
         )
         
         # Store refresh token
-        token_record = RefreshToken(
-            user_id=user.id,
-            token_hash=hash_token(refresh_token),
-            expires_at=datetime.utcnow() + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS),
-            user_agent=user_agent,
-            ip_address=ip_address,
-        )
-        self.db.add(token_record)
-        
-        await self.db.commit()
+        token_record = {
+            "user_id": user["id"],
+            "token_hash": hash_token(refresh_token),
+            "expires_at": (datetime.utcnow() + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)).isoformat(),
+            "user_agent": user_agent,
+            "ip_address": ip_address,
+            "created_at": datetime.utcnow().isoformat(),
+            "revoked": False
+        }
+        supabase.table("refresh_tokens").insert(token_record).execute()
         
         tokens = Token(
             access_token=access_token,
@@ -175,32 +139,14 @@ class AuthService:
         
         return user, tokens
     
-    # =========================================================================
-    # Token Refresh
-    # =========================================================================
-    
     async def refresh_tokens(
         self,
         refresh_token: str,
         ip_address: Optional[str] = None,
         user_agent: Optional[str] = None
     ) -> Token:
-        """
-        Refresh access token using refresh token.
-        Implements token rotation - old refresh token is revoked.
+        """Refresh tokens using rotation via Supabase."""
         
-        Args:
-            refresh_token: The refresh token
-            ip_address: Client IP address
-            user_agent: Client user agent
-            
-        Returns:
-            New tokens
-            
-        Raises:
-            ValueError: If refresh token is invalid
-        """
-        # Verify refresh token
         payload = verify_refresh_token(refresh_token)
         if payload is None:
             raise ValueError("Invalid refresh token")
@@ -208,48 +154,45 @@ class AuthService:
         user_id = int(payload.get("sub"))
         token_hash = hash_token(refresh_token)
         
-        # Find token in database
-        result = await self.db.execute(
-            select(RefreshToken).where(
-                RefreshToken.token_hash == token_hash,
-                RefreshToken.user_id == user_id,
-                RefreshToken.revoked == False,
-            )
-        )
-        token_record = result.scalar_one_or_none()
-        
-        if token_record is None or not token_record.is_valid:
+        # Find token in Supabase
+        res = supabase.table("refresh_tokens").select("*").eq("token_hash", token_hash).eq("user_id", user_id).eq("revoked", False).execute()
+        if not res.data:
             raise ValueError("Invalid or expired refresh token")
+            
+        token_record = res.data[0]
+        expires_at = datetime.fromisoformat(token_record["expires_at"].replace('Z', '+00:00'))
+        if datetime.utcnow().replace(tzinfo=expires_at.tzinfo) >= expires_at:
+            raise ValueError("Refresh token expired")
         
         # Get user
-        result = await self.db.execute(
-            select(User).where(User.id == user_id)
-        )
-        user = result.scalar_one_or_none()
-        
-        if user is None or not user.is_active:
+        res = supabase.table("users").select("*").eq("id", user_id).execute()
+        if not res.data or not res.data[0].get("is_active", True):
             raise ValueError("User not found or inactive")
         
-        # Revoke old refresh token (token rotation)
-        token_record.revoked = True
-        token_record.revoked_at = datetime.utcnow()
+        user = res.data[0]
+        
+        # Revoke old token
+        supabase.table("refresh_tokens").update({
+            "revoked": True,
+            "revoked_at": datetime.utcnow().isoformat()
+        }).eq("id", token_record["id"]).execute()
         
         # Create new tokens
         access_token, new_refresh_token, expires_in = create_tokens(
-            user.id, user.username, user.role.value
+            user["id"], user["username"], user["role"]
         )
         
         # Store new refresh token
-        new_token_record = RefreshToken(
-            user_id=user.id,
-            token_hash=hash_token(new_refresh_token),
-            expires_at=datetime.utcnow() + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS),
-            user_agent=user_agent,
-            ip_address=ip_address,
-        )
-        self.db.add(new_token_record)
-        
-        await self.db.commit()
+        new_record = {
+            "user_id": user["id"],
+            "token_hash": hash_token(new_refresh_token),
+            "expires_at": (datetime.utcnow() + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)).isoformat(),
+            "user_agent": user_agent,
+            "ip_address": ip_address,
+            "created_at": datetime.utcnow().isoformat(),
+            "revoked": False
+        }
+        supabase.table("refresh_tokens").insert(new_record).execute()
         
         return Token(
             access_token=access_token,
@@ -258,141 +201,63 @@ class AuthService:
             expires_in=expires_in,
         )
     
-    # =========================================================================
-    # Logout
-    # =========================================================================
-    
     async def logout(self, refresh_token: str) -> bool:
-        """
-        Logout user by revoking refresh token.
-        
-        Args:
-            refresh_token: The refresh token to revoke
-            
-        Returns:
-            True if successful
-        """
+        """Revoke a refresh token in Supabase."""
         token_hash = hash_token(refresh_token)
-        
-        result = await self.db.execute(
-            select(RefreshToken).where(RefreshToken.token_hash == token_hash)
-        )
-        token_record = result.scalar_one_or_none()
-        
-        if token_record:
-            token_record.revoked = True
-            token_record.revoked_at = datetime.utcnow()
-            await self.db.commit()
-        
+        supabase.table("refresh_tokens").update({
+            "revoked": True,
+            "revoked_at": datetime.utcnow().isoformat()
+        }).eq("token_hash", token_hash).execute()
         return True
     
     async def logout_all(self, user_id: int) -> int:
-        """
-        Logout user from all sessions by revoking all refresh tokens.
-        
-        Args:
-            user_id: The user ID
-            
-        Returns:
-            Number of sessions revoked
-        """
-        result = await self.db.execute(
-            select(RefreshToken).where(
-                RefreshToken.user_id == user_id,
-                RefreshToken.revoked == False,
-            )
-        )
-        tokens = result.scalars().all()
-        
-        count = 0
-        for token in tokens:
-            token.revoked = True
-            token.revoked_at = datetime.utcnow()
-            count += 1
-        
-        await self.db.commit()
-        return count
-    
-    # =========================================================================
-    # Password Management
-    # =========================================================================
+        """Revoke all active refresh tokens for a user in Supabase."""
+        res = supabase.table("refresh_tokens").update({
+            "revoked": True,
+            "revoked_at": datetime.utcnow().isoformat()
+        }).eq("user_id", user_id).eq("revoked", False).execute()
+        return len(res.data) if res.data else 0
     
     async def change_password(
         self,
-        user: User,
+        user: Dict[str, Any],
         current_password: str,
         new_password: str
     ) -> bool:
-        """
-        Change user password.
-        
-        Args:
-            user: The user
-            current_password: Current password
-            new_password: New password
-            
-        Returns:
-            True if successful
-            
-        Raises:
-            ValueError: If current password is incorrect
-        """
-        if not verify_password(current_password, user.hashed_password):
+        """Change password and revoke all tokens in Supabase."""
+        if not verify_password(current_password, user.get("hashed_password")):
             raise ValueError("Current password is incorrect")
         
-        user.hashed_password = hash_password(new_password)
-        user.password_changed_at = datetime.utcnow()
+        supabase.table("users").update({
+            "hashed_password": hash_password(new_password),
+            "password_changed_at": datetime.utcnow().isoformat(),
+            "updated_at": datetime.utcnow().isoformat()
+        }).eq("id", user["id"]).execute()
         
-        # Revoke all refresh tokens (force re-login)
-        await self.logout_all(user.id)
-        
-        await self.db.commit()
+        await self.logout_all(user["id"])
         return True
     
-    # =========================================================================
-    # User Management
-    # =========================================================================
+    async def get_user_by_id(self, user_id: int) -> Optional[Dict[str, Any]]:
+        res = supabase.table("users").select("*").eq("id", user_id).execute()
+        return res.data[0] if res.data else None
     
-    async def get_user_by_id(self, user_id: int) -> Optional[User]:
-        """Get user by ID"""
-        result = await self.db.execute(
-            select(User).where(User.id == user_id)
-        )
-        return result.scalar_one_or_none()
+    async def get_user_by_email(self, email: str) -> Optional[Dict[str, Any]]:
+        res = supabase.table("users").select("*").eq("email", email).execute()
+        return res.data[0] if res.data else None
     
-    async def get_user_by_email(self, email: str) -> Optional[User]:
-        """Get user by email"""
-        result = await self.db.execute(
-            select(User).where(User.email == email)
-        )
-        return result.scalar_one_or_none()
+    async def get_user_by_username(self, username: str) -> Optional[Dict[str, Any]]:
+        res = supabase.table("users").select("*").eq("username", username.lower()).execute()
+        return res.data[0] if res.data else None
     
-    async def get_user_by_username(self, username: str) -> Optional[User]:
-        """Get user by username"""
-        result = await self.db.execute(
-            select(User).where(User.username == username.lower())
-        )
-        return result.scalar_one_or_none()
-    
-    async def update_user_role(self, user_id: int, new_role: UserRole) -> User:
-        """Update user role (admin only)"""
-        user = await self.get_user_by_id(user_id)
-        if user is None:
+    async def update_user_role(self, user_id: int, new_role: UserRole) -> Dict[str, Any]:
+        res = supabase.table("users").update({"role": new_role.value, "updated_at": datetime.utcnow().isoformat()}).eq("id", user_id).execute()
+        if not res.data:
             raise ValueError("User not found")
-        
-        user.role = new_role
-        await self.db.commit()
-        await self.db.refresh(user)
-        return user
+        return res.data[0]
     
-    async def deactivate_user(self, user_id: int) -> User:
-        """Deactivate user account"""
-        user = await self.get_user_by_id(user_id)
-        if user is None:
+    async def deactivate_user(self, user_id: int) -> Dict[str, Any]:
+        res = supabase.table("users").update({"is_active": False, "updated_at": datetime.utcnow().isoformat()}).eq("id", user_id).execute()
+        if not res.data:
             raise ValueError("User not found")
-        
-        user.is_active = False
         await self.logout_all(user_id)
-        await self.db.commit()
-        await self.db.refresh(user)
-        return user
+        return res.data[0]

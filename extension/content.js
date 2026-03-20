@@ -337,18 +337,85 @@ class ScreenCapture {
     }
 }
 
+// ==================== DOM CAPTURE MODULE (html2canvas) ====================
+class DOMCapture {
+    constructor() {
+        this.captureInterval = null;
+        this.isCapturing = false;
+        this.LAST_CAPTURE_HASH = '';
+    }
+
+    async start(intervalMs = 15000) { // Every 15s for DOM capture (lighter than video)
+        if (this.isCapturing) return;
+        this.isCapturing = true;
+        
+        console.log('🖼️ DOM-based monitoring started');
+        this.captureInterval = setInterval(() => this.capture(), intervalMs);
+        this.capture(); // Initial capture
+    }
+
+    stop() {
+        if (this.captureInterval) {
+            clearInterval(this.captureInterval);
+            this.captureInterval = null;
+        }
+        this.isCapturing = false;
+    }
+
+    async capture() {
+        if (!this.isCapturing || document.hidden) return;
+
+        try {
+            // Focus on the main content area (usually body or a specific container)
+            const targetElement = document.body;
+            
+            const canvas = await html2canvas(targetElement, {
+                scale: 0.5, // Reduced scale for performance
+                logging: false,
+                useCORS: true,
+                allowTaint: true,
+                // Only capture visible viewport for "what exactly is being watched"
+                width: window.innerWidth,
+                height: window.innerHeight,
+                x: window.scrollX,
+                y: window.scrollY
+            });
+
+            const dataUrl = canvas.toDataURL('image/jpeg', 0.5);
+            
+            // Send capture to background
+            chrome.runtime.sendMessage({
+                type: 'DOM_CONTENT_CAPTURE',
+                data: {
+                    image: dataUrl,
+                    url: window.location.href,
+                    title: document.title,
+                    timestamp: Date.now(),
+                    scrollPos: { x: window.scrollX, y: window.scrollY }
+                }
+            });
+
+        } catch (error) {
+            console.warn('DOM capture failed:', error.message);
+        }
+    }
+}
+
 // ==================== INITIALIZATION ====================
 const screenCapture = new ScreenCapture();
+const domCapture = new DOMCapture();
 const behaviorMonitor = new ExamMonitor();
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-    if (message.type === 'START_SCREEN_CAPTURE') {
+    if (message.type === 'START_SCREEN_CAPTURE' || message.type === 'EXAM_STARTED') {
         screenCapture.startCapture(message.interval || 5000).then(sendResponse);
-        behaviorMonitor.start(); // Also start behavioral monitoring
+        domCapture.start(20000); // Higher interval for DOM (save resources)
+        behaviorMonitor.start();
         return true;
     }
-    if (message.type === 'STOP_SCREEN_CAPTURE') {
+    if (message.type === 'STOP_SCREEN_CAPTURE' || message.type === 'EXAM_STOPPED') {
         screenCapture.stopCapture();
+        domCapture.stop();
         behaviorMonitor.isMonitoring = false;
         sendResponse({ success: true });
     }

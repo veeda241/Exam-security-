@@ -1,30 +1,14 @@
-"""
-ExamGuard Pro - Real-Time Analysis Pipeline
-Connects extension events → transformer analysis → database updates → WebSocket push
-
-Runs as a background task that processes incoming events through the AI pipeline
-and pushes results to the dashboard in real time.
-"""
-
 import asyncio
 from datetime import datetime
 from typing import Dict, Any, Optional
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, update
 
-from database import async_session
-from models.session import ExamSession
-from models.event import Event
-from models.analysis import AnalysisResult
+from supabase_client import get_supabase
 
+supabase = get_supabase()
 
 class AnalysisPipeline:
     """
-    Real-time analysis pipeline that:
-    1. Receives events from the extension
-    2. Runs transformer + similarity analysis
-    3. Updates the database with results
-    4. Pushes updates to dashboard via WebSocket
+    Real-time analysis pipeline using Supabase.
     """
 
     def __init__(self):
@@ -72,7 +56,6 @@ class AnalysisPipeline:
         """Background worker that processes events from the queue."""
         while self._running:
             try:
-                # Wait for event with timeout (allows clean shutdown)
                 try:
                     event_data = await asyncio.wait_for(self._queue.get(), timeout=1.0)
                 except asyncio.TimeoutError:
@@ -112,7 +95,7 @@ class AnalysisPipeline:
         await self._update_session_risk(session_id)
 
     async def _handle_text_event(self, event_data: Dict[str, Any]):
-        """Run transformer analysis on text events (copy/paste)."""
+        """Run transformer analysis on text events via Supabase."""
         text = event_data.get("data", {}).get("text", "") or event_data.get("data", {}).get("preview", "")
         session_id = event_data.get("session_id", "")
 
@@ -120,11 +103,9 @@ class AnalysisPipeline:
             return
 
         try:
-            # Run similarity check
             from services.similarity import check_text_similarity
             sim_result = await check_text_similarity(text)
 
-            # Run transformer analysis if available
             transformer_result = None
             try:
                 from services.transformer_analysis import get_transformer_analyzer
@@ -135,25 +116,22 @@ class AnalysisPipeline:
             except Exception as e:
                 print(f"[Pipeline] Transformer analysis skipped: {e}")
 
-            # Store result in DB
-            async with async_session() as db:
-                analysis = AnalysisResult(
-                    session_id=session_id,
-                    timestamp=datetime.utcnow(),
-                    analysis_type="TEXT_ANALYSIS",
-                    similarity_score=sim_result.get("similarity_score", 0),
-                    risk_score_added=sim_result.get("risk_score", 0),
-                    result_data={
-                        "similarity": sim_result,
-                        "transformer": transformer_result,
-                        "source_text_preview": text[:200],
-                    },
-                )
-                db.add(analysis)
-                await db.commit()
-                self._stats["db_updates"] += 1
+            # Store result in Supabase
+            analysis = {
+                "session_id": session_id,
+                "timestamp": datetime.utcnow().isoformat(),
+                "analysis_type": "TEXT_ANALYSIS",
+                "similarity_score": sim_result.get("similarity_score", 0),
+                "risk_score_added": sim_result.get("risk_score", 0),
+                "result_data": {
+                    "similarity": sim_result,
+                    "transformer": transformer_result,
+                    "source_text_preview": text[:200],
+                },
+            }
+            supabase.table("analysis_results").insert(analysis).execute()
+            self._stats["db_updates"] += 1
 
-            # Push to WebSocket
             await self._push_to_dashboard(session_id, {
                 "type": "text_analysis",
                 "similarity_score": sim_result.get("similarity_score", 0),
@@ -165,7 +143,7 @@ class AnalysisPipeline:
             print(f"[Pipeline] Text analysis error: {e}")
 
     async def _handle_navigation_event(self, event_data: Dict[str, Any]):
-        """Process navigation events - check for forbidden sites."""
+        """Process navigation events via Supabase."""
         url = event_data.get("data", {}).get("url", "")
         session_id = event_data.get("session_id", "")
 
@@ -173,35 +151,32 @@ class AnalysisPipeline:
             return
 
         from config import FORBIDDEN_KEYWORDS
-
         url_lower = url.lower()
         found = [kw for kw in FORBIDDEN_KEYWORDS if kw in url_lower]
 
         if found:
-            async with async_session() as db:
-                analysis = AnalysisResult(
-                    session_id=session_id,
-                    timestamp=datetime.utcnow(),
-                    analysis_type="URL_CHECK",
-                    risk_score_added=40,
-                    result_data={
-                        "url": url,
-                        "forbidden_keywords": found,
-                    },
-                )
-                db.add(analysis)
+            analysis = {
+                "session_id": session_id,
+                "timestamp": datetime.utcnow().isoformat(),
+                "analysis_type": "URL_CHECK",
+                "risk_score_added": 40,
+                "result_data": {
+                    "url": url,
+                    "forbidden_keywords": found,
+                },
+            }
+            supabase.table("analysis_results").insert(analysis).execute()
 
-                # Update session
-                result = await db.execute(
-                    select(ExamSession).where(ExamSession.id == session_id)
-                )
-                session = result.scalar_one_or_none()
-                if session:
-                    session.forbidden_site_count += 1
-                    session.risk_score = min(100, session.risk_score + 40)
-                    session.content_relevance = max(0, session.content_relevance - 20)
-
-                await db.commit()
+            # Update session
+            res = supabase.table("exam_sessions").select("*").eq("id", session_id).execute()
+            if res.data:
+                session = res.data[0]
+                updates = {
+                    "forbidden_site_count": session.get("forbidden_site_count", 0) + 1,
+                    "risk_score": min(100, session.get("risk_score", 0) + 40),
+                    "content_relevance": max(0, session.get("content_relevance", 100) - 20)
+                }
+                supabase.table("exam_sessions").update(updates).eq("id", session_id).execute()
                 self._stats["db_updates"] += 1
 
             await self._push_to_dashboard(session_id, {
@@ -211,35 +186,29 @@ class AnalysisPipeline:
             })
 
     async def _handle_focus_event(self, event_data: Dict[str, Any]):
-        """Process window blur / page hidden events."""
+        """Process window blur via Supabase."""
         session_id = event_data.get("session_id", "")
-
-        async with async_session() as db:
-            result = await db.execute(
-                select(ExamSession).where(ExamSession.id == session_id)
-            )
-            session = result.scalar_one_or_none()
-            if session:
-                session.engagement_score = max(0, session.engagement_score - 3)
-                await db.commit()
-                self._stats["db_updates"] += 1
+        res = supabase.table("exam_sessions").select("engagement_score").eq("id", session_id).execute()
+        if res.data:
+            score = max(0, res.data[0].get("engagement_score", 100) - 3)
+            supabase.table("exam_sessions").update({"engagement_score": score}).eq("id", session_id).execute()
+            self._stats["db_updates"] += 1
 
     async def _handle_transformer_alert(self, event_data: Dict[str, Any]):
-        """Process alerts from the transformer analysis."""
+        """Process transformer alerts via Supabase."""
         session_id = event_data.get("session_id", "")
         similarity = event_data.get("data", {}).get("similarity", 0)
 
         if similarity > 0.7:
-            async with async_session() as db:
-                result = await db.execute(
-                    select(ExamSession).where(ExamSession.id == session_id)
-                )
-                session = result.scalar_one_or_none()
-                if session:
-                    session.effort_alignment = max(0, session.effort_alignment - 15)
-                    session.risk_score = min(100, session.risk_score + 20)
-                    await db.commit()
-                    self._stats["db_updates"] += 1
+            res = supabase.table("exam_sessions").select("*").eq("id", session_id).execute()
+            if res.data:
+                session = res.data[0]
+                updates = {
+                    "effort_alignment": max(0, session.get("effort_alignment", 100) - 15),
+                    "risk_score": min(100, session.get("risk_score", 0) + 20)
+                }
+                supabase.table("exam_sessions").update(updates).eq("id", session_id).execute()
+                self._stats["db_updates"] += 1
 
             await self._push_to_dashboard(session_id, {
                 "type": "plagiarism_detected",
@@ -247,71 +216,63 @@ class AnalysisPipeline:
             })
 
     async def _handle_vision_event(self, event_data: Dict[str, Any]):
-        """Process face/phone detection events."""
+        """Process vision events via Supabase."""
         session_id = event_data.get("session_id", "")
         event_type = event_data.get("type", "")
 
-        async with async_session() as db:
-            result = await db.execute(
-                select(ExamSession).where(ExamSession.id == session_id)
-            )
-            session = result.scalar_one_or_none()
-            if session:
-                if event_type == "PHONE_DETECTED":
-                    session.risk_score = 100
-                    session.risk_level = "suspicious"
-                elif event_type == "FACE_ABSENT":
-                    session.face_absence_count += 1
-                    session.engagement_score = max(0, session.engagement_score - 10)
-                await db.commit()
+        res = supabase.table("exam_sessions").select("*").eq("id", session_id).execute()
+        if res.data:
+            session = res.data[0]
+            updates = {}
+            if event_type == "PHONE_DETECTED":
+                updates["risk_score"] = 100
+                updates["risk_level"] = "suspicious"
+            elif event_type == "FACE_ABSENT":
+                updates["face_absence_count"] = session.get("face_absence_count", 0) + 1
+                updates["engagement_score"] = max(0, session.get("engagement_score", 100) - 10)
+            
+            if updates:
+                supabase.table("exam_sessions").update(updates).eq("id", session_id).execute()
                 self._stats["db_updates"] += 1
 
     async def _update_session_risk(self, session_id: str):
-        """Recalculate and update session risk level."""
+        """Update session risk level in Supabase."""
         try:
-            async with async_session() as db:
-                result = await db.execute(
-                    select(ExamSession).where(ExamSession.id == session_id)
-                )
-                session = result.scalar_one_or_none()
-                if session:
-                    # Update risk level based on score
-                    if session.risk_score > 85:
-                        session.risk_level = "suspicious"
-                    elif session.risk_score > 60:
-                        session.risk_level = "review"
-                    else:
-                        session.risk_level = "safe"
-                    await db.commit()
+            res = supabase.table("exam_sessions").select("*").eq("id", session_id).execute()
+            if res.data:
+                session = res.data[0]
+                risk_score = session.get("risk_score", 0)
+                
+                if risk_score > 85:
+                    new_level = "suspicious"
+                elif risk_score > 60:
+                    new_level = "review"
+                else:
+                    new_level = "safe"
+                
+                if session.get("risk_level") != new_level:
+                    supabase.table("exam_sessions").update({"risk_level": new_level}).eq("id", session_id).execute()
 
-                    # Push risk update to dashboard
-                    await self._push_to_dashboard(session_id, {
-                        "type": "risk_score_update",
-                        "risk_score": session.risk_score,
-                        "risk_level": session.risk_level,
-                        "engagement_score": session.engagement_score,
-                        "effort_alignment": session.effort_alignment,
-                    })
+                await self._push_to_dashboard(session_id, {
+                    "type": "risk_score_update",
+                    "risk_score": risk_score,
+                    "risk_level": new_level,
+                    "engagement_score": session.get("engagement_score"),
+                    "effort_alignment": session.get("effort_alignment"),
+                })
         except Exception as e:
             print(f"[Pipeline] Risk update error: {e}")
 
     async def _push_to_dashboard(self, session_id: str, data: Dict[str, Any]):
-        """Push real-time update to connected dashboards via WebSocket."""
+        """Push real-time update to dashboards via WebSocket."""
         try:
             from services.realtime import get_realtime_manager, AlertLevel
             realtime = get_realtime_manager()
 
-            # Get student_id from session
-            async with async_session() as db:
-                result = await db.execute(
-                    select(ExamSession).where(ExamSession.id == session_id)
-                )
-                session = result.scalar_one_or_none()
-                student_id = session.student_id if session else "unknown"
+            res = supabase.table("exam_sessions").select("student_id").eq("id", session_id).execute()
+            student_id = res.data[0].get("student_id", "unknown") if res.data else "unknown"
 
             event_type = data.get("type", "analysis_update")
-
-            # Determine alert level
             alert_level = AlertLevel.INFO
             if data.get("is_suspicious") or data.get("type") == "plagiarism_detected":
                 alert_level = AlertLevel.WARNING
@@ -328,13 +289,10 @@ class AnalysisPipeline:
         except Exception as e:
             print(f"[Pipeline] WebSocket push error: {e}")
 
-
 # Singleton
 _pipeline: Optional[AnalysisPipeline] = None
 
-
 def get_pipeline() -> AnalysisPipeline:
-    """Get or create the analysis pipeline singleton."""
     global _pipeline
     if _pipeline is None:
         _pipeline = AnalysisPipeline()

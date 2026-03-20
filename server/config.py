@@ -28,12 +28,14 @@ PG_DB = os.getenv("PG_DB", "postgres")
 
 # Database mode: use DATABASE_URL if set, else Supabase config, else SQLite
 if os.getenv("DATABASE_URL"):
-    DATABASE_URL = os.getenv("DATABASE_URL")
+    db_url = os.getenv("DATABASE_URL")
     # Render uses postgres:// but SQLAlchemy needs postgresql+asyncpg://
-    if DATABASE_URL.startswith("postgres://"):
-        DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql+asyncpg://", 1)
-    elif DATABASE_URL.startswith("postgresql://"):
-        DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://", 1)
+    if db_url.startswith("postgres://"):
+        DATABASE_URL = db_url.replace("postgres://", "postgresql+asyncpg://", 1)
+    elif db_url.startswith("postgresql://"):
+        DATABASE_URL = db_url.replace("postgresql://", "postgresql+asyncpg://", 1)
+    else:
+        DATABASE_URL = db_url
 elif PG_HOST:
     DATABASE_URL = f"postgresql+asyncpg://{PG_USER}:{quote_plus(PG_PASSWORD)}@{PG_HOST}:{PG_PORT}/{PG_DB}"
 else:
@@ -43,8 +45,8 @@ else:
 API_HOST = os.getenv("API_HOST", "0.0.0.0")
 API_PORT = int(os.getenv("API_PORT", "8000"))
 
-# CORS - comma-separated allowed origins (use * for dev)
-CORS_ORIGINS = os.getenv("CORS_ORIGINS", "http://localhost:5173,http://localhost:4173,http://localhost:3000").split(",")
+# CORS - allow all origins for robust local development & extension connection
+CORS_ORIGINS = ["*"]
 
 # Capture settings
 SCREENSHOT_INTERVAL_SECONDS = 3
@@ -155,6 +157,14 @@ RISK_WEIGHTS = {
     "CONTEXT_MENU": 5,
     "PAGE_HIDDEN": 8,
     "SCREEN_SHARE_STOPPED": 50,
+    "CLICK": 1,
+    "TYPING": 1,
+    "VISIBILITY_CHANGE": 5,
+    "BROWSER_FOCUS_LOST": 5,
+    "WINDOW_RESIZE": 5,
+    "BROWSING_SUMMARY": 0,
+    "TAB_AUDIT": 0,
+    "VISUAL_FORBIDDEN_CONTENT": 45,
 }
 
 # Risk score thresholds

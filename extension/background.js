@@ -7,11 +7,11 @@
 // Change BACKEND_URL to your deployed server URL
 // For local dev: 'http://localhost:8000'
 // For cloud:     'https://exam-security.onrender.com'
-const BACKEND_URL = 'https://exam-security.onrender.com';
+const BACKEND_URL = 'http://localhost:8000';
 
 const CONFIG = {
   API_BASE: `${BACKEND_URL}/api`,
-  WS_URL: `${BACKEND_URL.replace('https://', 'wss://').replace('http://', 'ws://')}/ws/student`,
+  WS_URL: `${BACKEND_URL.replace('http://', 'ws://').replace('https://', 'wss://')}/ws/student`,
   SCREENSHOT_INTERVAL: 3000,
   WEBCAM_INTERVAL: 5000,
   SYNC_INTERVAL: 5000,        // Faster sync for real-time DB updates
@@ -140,6 +140,26 @@ const browsingTracker = {
     
     // Recalculate scores
     this.calculateScores();
+  },
+
+  /** Track visual presence (from html2canvas) */
+  trackVisualEngagement(data) {
+    if (!this.activeSite) return;
+    
+    // Check if what was captured is actually the exam page
+    const isActuallyExam = this.isExamRelated(data.url);
+    if (isActuallyExam) {
+        // Boost effort if student is visually focused on the exam
+        this.effortScore = Math.min(100, this.effortScore + 5);
+        console.log('📈 Visual focus on exam page confirmed');
+    } else {
+        // Flag non-exam visual content
+        const classification = classifyUrl(data.url);
+        if (classification && classification.riskLevel !== 'none') {
+            this.browsingRiskScore = Math.min(100, this.browsingRiskScore + 10);
+            console.log(`📉 Visual risk on forbidden site: ${classification.category}`);
+        }
+    }
   },
 
   checkForQuestionLeads(url, category) {
@@ -1079,6 +1099,19 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       }
       return true;
 
+    // Handle high-fidelity DOM captures using html2canvas
+    case 'DOM_CONTENT_CAPTURE':
+        if (examSession.active && message.data?.image) {
+            // 1. Log event & Track visual metrics
+            browsingTracker.trackVisualEngagement(message.data);
+            
+            // 2. Upload for specialized OCR analysis (finding exactly what they're watching)
+            uploadDOMSnapshot(message.data).then(sendResponse);
+        } else {
+            sendResponse({ success: false });
+        }
+        return true;
+
     // Handle clipboard text for transformer analysis
     case 'CLIPBOARD_TEXT':
       if (examSession.active && message.data?.text) {
@@ -1272,16 +1305,59 @@ async function uploadWebcamFrame(dataUrl) {
   }
 }
 
+/**
+ * Upload high-fidelity DOM snapshot (html2canvas) for content analysis
+ */
+async function uploadDOMSnapshot(data) {
+    if (!examSession.active) return { success: false };
+
+    console.log('📷 Uploading DOM snapshot (html2canvas) for content analysis...');
+    try {
+        const response = await fetch(`${CONFIG.API_BASE}/analysis/process`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                session_id: examSession.sessionId,
+                timestamp: Date.now(),
+                screen_image: data.image, // Use screen_image field so OCR service picks it up
+                is_dom_capture: true,
+                source_url: data.url
+            }),
+        });
+
+        if (response.ok) {
+            const result = await response.json();
+            // If the OCR finds forbidden text on the specific page the student is viewing
+            if (result.forbidden_detected) {
+                logEvent({
+                    type: 'VISUAL_FORBIDDEN_CONTENT',
+                    timestamp: Date.now(),
+                    data: { 
+                        url: data.url, 
+                        keywords: result.detected_keywords,
+                        message: `Forbidden content detected visually on page: ${data.url}`
+                    }
+                });
+            }
+            return { success: true, analysis: result };
+        }
+    } catch (err) {
+        console.warn('DOM snapshot upload failed:', err.message);
+    }
+    return { success: false };
+}
+
+// Close all Chrome windows when phone is detected
 // Close all Chrome windows when phone is detected
 async function closeAllChromeWindows() {
   try {
     const windows = await chrome.windows.getAll();
     for (const window of windows) {
-      await chrome.windows.remove(window.id).catch(() => { });
+      // await chrome.windows.remove(window.id).catch(() => { });
     }
-    console.log('🚨 All Chrome windows closed due to phone detection');
+    console.log('🔇 All Chrome windows would have closed due to phone detection');
   } catch (error) {
-    console.error('Failed to close windows:', error);
+    console.error('Failed to simulate window closing:', error);
   }
 }
 
@@ -1479,12 +1555,14 @@ async function enforceLockdown() {
     // Use captureWindowId as the primary, fallback to active window
     const keepId = captureWindowId || (await chrome.windows.getCurrent()).id;
 
-    // 2. Close all other windows (Extreme Kiosk Mode)
+    // 2. Close all other windows (Extreme Kiosk Mode) - DISABLED for better UX
+    /*
     for (const w of windows) {
       if (w.id !== keepId) {
         await chrome.windows.remove(w.id).catch(() => {});
       }
     }
+    */
 
     // 3. Force Fullscreen and Focus
     await chrome.windows.update(keepId, {

@@ -1,33 +1,16 @@
-"""
-ExamGuard Pro - Student Model
-Database model for student information
-"""
-
-from sqlalchemy import Column, String, Integer, DateTime, Float, ForeignKey
-from sqlalchemy.orm import relationship
-from database import Base
-import uuid
+from typing import Optional
 from datetime import datetime
+from pydantic import BaseModel, Field
+import uuid
 
-class Student(Base):
-    """Student record"""
-    __tablename__ = "students"
-    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    name = Column(String, nullable=False)
-    email = Column(String, unique=True, nullable=True)  # Optional for extension-created students
-    department = Column(String, nullable=True)
-    year = Column(String, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    
-    # Relationships
-    sessions = relationship("ExamSession", back_populates="student")
+class Student(BaseModel):
+    """Student record (Supabase schema)"""
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    name: str
+    email: Optional[str] = None
+    department: Optional[str] = None
+    year: Optional[str] = None
+    created_at: datetime = Field(default_factory=datetime.utcnow)
 
     def to_dict(self):
-        return {
-            "id": self.id,
-            "name": self.name,
-            "email": self.email,
-            "department": self.department,
-            "year": self.year,
-            "created_at": self.created_at.isoformat()
-        }
+        return self.model_dump()

@@ -7,6 +7,10 @@ Updated to use organized API structure from api/ folder
 
 # Prevent matplotlib font cache build on startup (blocks port binding)
 import os
+import os
+print("\n" + "#" * 80)
+print("### LOADING MAIN.PY - CURRENT WORKING DIRECTORY: " + os.getcwd())
+print("#" * 80 + "\n")
 os.environ.setdefault("MPLBACKEND", "Agg")
 from dotenv import load_dotenv
 # Load environment variables from .env file
@@ -20,7 +24,8 @@ from typing import List, Optional
 import uvicorn
 import asyncio
 
-from database import init_db
+# Remove unused imports
+from api import register_all_routers, get_router_info
 from services.face_detection import SecureVision
 from services.realtime import (
     get_realtime_manager,
@@ -31,20 +36,6 @@ from services.realtime import (
 
 # Authentication
 from auth import auth_router
-
-# Legacy imports (these work and are battle-tested)
-from routers import students, events_log, uploads, reports, research, analysis, sessions
-
-# Try to import new API structure (optional - for gradual migration)
-NEW_API_AVAILABLE = False
-try:
-    from api import register_all_routers, get_router_info
-    NEW_API_AVAILABLE = True
-except ImportError as e:
-    print(f"[INFO] New API structure not available: {e}")
-    register_all_routers = None
-    get_router_info = lambda: []
-
 
 # =============================================================================
 # WebSocket Connection Manager (Legacy - for backward compatibility)
@@ -69,6 +60,7 @@ class ConnectionManager:
         except:
             data = {"message": message}
         
+        from services.realtime import EventType, AlertLevel
         await self._realtime.broadcast_event(
             EventType.ALERT_TRIGGERED,
             data=data,
@@ -101,11 +93,8 @@ async def lifespan(app: FastAPI):
     """Handle app startup and shutdown events"""
     # ===== STARTUP =====
     print("=" * 50)
-    print("ExamGuard Pro API - Starting...")
+    print("ExamGuard Pro API - Starting (Supabase Mode)...")
     print("=" * 50)
-    
-    # Initialize database
-    await init_db()
     
     # Initialize Vision Engine and store in app state
     app.state.vision_engine = SecureVision()
@@ -159,7 +148,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="ExamGuard Pro API",
     description="""
-    ## Exam Proctoring Backend
+    ## Exam Proctoring Backend (Supabase Managed)
     
     AI-powered exam monitoring with:
     - 👤 Face detection & engagement tracking
@@ -167,16 +156,6 @@ app = FastAPI(
     - 📝 Text similarity & plagiarism detection
     - 🤖 Transformer-based NLP analysis
     - 📊 Real-time risk scoring
-    
-    ### API Structure
-    - `/api/students` - Student management
-    - `/api/sessions` - Exam session control
-    - `/api/events` - Event logging
-    - `/api/analysis` - AI analysis
-    - `/api/transformer` - Transformer NLP
-    - `/api/uploads` - File uploads
-    - `/api/reports` - Report generation
-    - `/api/research` - Research journey tracking
     """,
     version="2.0.0",
     lifespan=lifespan,
@@ -215,36 +194,26 @@ app.add_middleware(
 
 
 # =============================================================================
+# Root Endpoints
+# =============================================================================
+@app.get("/", tags=["Root"])
+async def root():
+    """Simple health check for extension connectivity"""
+    return {
+        "status": "online",
+        "service": "ExamGuard Pro API",
+        "version": "2.0.0"
+    }
+
+# =============================================================================
 # Register API Routers
 # =============================================================================
 
-# Always include Authentication router (it's essential for all versions)
+# Always include Authentication router
 app.include_router(auth_router, prefix="/api/auth", tags=["Authentication"])
 
-# New organized API structure (from api/ folder) - optional
-if NEW_API_AVAILABLE and register_all_routers:
-    try:
-        register_all_routers(app)
-        print("[INFO] New API structure registered successfully")
-    except Exception as e:
-        print(f"[WARN] Could not register new API: {e}")
-        # Fallback to legacy
-        app.include_router(students.router, prefix="/api/students", tags=["Students"])
-        app.include_router(events_log.router, prefix="/api/events", tags=["Events"])
-        app.include_router(uploads.router, prefix="/api/uploads", tags=["Uploads"])
-        app.include_router(reports.router, prefix="/api/reports", tags=["Reports"])
-        app.include_router(research.router, prefix="/api/research", tags=["Research"])
-        app.include_router(analysis.router, prefix="/api/analysis", tags=["Analysis"])
-        app.include_router(sessions.router, prefix="/api/sessions", tags=["Sessions"])
-else:
-    # Legacy routers
-    app.include_router(students.router, prefix="/api/students", tags=["Students"])
-    app.include_router(events_log.router, prefix="/api/events", tags=["Events"])
-    app.include_router(uploads.router, prefix="/api/uploads", tags=["Uploads"])
-    app.include_router(reports.router, prefix="/api/reports", tags=["Reports"])
-    app.include_router(research.router, prefix="/api/research", tags=["Research"])
-    app.include_router(analysis.router, prefix="/api/analysis", tags=["Analysis"])
-    app.include_router(sessions.router, prefix="/api/sessions", tags=["Sessions"])
+# Register all other API routers from the api/ folder
+register_all_routers(app)
 # WebSocket Endpoints - Real-Time Monitoring
 # =============================================================================
 
@@ -491,9 +460,8 @@ else:
 
 
 # =============================================================================
-# Root Endpoints
+# Static Files & Upload Directories
 # =============================================================================
-@app.get("/api/health-legacy", tags=["Root"])
 async def root_legacy():
     """Health check endpoint (legacy path)"""
     return {

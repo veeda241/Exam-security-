@@ -1,18 +1,10 @@
-"""
-ExamGuard Pro - API Dependencies
-Shared dependencies for FastAPI endpoints
-"""
-
+from typing import Optional, Dict, Any
 from fastapi import Depends, HTTPException, status
 from fastapi.security import APIKeyHeader
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
-from typing import Optional
 
-from database import get_db
-from models.session import ExamSession
-from models.student import Student
+from supabase_client import get_supabase
 
+supabase = get_supabase()
 
 # API Key authentication (optional)
 api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
@@ -20,7 +12,6 @@ api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
 
 async def get_api_key(api_key: str = Depends(api_key_header)) -> Optional[str]:
     """Validate API key if provided"""
-    # For now, just return the key - implement validation as needed
     return api_key
 
 
@@ -31,19 +22,13 @@ async def require_api_key(api_key: str = Depends(api_key_header)) -> str:
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="API key required"
         )
-    # Add actual validation here
     return api_key
 
 
-async def get_current_session(
-    session_id: str,
-    db: AsyncSession = Depends(get_db)
-) -> ExamSession:
-    """Get and validate current exam session"""
-    result = await db.execute(
-        select(ExamSession).where(ExamSession.id == session_id)
-    )
-    session = result.scalar_one_or_none()
+async def get_current_session(session_id: str) -> Dict[str, Any]:
+    """Get and validate current exam session via Supabase"""
+    res = supabase.table("exam_sessions").select("*").eq("id", session_id).execute()
+    session = res.data[0] if res.data else None
     
     if not session:
         raise HTTPException(
@@ -54,14 +39,11 @@ async def get_current_session(
     return session
 
 
-async def get_active_session(
-    session_id: str,
-    db: AsyncSession = Depends(get_db)
-) -> ExamSession:
-    """Get and validate active exam session"""
-    session = await get_current_session(session_id, db)
+async def get_active_session(session_id: str) -> Dict[str, Any]:
+    """Get and validate active exam session via Supabase"""
+    session = await get_current_session(session_id)
     
-    if not session.is_active:
+    if not session.get("is_active", False):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Session is not active"
@@ -70,15 +52,10 @@ async def get_active_session(
     return session
 
 
-async def get_student(
-    student_id: str,
-    db: AsyncSession = Depends(get_db)
-) -> Student:
-    """Get and validate student"""
-    result = await db.execute(
-        select(Student).where(Student.id == student_id)
-    )
-    student = result.scalar_one_or_none()
+async def get_student(student_id: str) -> Dict[str, Any]:
+    """Get and validate student via Supabase"""
+    res = supabase.table("students").select("*").eq("id", student_id).execute()
+    student = res.data[0] if res.data else None
     
     if not student:
         raise HTTPException(

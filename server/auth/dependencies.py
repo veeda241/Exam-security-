@@ -1,20 +1,14 @@
-"""
-ExamGuard Pro - Authentication Dependencies
-FastAPI dependencies for route protection
-"""
-
 from datetime import datetime
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 from fastapi import Depends, HTTPException, status, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials, APIKeyHeader
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
 
-from database import get_db
-from auth.models import User, UserRole
+from supabase_client import get_supabase
+from auth.models import UserRole
 from auth.utils import verify_access_token, verify_api_key
 from auth.config import EXTENSION_API_KEY
 
+supabase = get_supabase()
 
 # =============================================================================
 # Security Schemes
@@ -33,10 +27,9 @@ api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
 
 async def get_current_user(
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(bearer_scheme),
-    db: AsyncSession = Depends(get_db)
-) -> User:
+) -> Dict[str, Any]:
     """
-    Get the current authenticated user from JWT token.
+    Get the current authenticated user from JWT token via Supabase.
     Raises 401 if not authenticated.
     """
     if credentials is None:
@@ -58,11 +51,9 @@ async def get_current_user(
     
     user_id = int(payload.get("sub"))
     
-    # Get user from database
-    result = await db.execute(
-        select(User).where(User.id == user_id)
-    )
-    user = result.scalar_one_or_none()
+    # Get user from Supabase
+    res = supabase.table("users").select("*").eq("id", user_id).execute()
+    user = res.data[0] if res.data else None
     
     if user is None:
         raise HTTPException(
@@ -71,25 +62,27 @@ async def get_current_user(
             headers={"WWW-Authenticate": "Bearer"},
         )
     
-    if not user.is_active:
+    if not user.get("is_active", True):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="User account is disabled",
         )
     
-    if user.is_locked:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="User account is locked",
-        )
+    locked_until_str = user.get("locked_until")
+    if locked_until_str:
+        locked_until = datetime.fromisoformat(locked_until_str.replace('Z', '+00:00'))
+        if datetime.utcnow().replace(tzinfo=locked_until.tzinfo) < locked_until:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="User account is locked",
+            )
     
     return user
 
 
 async def get_current_user_optional(
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(bearer_scheme),
-    db: AsyncSession = Depends(get_db)
-) -> Optional[User]:
+) -> Optional[Dict[str, Any]]:
     """
     Get the current user if authenticated, None otherwise.
     Useful for endpoints that work with or without auth.
@@ -98,7 +91,7 @@ async def get_current_user_optional(
         return None
     
     try:
-        return await get_current_user(credentials, db)
+        return await get_current_user(credentials)
     except HTTPException:
         return None
 
@@ -110,16 +103,11 @@ async def get_current_user_optional(
 def require_roles(allowed_roles: List[str]):
     """
     Dependency factory for role-based access control.
-    
-    Usage:
-        @router.get("/admin-only")
-        async def admin_endpoint(user: User = Depends(require_roles(["admin"]))):
-            ...
     """
     async def role_checker(
-        user: User = Depends(get_current_user)
-    ) -> User:
-        if user.role.value not in allowed_roles:
+        user: Dict[str, Any] = Depends(get_current_user)
+    ) -> Dict[str, Any]:
+        if user.get("role") not in allowed_roles:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail=f"Access denied. Required roles: {allowed_roles}",
@@ -130,10 +118,10 @@ def require_roles(allowed_roles: List[str]):
 
 
 async def get_admin_user(
-    user: User = Depends(get_current_user)
-) -> User:
+    user: Dict[str, Any] = Depends(get_current_user)
+) -> Dict[str, Any]:
     """Require admin role"""
-    if user.role != UserRole.ADMIN:
+    if user.get("role") != UserRole.ADMIN.value:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Admin access required",
@@ -142,10 +130,11 @@ async def get_admin_user(
 
 
 async def get_privileged_user(
-    user: User = Depends(get_current_user)
-) -> User:
+    user: Dict[str, Any] = Depends(get_current_user)
+) -> Dict[str, Any]:
     """Require privileged role (admin, proctor, or instructor)"""
-    if not user.is_privileged:
+    privileged_roles = [UserRole.ADMIN.value, UserRole.PROCTOR.value, UserRole.INSTRUCTOR.value]
+    if user.get("role") not in privileged_roles:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Privileged access required",
@@ -154,10 +143,10 @@ async def get_privileged_user(
 
 
 async def get_proctor_user(
-    user: User = Depends(get_current_user)
-) -> User:
+    user: Dict[str, Any] = Depends(get_current_user)
+) -> Dict[str, Any]:
     """Require proctor or admin role"""
-    if user.role not in [UserRole.ADMIN, UserRole.PROCTOR]:
+    if user.get("role") not in [UserRole.ADMIN.value, UserRole.PROCTOR.value]:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Proctor access required",
@@ -174,7 +163,6 @@ async def verify_extension_api_key(
 ) -> bool:
     """
     Verify API key for browser extension.
-    Used for endpoints that the extension calls.
     """
     if api_key is None:
         raise HTTPException(
@@ -194,11 +182,9 @@ async def verify_extension_api_key(
 async def get_api_key_or_user(
     api_key: Optional[str] = Depends(api_key_header),
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(bearer_scheme),
-    db: AsyncSession = Depends(get_db)
-) -> Optional[User]:
+) -> Optional[Dict[str, Any]]:
     """
     Authenticate via API key OR bearer token.
-    Useful for endpoints that accept both auth methods.
     """
     # Try API key first
     if api_key and api_key == EXTENSION_API_KEY:
@@ -206,7 +192,7 @@ async def get_api_key_or_user(
     
     # Try bearer token
     if credentials:
-        return await get_current_user(credentials, db)
+        return await get_current_user(credentials)
     
     raise HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
@@ -220,15 +206,12 @@ async def get_api_key_or_user(
 
 def get_client_ip(request: Request) -> str:
     """Get client IP address from request"""
-    # Check for forwarded IP (behind proxy)
     forwarded = request.headers.get("X-Forwarded-For")
     if forwarded:
         return forwarded.split(",")[0].strip()
     
-    # Check for real IP header
     real_ip = request.headers.get("X-Real-IP")
     if real_ip:
         return real_ip
     
-    # Use client host
     return request.client.host if request.client else "unknown"
