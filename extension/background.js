@@ -1580,25 +1580,6 @@ async function runBatchTransformerAnalysis() {
   }
 }
 
-async function uploadDOMSnapshot(data) {
-  try {
-    const response = await fetch(`${CONFIG.API_BASE}/analysis/process`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        session_id: examSession.sessionId,
-        timestamp: data.timestamp || Date.now(),
-        dom_snapshot: data.image,
-        url: data.url
-      }),
-    });
-    return { success: response.ok };
-  } catch (error) {
-    console.warn('DOM snapshot upload failed:', error.message);
-    return { success: false };
-  }
-}
-
 // ==================== UTILITIES ====================
 
 function randomId() {
