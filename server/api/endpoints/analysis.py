@@ -198,7 +198,7 @@ async def get_dashboard_data():
             
             if session:
                 dashboard_data.append(StudentSummary(
-                    student_id=student["id"],
+                    id=student["id"],
                     name=student["name"],
                     email=student.get("email"),
                     department=student.get("department"),
@@ -215,7 +215,7 @@ async def get_dashboard_data():
                 ))
             else:
                 dashboard_data.append(StudentSummary(
-                    student_id=student["id"],
+                    id=student["id"],
                     name=student["name"],
                     email=student.get("email"),
                     department=student.get("department"),

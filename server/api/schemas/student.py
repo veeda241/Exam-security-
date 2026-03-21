@@ -51,7 +51,7 @@ class StudentResponse(BaseModel):
 
 class StudentSummary(BaseModel):
     """Schema for student dashboard summary"""
-    student_id: str
+    id: str
     name: str
     email: Optional[str] = None
     department: Optional[str] = None
