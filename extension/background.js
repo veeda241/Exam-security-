@@ -1528,7 +1528,8 @@ async function enforceLockdown() {
 
 async function getDeviceFingerprint() {
   const displayInfo = await new Promise(r => chrome.system.display.getInfo(r));
-  const res = `${screen.width}x${screen.height}-${displayInfo.length}`;
+  const pb = displayInfo[0]?.bounds || { width: 0, height: 0 };
+  const res = `${pb.width}x${pb.height}-${displayInfo.length}`;
   const userAgent = navigator.userAgent;
   // Simple hardware fingerprint combine with timezone
   return btoa(`${res}-${userAgent}-${Intl.DateTimeFormat().resolvedOptions().timeZone}`);
