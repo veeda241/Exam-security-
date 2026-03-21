@@ -29,15 +29,19 @@ async def get_current_user(
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(bearer_scheme),
 ) -> Dict[str, Any]:
     """
-    Get the current authenticated user from JWT token via Supabase.
-    Raises 401 if not authenticated.
+    Get the current authenticated user. Returns a Mock Admin if no credentials provided.
     """
     if credentials is None:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Not authenticated",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+        # TEMP: Bypass authentication for direct dashboard access
+        print("[AUTH] Bypassing authentication - returning Mock Admin")
+        return {
+            "id": 1,
+            "username": "admin",
+            "email": "admin@examguard.pro",
+            "role": "admin",
+            "full_name": "Temporary Administrator",
+            "is_active": True
+        }
     
     token = credentials.credentials
     payload = verify_access_token(token)
