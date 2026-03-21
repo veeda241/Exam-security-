@@ -42,6 +42,81 @@ let wsReconnectTimer = null;
 let clipboardTexts = [];     // Buffer for transformer analysis
 let pendingAnalysis = [];    // Buffer for pending text analysis
 
+// ==================== MESSAGE HANDLING (REGISTER EARLY) ====================
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  console.log('✉️ Received message:', message.type);
+  switch (message.type) {
+    case 'START_EXAM':
+      handleStartExam(message.data).then(sendResponse);
+      return true;
+
+    case 'CAPTURE_READY':
+      onCaptureReady(message);
+      sendResponse({ success: true });
+      return true;
+
+    case 'STOP_EXAM':
+      stopExamSession().then(sendResponse);
+      return true;
+
+    case 'LOG_EVENT':
+      logEvent(message.event);
+      sendResponse({ success: true });
+      return true;
+
+    case 'GET_STATUS':
+      sendResponse({
+        active: examSession.active,
+        sessionId: examSession.sessionId,
+        tabSwitchCount: examSession.tabSwitchCount,
+        copyCount: examSession.copyCount,
+        eventCount: examSession.events.length,
+        duration: examSession.startTime ? Date.now() - examSession.startTime : 0,
+        lastScreenCapture: examSession.lastScreenCapture,
+        lastWebcamCapture: examSession.lastWebcamCapture,
+        lastSync: examSession.lastSync,
+        browsing: examSession.active ? browsingTracker.getStats() : null,
+      });
+      return true;
+
+    case 'WEBCAM_CAPTURE':
+      if (examSession.active && message.data?.image) {
+        uploadWebcamFrame(message.data.image).then(sendResponse);
+      } else {
+        sendResponse({ success: false, error: 'No active session' });
+      }
+      return true;
+
+    case 'SCREEN_CAPTURE':
+      if (examSession.active && message.data?.image) {
+        uploadScreenshot(message.data.image).then(sendResponse);
+      } else {
+        sendResponse({ success: false, error: 'No active session' });
+      }
+      return true;
+      
+    case 'CLIPBOARD_TEXT':
+      if (examSession.active && message.data?.text) {
+        clipboardTexts.push({
+          text: message.data.text,
+          timestamp: message.data.timestamp || Date.now(),
+        });
+        analyzeTextWithTransformer(message.data.text).then(sendResponse);
+      } else {
+        sendResponse({ success: false });
+      }
+      return true;
+
+    case 'DOM_CONTENT_CAPTURE':
+      if (examSession.active && message.data?.image) {
+        uploadDOMSnapshot(message.data).then(sendResponse);
+      } else {
+        sendResponse({ success: false });
+      }
+      return true;
+  }
+});
+
 // ==================== BROWSING TRACKER ====================
 /**
  * BrowsingTracker uses chrome.tabs API to monitor:
@@ -992,141 +1067,7 @@ function debounce(func, wait) {
 
 // ==================== MESSAGE HANDLING ====================
 
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  switch (message.type) {
-    case 'START_EXAM':
-      handleStartExam(message.data).then(sendResponse);
-      return true;
-
-    case 'CAPTURE_READY':
-      onCaptureReady(message);
-      sendResponse({ success: true });
-      return true;
-
-    case 'STOP_EXAM':
-      stopExamSession().then(sendResponse);
-      return true;
-
-    case 'LOG_EVENT':
-      logEvent(message.event);
-      sendResponse({ success: true });
-      return true;
-
-    case 'BEHAVIOR_ALERT':
-      // Handle the new Layer 2/3 behavioral signals
-      if (examSession.active) {
-        logEvent({
-            type: message.data.type,
-            timestamp: message.data.timestamp,
-            data: { 
-                ...message.data,
-                message: `Behavioral Alert: ${message.data.type.replace(/_/g, ' ')} detected.` 
-            }
-        });
-
-        // Send high-priority alerts to WebSocket instantly
-        const highPriorityTypes = ['PASTE_DETECTED', 'DEVTOOLS_DETECTED', 'VELOCITY_VIOLATION'];
-        if (highPriorityTypes.includes(message.data.type)) {
-            sendViaWebSocket({
-                type: 'behavior_violation',
-                session_id: examSession.sessionId,
-                violation: message.data.type,
-                method: message.data.method || 'unknown'
-            });
-        }
-      }
-      sendResponse({ success: true });
-      return true;
-
-    case 'NETWORK_INFO':
-      if (examSession.active && message.data.localIp) {
-        // Track IP consistency (mid-session switch is suspicious)
-        if (examSession.lastKnownIp && examSession.lastKnownIp !== message.data.localIp) {
-            logEvent({
-                type: 'IP_ADDRESS_CHANGE',
-                timestamp: message.data.timestamp,
-                data: {
-                    oldIp: examSession.lastKnownIp,
-                    newIp: message.data.localIp,
-                    message: 'Student switched network during exam'
-                }
-            });
-        }
-        examSession.lastKnownIp = message.data.localIp;
-      }
-      sendResponse({ success: true });
-      return true;
-
-    case 'GET_STATUS':
-      sendResponse({
-        active: examSession.active,
-        sessionId: examSession.sessionId,
-        tabSwitchCount: examSession.tabSwitchCount,
-        copyCount: examSession.copyCount,
-        eventCount: examSession.events.length,
-        duration: examSession.startTime ? Date.now() - examSession.startTime : 0,
-        lastScreenCapture: examSession.lastScreenCapture,
-        lastWebcamCapture: examSession.lastWebcamCapture,
-        lastSync: examSession.lastSync,
-        // Browsing tracker data
-        browsing: examSession.active ? browsingTracker.getStats() : null,
-      });
-      return true;
-
-    case 'UPLOAD_SCREENSHOT':
-      uploadScreenshot(message.data).then(sendResponse);
-      return true;
-
-    case 'UPLOAD_WEBCAM':
-      uploadWebcamFrame(message.data).then(sendResponse);
-      return true;
-
-    // Handle webcam capture from webcam.js content script
-    case 'WEBCAM_CAPTURE':
-      if (examSession.active && message.data?.image) {
-        uploadWebcamFrame(message.data.image).then(sendResponse);
-      } else {
-        sendResponse({ success: false, error: 'No active session' });
-      }
-      return true;
-
-    // Handle screen capture from content.js
-    case 'SCREEN_CAPTURE':
-      if (examSession.active && message.data?.image) {
-        uploadScreenshot(message.data.image).then(sendResponse);
-      } else {
-        sendResponse({ success: false, error: 'No active session' });
-      }
-      return true;
-
-    // Handle high-fidelity DOM captures using html2canvas
-    case 'DOM_CONTENT_CAPTURE':
-        if (examSession.active && message.data?.image) {
-            // 1. Log event & Track visual metrics
-            browsingTracker.trackVisualEngagement(message.data);
-            
-            // 2. Upload for specialized OCR analysis (finding exactly what they're watching)
-            uploadDOMSnapshot(message.data).then(sendResponse);
-        } else {
-            sendResponse({ success: false });
-        }
-        return true;
-
-    // Handle clipboard text for transformer analysis
-    case 'CLIPBOARD_TEXT':
-      if (examSession.active && message.data?.text) {
-        clipboardTexts.push({
-          text: message.data.text,
-          timestamp: message.data.timestamp || Date.now(),
-        });
-        // Immediately send for transformer analysis
-        analyzeTextWithTransformer(message.data.text).then(sendResponse);
-      } else {
-        sendResponse({ success: false });
-      }
-      return true;
-  }
-});
+// Message listener moved to top for early registration
 
 // ==================== EVENT LOGGING ====================
 
@@ -1636,6 +1577,25 @@ async function runBatchTransformerAnalysis() {
     } catch (error) {
       console.warn('🧠 Cross-compare error:', error.message);
     }
+  }
+}
+
+async function uploadDOMSnapshot(data) {
+  try {
+    const response = await fetch(`${CONFIG.API_BASE}/analysis/process`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        session_id: examSession.sessionId,
+        timestamp: data.timestamp || Date.now(),
+        dom_snapshot: data.image,
+        url: data.url
+      }),
+    });
+    return { success: response.ok };
+  } catch (error) {
+    console.warn('DOM snapshot upload failed:', error.message);
+    return { success: false };
   }
 }
 

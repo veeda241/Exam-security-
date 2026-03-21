@@ -149,6 +149,18 @@ class ExamMonitor {
         }
     }
 
+    sendAlert(type, data = {}) {
+        chrome.runtime.sendMessage({
+            type: 'BEHAVIOR_ALERT',
+            data: {
+                type: type,
+                timestamp: Date.now(),
+                url: window.location.href,
+                ...data
+            }
+        }).catch(() => {});
+    }
+
     calculateMouseEntropy() {
         if (this.mouseMovements.length < 10) return;
         

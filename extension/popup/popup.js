@@ -327,7 +327,7 @@ setupForm.addEventListener('submit', async (e) => {
             }, resolve);
         });
 
-        if (response.success) {
+        if (response && response.success) {
             showNotification('Please grant permissions in the new window', 'info');
             // Close popup - capture window will handle the rest
             setTimeout(() => window.close(), 1500);
