@@ -35,13 +35,15 @@ pwd_context = CryptContext(
 
 
 def hash_password(password: str) -> str:
-    """Hash a password using bcrypt"""
-    return pwd_context.hash(password)
+    """Hash a password using bcrypt (max 72 bytes)"""
+    # Truncate to 72 bytes to avoid bcrypt limitation
+    return pwd_context.hash(password[:72])
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    """Verify a password against its hash"""
-    return pwd_context.verify(plain_password, hashed_password)
+    """Verify a password against its hash (max 72 bytes)"""
+    # Truncate to 72 bytes to avoid bcrypt limitation
+    return pwd_context.verify(plain_password[:72], hashed_password)
 
 
 # =============================================================================
