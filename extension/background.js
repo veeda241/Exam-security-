@@ -80,21 +80,25 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       return true;
 
     case 'WEBCAM_CAPTURE':
-      if (examSession.active && message.data?.image) {
-        uploadWebcamFrame(message.data.image).then(sendResponse);
+    case 'UPLOAD_WEBCAM':
+      if (examSession.active && (message.data?.image || message.data)) {
+        const img = message.data?.image || message.data;
+        uploadWebcamFrame(img).then(sendResponse);
       } else {
         sendResponse({ success: false, error: 'No active session' });
       }
       return true;
 
     case 'SCREEN_CAPTURE':
-      if (examSession.active && message.data?.image) {
-        uploadScreenshot(message.data.image).then(sendResponse);
+    case 'UPLOAD_SCREENSHOT':
+      if (examSession.active && (message.data?.image || message.data)) {
+        const img = message.data?.image || message.data;
+        uploadScreenshot(img).then(sendResponse);
       } else {
         sendResponse({ success: false, error: 'No active session' });
       }
       return true;
-      
+
     case 'CLIPBOARD_TEXT':
       if (examSession.active && message.data?.text) {
         clipboardTexts.push({

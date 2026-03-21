@@ -95,7 +95,7 @@ class ExamCapture {
             this.captureCount.screen++;
             this.errorCount.screen = 0;
         } catch (error) {
-            console.error('Screenshot error:', error.message);
+            console.error('Screenshot error:', error?.message || error || 'Unknown');
             this.errorCount.screen++;
         }
     }
@@ -166,7 +166,7 @@ class ExamCapture {
             this.captureCount.webcam++;
             this.errorCount.webcam = 0;
         } catch (error) {
-            console.error('Webcam capture error:', error.message);
+            console.error('Webcam capture error:', error?.message || error || 'Unknown');
             this.errorCount.webcam++;
         }
     }
@@ -207,7 +207,7 @@ class ExamCapture {
             this.sendCapture(type, dataUrl);
         } catch (err) {
             // Fallback to canvas method if ImageCapture fails
-            console.warn(`ImageCapture failed for ${type}, falling back to canvas:`, err.message);
+            console.warn(`ImageCapture failed for ${type}, falling back to canvas:`, err?.message || err);
             const stream = type === 'screen' ? this.screenStream : this.webcamStream;
             if (stream) {
                 await this.captureWithCanvas(stream, type);
@@ -223,9 +223,9 @@ class ExamCapture {
 
         await new Promise((resolve, reject) => {
             video.onloadedmetadata = () => {
-                video.play().then(resolve).catch(reject);
+                video.play().then(resolve).catch(err => reject(err || new Error('Video play failed')));
             };
-            video.onerror = reject;
+            video.onerror = (e) => reject(new Error('Video stream error'));
             setTimeout(() => reject(new Error('Video load timeout')), 5000);
         });
 
@@ -269,7 +269,7 @@ class ExamCapture {
                 data: dataUrl,
             }, (response) => {
                 if (chrome.runtime.lastError) {
-                    console.warn(`${type} upload channel:`, chrome.runtime.lastError.message);
+                    console.warn(`${type} upload channel:`, chrome.runtime.lastError?.message || 'Port closed');
                 }
             });
         } catch (err) {
