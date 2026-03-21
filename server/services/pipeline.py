@@ -179,23 +179,46 @@ class AnalysisPipeline:
             "risk_score": min(100, session.get("risk_score", 0) + 5),
         }
 
-        from config import FORBIDDEN_KEYWORDS
+        from config import FORBIDDEN_KEYWORDS, AI_SITES, ENTERTAINMENT_SITES, SOCIAL_SITES, EDUCATIONAL_SITES
         url_lower = url.lower()
         found = [kw for kw in FORBIDDEN_KEYWORDS if kw in url_lower]
+        
+        # Categorize for the timeline
+        category = "General"
+        risk_impact = 5
+        if found:
+            category = "Forbidden"
+            risk_impact = 40
+        elif any(s in url_lower for s in AI_SITES):
+            category = "AI Research"
+            risk_impact = 25
+        elif any(s in url_lower for s in ENTERTAINMENT_SITES):
+            category = "Entertainment"
+            risk_impact = 10
+        elif any(s in url_lower for s in SOCIAL_SITES):
+            category = "Social Media"
+            risk_impact = 15
+        elif any(s in url_lower for s in EDUCATIONAL_SITES):
+            category = "Educational"
+            risk_impact = 0
+
+        # Create analysis result for the timeline (for EVERY visit)
+        analysis = {
+            "session_id": session_id,
+            "timestamp": datetime.utcnow().isoformat(),
+            "analysis_type": "URL_VISIT",
+            "risk_score_added": risk_impact if not found else 40,
+            "result_data": {
+                "url": url,
+                "category": category,
+                "domain": url.split('/')[2] if '//' in url else url.split('/')[0],
+                "is_forbidden": len(found) > 0,
+                "forbidden_keywords": found
+            },
+        }
+        supabase.table("analysis_results").insert(analysis).execute()
 
         if found:
-            analysis = {
-                "session_id": session_id,
-                "timestamp": datetime.utcnow().isoformat(),
-                "analysis_type": "URL_CHECK",
-                "risk_score_added": 40,
-                "result_data": {
-                    "url": url,
-                    "forbidden_keywords": found,
-                },
-            }
-            supabase.table("analysis_results").insert(analysis).execute()
-
             # Extra penalties for forbidden sites
             updates["forbidden_site_count"] = session.get("forbidden_site_count", 0) + 1
             updates["risk_score"] = min(100, session.get("risk_score", 0) + 40)

@@ -116,18 +116,27 @@ async def log_events_batch(
             if stat_field:
                 session_updates[stat_field] = (session_updates.get(stat_field) or session.get(stat_field) or 0) + 1
 
-            # Research Journey tracking
-            if event_data.type == "NAVIGATION" and event_data.data:
+            # Research Journey tracking (record both full navigations and tab switches)
+            if event_data.type in ("NAVIGATION", "TAB_SWITCH") and event_data.data:
                 nav_url = event_data.data.get('url', 'unknown')
                 nav_title = event_data.data.get('title', 'unknown')
                 url_class = classify_url(nav_url)
+                
                 category = "General"
                 relevance = 0.5
+                
                 if url_class:
-                    category = url_class["category"]
-                    if category == "AI": relevance = 0.1
-                    elif category == "CHEATING": relevance = 0.0
-                    elif category == "ENTERTAINMENT": relevance = 0.15
+                    category = url_class.get("category", "General")
+                    if category == "AI": 
+                        relevance = 0.1
+                    elif category == "CHEATING": 
+                        relevance = 0.0
+                    elif category == "ENTERTAINMENT": 
+                        relevance = 0.15
+                    elif category == "EDUCATION":
+                        relevance = 0.9
+                    elif category == "SOCIAL":
+                        relevance = 0.2
                 
                 research_entries.append({
                     "session_id": session_id,
@@ -151,6 +160,23 @@ async def log_events_batch(
             
         # Update Session
         supabase.table("exam_sessions").update(session_updates).eq("id", session_id).execute()
+        
+        # Submit events to the real-time analysis pipeline
+        try:
+            from services.pipeline import get_pipeline
+            pipeline = get_pipeline()
+            # If the pipeline is running, submit events
+            if pipeline._running:
+                for event_data in batch.events:
+                    # We pass the same structure as event_log version for compatibility
+                    await pipeline.submit({
+                        "type": event_data.type,
+                        "session_id": session_id,
+                        "data": event_data.data or {},
+                        "timestamp": event_data.timestamp,
+                    })
+        except Exception as e:
+            print(f"[WARN] Pipeline submission failed in Supabase router: {e}")
         
         return {
             "success": True,
