@@ -66,87 +66,107 @@ async def process_analysis_data(
         
         session = session_res.data[0]
         
-        # Prepare analysis record
+        # Prepare analysis record with all optional fields initialized to prevent Supabase schema errors
         analysis_data = {
+            "id": str(uuid.uuid4()),
             "session_id": session["id"],
             "timestamp": datetime.utcnow().isoformat(),
             "analysis_type": "MULTI_MODAL",
             "result_data": {},
             "risk_score_added": 0.0,
-            "face_detected": True
+            "face_detected": True,
+            "face_confidence": 1.0,
+            "detected_text": "",
+            "forbidden_keywords_found": [],
+            "similarity_score": 0.0
         }
         
         # Track session updates
         session_updates = {}
         
         # 1. Webcam Analysis
-        webcam_frame = decode_image(analysis_request.webcam_image)
-        if webcam_frame is not None:
-            fname, fpath = save_image(webcam_frame, WEBCAM_DIR, "webcam")
-            analysis_data["source_file"] = f"/uploads/webcam/{fname}"
-            
-            if vision_engine:
-                vision_results = vision_engine.analyze_frame(webcam_frame)
-                is_face_detected = "FACE_NOT_FOUND" not in vision_results['violations']
-                analysis_data["face_detected"] = is_face_detected
-                analysis_data["face_confidence"] = 0.0 if not is_face_detected else 0.9
+        if analysis_request.webcam_image:
+            webcam_frame = decode_image(analysis_request.webcam_image)
+            if webcam_frame is not None:
+                fname, fpath = save_image(webcam_frame, WEBCAM_DIR, "webcam")
+                analysis_data["source_file"] = f"/uploads/webcam/{fname}"
                 
-                if "GAZE_AWAY_LONG" in vision_results['violations']:
-                    session_updates["engagement_score"] = max(0, session.get("engagement_score", 100) - 5)
-                elif not is_face_detected:
-                    session_updates["face_absence_count"] = session.get("face_absence_count", 0) + 1
-                    session_updates["engagement_score"] = max(0, session.get("engagement_score", 100) - 10)
-                else:
-                    session_updates["engagement_score"] = min(100, session.get("engagement_score", 100) + 1)
+                if vision_engine:
+                    try:
+                        vision_results = vision_engine.analyze_frame(webcam_frame)
+                        violations = vision_results.get('violations', [])
+                        is_face_detected = "FACE_NOT_FOUND" not in violations and "FACE_ABSENT_VIOLATION" not in violations
+                        analysis_data["face_detected"] = is_face_detected
+                        analysis_data["face_confidence"] = 0.0 if not is_face_detected else 0.9
+                        
+                        if "GAZE_AWAY_LONG" in violations:
+                            session_updates["engagement_score"] = max(0, session.get("engagement_score", 100) - 5)
+                        elif not is_face_detected:
+                            session_updates["face_absence_count"] = session.get("face_absence_count", 0) + 1
+                            session_updates["engagement_score"] = max(0, session.get("engagement_score", 100) - 10)
+                        else:
+                            session_updates["engagement_score"] = min(100, session.get("engagement_score", 100) + 1)
 
-                analysis_data["result_data"]["vision"] = vision_results
-                analysis_data["risk_score_added"] += vision_results['integrity_score_impact']
+                        analysis_data["result_data"]["vision"] = vision_results
+                        analysis_data["risk_score_added"] += vision_results.get('integrity_score_impact', 0)
+                    except Exception as ve:
+                        print(f"[Analysis] Vision Engine Error: {ve}")
 
                 # Object Detection
-                from services.object_detection import get_object_detector
-                yolo = get_object_detector()
-                obj_result = yolo.detect(webcam_frame)
-                
-                if obj_result["forbidden_detected"]:
-                    analysis_data["result_data"]["objects"] = obj_result["objects"]
-                    analysis_data["risk_score_added"] += obj_result["risk_score"]
+                try:
+                    from services.object_detection import get_object_detector
+                    yolo = get_object_detector()
+                    obj_result = yolo.detect(webcam_frame)
+                    
+                    if obj_result.get("forbidden_detected"):
+                        analysis_data["result_data"]["objects"] = obj_result.get("objects", [])
+                        analysis_data["risk_score_added"] += obj_result.get("risk_score", 0)
+                except Exception as oe:
+                    print(f"[Analysis] Object detection skip: {oe}")
 
         # 2. Screen Analysis (OCR)
-        screen_frame = decode_image(analysis_request.screen_image)
-        if screen_frame is not None:
-            fname, fpath = save_image(screen_frame, SCREENSHOTS_DIR, "screen")
-            ocr_result = await analyze_screenshot_ocr(fpath)
-            
-            analysis_data["detected_text"] = ocr_result.get("text", "")
-            analysis_data["forbidden_keywords_found"] = ocr_result.get("forbidden_keywords", [])
-            
-            if ocr_result.get("forbidden_detected"):
-                session_updates["forbidden_site_count"] = session.get("forbidden_site_count", 0) + 1
-                session_updates["content_relevance"] = max(0, session.get("content_relevance", 100) - 20)
-                analysis_data["risk_score_added"] += ocr_result.get("risk_score", 0)
-            
-            analysis_data["result_data"]["ocr"] = ocr_result
+        if analysis_request.screen_image:
+            screen_frame = decode_image(analysis_request.screen_image)
+            if screen_frame is not None:
+                fname, fpath = save_image(screen_frame, SCREENSHOTS_DIR, "screen")
+                ocr_result = await analyze_screenshot_ocr(fpath)
+                
+                analysis_data["detected_text"] = ocr_result.get("text", "")
+                analysis_data["forbidden_keywords_found"] = ocr_result.get("forbidden_keywords", [])
+                
+                if ocr_result.get("forbidden_detected"):
+                    session_updates["forbidden_site_count"] = session.get("forbidden_site_count", 0) + 1
+                    session_updates["content_relevance"] = max(0, session.get("content_relevance", 100) - 20)
+                    analysis_data["risk_score_added"] += ocr_result.get("risk_score", 0)
+                
+                analysis_data["result_data"]["ocr"] = ocr_result
 
         # 3. Text Similarity (Clipboard)
         if analysis_request.clipboard_text:
-            sim_result = await check_text_similarity(analysis_request.clipboard_text)
-            analysis_data["similarity_score"] = sim_result.get("similarity_score", 0)
-            if sim_result.get("is_suspicious"):
-                session_updates["effort_alignment"] = max(0, session.get("effort_alignment", 100) - 15)
-                analysis_data["risk_score_added"] += sim_result.get("risk_score", 0)
-            
-            analysis_data["result_data"]["similarity"] = sim_result
+            try:
+                sim_result = await check_text_similarity(analysis_request.clipboard_text)
+                analysis_data["similarity_score"] = sim_result.get("similarity_score", 0)
+                if sim_result.get("is_suspicious"):
+                    session_updates["effort_alignment"] = max(0, session.get("effort_alignment", 100) - 15)
+                    analysis_data["risk_score_added"] += sim_result.get("risk_score", 0)
+                
+                analysis_data["result_data"]["similarity"] = sim_result
+            except Exception as se:
+                print(f"[Analysis] Similarity Check Error: {se}")
 
         # 4. LLM Analysis (Optional)
-        llm = get_llm_service()
-        if await llm.check_connection():
-            llm_result = await llm.analyze_behavior(
-                text=analysis_data.get("detected_text", ""),
-                violations=analysis_data.get("forbidden_keywords_found", [])
-            )
-            if llm_result.get("is_cheating"):
-                analysis_data["risk_score_added"] += 25
-                analysis_data["result_data"]["llm_analysis"] = llm_result
+        try:
+            llm = get_llm_service()
+            if await llm.check_connection():
+                llm_result = await llm.analyze_behavior(
+                    text=analysis_data.get("detected_text", ""),
+                    violations=analysis_data.get("forbidden_keywords_found", [])
+                )
+                if llm_result.get("is_cheating"):
+                    analysis_data["risk_score_added"] += 25
+                    analysis_data["result_data"]["llm_analysis"] = llm_result
+        except Exception as le:
+            print(f"[Analysis] LLM Analysis Error: {le}")
 
         # Save Analysis Result to Supabase
         supabase.table("analysis_results").insert(analysis_data).execute()
@@ -156,13 +176,15 @@ async def process_analysis_data(
         new_risk = min(100, current_risk + analysis_data["risk_score_added"])
         session_updates["risk_score"] = new_risk
         
-        if new_risk > 60:
-            session_updates["risk_level"] = "review"
         if new_risk > 85:
             session_updates["risk_level"] = "suspicious"
+        elif new_risk > 60:
+            session_updates["risk_level"] = "review"
+        else:
+            session_updates["risk_level"] = "safe"
             
-        # Update session in Supabase
-        supabase.table("exam_sessions").update(session_updates).eq("id", session["id"]).execute()
+        if session_updates:
+            supabase.table("exam_sessions").update(session_updates).eq("id", session["id"]).execute()
         
         return AnalysisResponse(
             status="processed",

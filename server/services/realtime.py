@@ -243,12 +243,16 @@ class RealtimeMonitoringManager:
     ):
         """Broadcast an event to relevant subscribers"""
         
+        # Extract string values if enums were passed
+        type_val = event_type.value if hasattr(event_type, "value") else event_type
+        level_val = alert_level.value if hasattr(alert_level, "value") else alert_level
+
         event = RealtimeEvent(
-            event_type=event_type.value,
+            event_type=type_val,
             student_id=student_id,
             session_id=session_id,
             data=data or {},
-            alert_level=alert_level.value,
+            alert_level=level_val,
             timestamp=datetime.utcnow().isoformat(),
         )
         
