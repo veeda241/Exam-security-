@@ -225,13 +225,14 @@ async def websocket_alerts(websocket: WebSocket):
     Legacy endpoint - maintains backward compatibility.
     """
     print(f"[WS] Dashboard client connecting to legacy alerts...")
-    await manager.connect(websocket)
     try:
+        await manager.connect(websocket)
         while True:
             data = await websocket.receive_text()
             if data == "ping":
                 await websocket.send_text("pong")
-    except WebSocketDisconnect:
+    except (WebSocketDisconnect, RuntimeError):
+        # RuntimeError happens if client closes before accept() completes
         manager.disconnect(websocket)
 
 
@@ -244,9 +245,17 @@ async def websocket_dashboard(websocket: WebSocket):
     """
     print(f"[WS] Dashboard client connecting...")
     realtime = get_realtime_manager()
-    await realtime.connect_dashboard(websocket)
     
     try:
+        # Explicit connect with state check
+        await realtime.connect_dashboard(websocket)
+        
+        # Guard: Ensure we are actually connected before loop
+        from starlette.websockets import WebSocketState
+        if websocket.application_state != WebSocketState.CONNECTED:
+            print("[WS] Dashboard connection check failed - closing")
+            return
+
         while True:
             data = await websocket.receive_text()
             
@@ -261,7 +270,7 @@ async def websocket_dashboard(websocket: WebSocket):
                 realtime.room_manager.join_room(session_id, websocket)
                 await websocket.send_json({"type": "subscribed", "session_id": session_id})
                 
-    except WebSocketDisconnect:
+    except (WebSocketDisconnect, RuntimeError):
         realtime.disconnect(websocket)
 
 
