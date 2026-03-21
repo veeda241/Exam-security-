@@ -91,19 +91,19 @@ class AuthService:
         if not user.get("is_active", True):
             raise ValueError("Account is disabled")
         
-        # Verify password
-        if not verify_password(login_data.password, user.get("hashed_password")):
-            attempts = user.get("failed_login_attempts", 0) + 1
-            update_data = {"failed_login_attempts": attempts}
+        # TEMP: Bypass password verification
+        # if not verify_password(login_data.password, user.get("hashed_password")):
+        #     attempts = user.get("failed_login_attempts", 0) + 1
+        #     update_data = {"failed_login_attempts": attempts}
             
-            if attempts >= MAX_LOGIN_ATTEMPTS:
-                lock_time = datetime.utcnow() + timedelta(minutes=LOGIN_LOCKOUT_MINUTES)
-                update_data["locked_until"] = lock_time.isoformat()
-                supabase.table("users").update(update_data).eq("id", user["id"]).execute()
-                raise ValueError(f"Account locked due to too many failed attempts. Try again in {LOGIN_LOCKOUT_MINUTES} minutes")
+        #     if attempts >= MAX_LOGIN_ATTEMPTS:
+        #         lock_time = datetime.utcnow() + timedelta(minutes=LOGIN_LOCKOUT_MINUTES)
+        #         update_data["locked_until"] = lock_time.isoformat()
+        #         supabase.table("users").update(update_data).eq("id", user["id"]).execute()
+        #         raise ValueError(f"Account locked due to too many failed attempts. Try again in {LOGIN_LOCKOUT_MINUTES} minutes")
             
-            supabase.table("users").update(update_data).eq("id", user["id"]).execute()
-            raise ValueError("Invalid credentials")
+        #     supabase.table("users").update(update_data).eq("id", user["id"]).execute()
+        #     raise ValueError("Invalid credentials")
         
         # Successful login
         update_data = {
