@@ -98,6 +98,23 @@ class AnalysisPipeline:
         """Run transformer analysis on text events via Supabase."""
         text = event_data.get("data", {}).get("text", "") or event_data.get("data", {}).get("preview", "")
         session_id = event_data.get("session_id", "")
+        event_type = event_data.get("type", "")
+
+        # Update copy_count in Supabase for COPY/PASTE events
+        if event_type in ("COPY", "PASTE"):
+            try:
+                res = supabase.table("exam_sessions").select("copy_count, risk_score, effort_alignment").eq("id", session_id).execute()
+                if res.data:
+                    session = res.data[0]
+                    updates = {
+                        "copy_count": session.get("copy_count", 0) + 1,
+                        "risk_score": min(100, session.get("risk_score", 0) + 8),
+                        "effort_alignment": max(0, session.get("effort_alignment", 100) - 5),
+                    }
+                    supabase.table("exam_sessions").update(updates).eq("id", session_id).execute()
+                    self._stats["db_updates"] += 1
+            except Exception as e:
+                print(f"[Pipeline] Copy count update error: {e}")
 
         if not text or len(text) < 10:
             return
@@ -150,6 +167,18 @@ class AnalysisPipeline:
         if not url:
             return
 
+        # Every tab switch / navigation reduces engagement and bumps risk slightly
+        res = supabase.table("exam_sessions").select("*").eq("id", session_id).execute()
+        if not res.data:
+            return
+        session = res.data[0]
+
+        updates = {
+            "tab_switch_count": session.get("tab_switch_count", 0) + 1,
+            "engagement_score": max(0, session.get("engagement_score", 100) - 2),
+            "risk_score": min(100, session.get("risk_score", 0) + 5),
+        }
+
         from config import FORBIDDEN_KEYWORDS
         url_lower = url.lower()
         found = [kw for kw in FORBIDDEN_KEYWORDS if kw in url_lower]
@@ -167,17 +196,11 @@ class AnalysisPipeline:
             }
             supabase.table("analysis_results").insert(analysis).execute()
 
-            # Update session
-            res = supabase.table("exam_sessions").select("*").eq("id", session_id).execute()
-            if res.data:
-                session = res.data[0]
-                updates = {
-                    "forbidden_site_count": session.get("forbidden_site_count", 0) + 1,
-                    "risk_score": min(100, session.get("risk_score", 0) + 40),
-                    "content_relevance": max(0, session.get("content_relevance", 100) - 20)
-                }
-                supabase.table("exam_sessions").update(updates).eq("id", session_id).execute()
-                self._stats["db_updates"] += 1
+            # Extra penalties for forbidden sites
+            updates["forbidden_site_count"] = session.get("forbidden_site_count", 0) + 1
+            updates["risk_score"] = min(100, session.get("risk_score", 0) + 40)
+            updates["content_relevance"] = max(0, session.get("content_relevance", 100) - 20)
+            updates["engagement_score"] = max(0, session.get("engagement_score", 100) - 10)
 
             await self._push_to_dashboard(session_id, {
                 "type": "forbidden_site",
@@ -185,13 +208,20 @@ class AnalysisPipeline:
                 "keywords": found,
             })
 
+        supabase.table("exam_sessions").update(updates).eq("id", session_id).execute()
+        self._stats["db_updates"] += 1
+
     async def _handle_focus_event(self, event_data: Dict[str, Any]):
         """Process window blur via Supabase."""
         session_id = event_data.get("session_id", "")
-        res = supabase.table("exam_sessions").select("engagement_score").eq("id", session_id).execute()
+        res = supabase.table("exam_sessions").select("engagement_score, risk_score").eq("id", session_id).execute()
         if res.data:
-            score = max(0, res.data[0].get("engagement_score", 100) - 3)
-            supabase.table("exam_sessions").update({"engagement_score": score}).eq("id", session_id).execute()
+            session = res.data[0]
+            updates = {
+                "engagement_score": max(0, session.get("engagement_score", 100) - 3),
+                "risk_score": min(100, session.get("risk_score", 0) + 3),
+            }
+            supabase.table("exam_sessions").update(updates).eq("id", session_id).execute()
             self._stats["db_updates"] += 1
 
     async def _handle_transformer_alert(self, event_data: Dict[str, Any]):
