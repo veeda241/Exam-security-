@@ -29,7 +29,7 @@ export function formatTime(date) {
 }
 
 export function exportCSV(students) {
-  const headers = ['Name', 'Email', 'Status', 'Risk Score', 'Engagement', 'Effort'];
+  const headers = ['Name', 'Email', 'Status', 'Risk Score', 'Engagement', 'Effort', 'Tab Switches', 'Flagged Sites', 'Copy Count', 'Last Visited Site'];
   const rows = students.map(s => [
     s.name,
     s.email,
@@ -37,6 +37,10 @@ export function exportCSV(students) {
     Math.round(s.risk_score),
     Math.round(s.engagement_score || 0),
     Math.round(s.effort_alignment || 0),
+    s.tab_switch_count || 0,
+    s.forbidden_site_count || 0,
+    s.copy_count || 0,
+    s.last_visited_url || 'N/A'
   ]);
 
   const csv = [headers.join(','), ...rows.map(r => r.map(c => `"${c}"`).join(','))].join('\n');

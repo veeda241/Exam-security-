@@ -65,6 +65,8 @@ class StudentSummary(BaseModel):
     forbidden_site_count: Optional[int] = 0
     copy_count: Optional[int] = 0
     status: Optional[str] = "inactive"  # inactive, safe, review, suspicious
+    last_visited_url: Optional[str] = None
+    last_visited_title: Optional[str] = None
     
     class Config:
         json_schema_extra = {

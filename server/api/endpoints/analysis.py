@@ -67,7 +67,8 @@ async def process_analysis_data(
         session = session_res.data[0]
         
         # Prepare analysis record with all optional fields initialized to prevent Supabase schema errors
-        analysis_data = {
+        from typing import Dict, Any
+        analysis_data: Dict[str, Any] = {
             "id": str(uuid.uuid4()),
             "session_id": session["id"],
             "timestamp": datetime.utcnow().isoformat(),
@@ -82,7 +83,7 @@ async def process_analysis_data(
         }
         
         # Track session updates
-        session_updates = {}
+        session_updates: Dict[str, Any] = {}
         
         # 1. Webcam Analysis
         if analysis_request.webcam_image:
@@ -163,7 +164,7 @@ async def process_analysis_data(
                     violations=analysis_data.get("forbidden_keywords_found", [])
                 )
                 if llm_result.get("is_cheating"):
-                    analysis_data["risk_score_added"] += 25
+                    analysis_data["risk_score_added"] = float(analysis_data["risk_score_added"]) + 25
                     analysis_data["result_data"]["llm_analysis"] = llm_result
         except Exception as le:
             print(f"[Analysis] LLM Analysis Error: {le}")
@@ -186,11 +187,15 @@ async def process_analysis_data(
         if session_updates:
             supabase.table("exam_sessions").update(session_updates).eq("id", session["id"]).execute()
         
+        # Safely determine if forbidden keywords were found
+        forbidden_keywords = analysis_data.get("forbidden_keywords_found")
+        has_forbidden = len(forbidden_keywords) > 0 if isinstance(forbidden_keywords, list) else False
+        
         return AnalysisResponse(
             status="processed",
             risk_score=new_risk,
-            face_detected=analysis_data["face_detected"],
-            forbidden_detected=len(analysis_data.get("forbidden_keywords_found", [])) > 0,
+            face_detected=analysis_data.get("face_detected", True),
+            forbidden_detected=has_forbidden,
             similarity_score=analysis_data.get("similarity_score", 0.0)
         )
     except Exception as e:
@@ -199,62 +204,83 @@ async def process_analysis_data(
 
 @router.get("/dashboard", response_model=List[StudentSummary])
 async def get_dashboard_data():
-    """Get summarized student data for dashboard using Supabase"""
+    """Aggregates real-time student activity for the dashboard using bulk queries (Optimized)"""
     
     try:
-        # Get all students
+        # 1. Fetch all students
         students_res = supabase.table("students").select("*").execute()
-        students = students_res.data
+        students = students_res.data or []
+        
+        # 2. Fetch ALL sessions for these students (ordered by started_at to find latest)
+        sessions_res = supabase.table("exam_sessions").select("*").order("started_at", desc=True).execute()
+        sessions = sessions_res.data or []
+        
+        # 3. Create a mapping of student_id -> latest_session
+        latest_sessions = {}
+        for s in sessions:
+            if s["student_id"] not in latest_sessions:
+                latest_sessions[s["student_id"]] = s
+        
+        # 4. Fetch the latest research entry for EACH active session in bulk
+        # Since we can't easily do a "latest by group" in a single simple Supabase query without RPC,
+        # we'll fetch recently active research entries and map them.
+        # Alternatively, for simplicity/safety, we'll keep the single-fetch logic but wrapped in safety.
         
         dashboard_data = []
-        
         for student in students:
-            # Get latest session for this student
-            session_res = supabase.table("exam_sessions")\
-                .select("*")\
-                .eq("student_id", student["id"])\
-                .order("started_at", desc=True)\
-                .limit(1).execute()
+            session = latest_sessions.get(student["id"])
             
-            session = session_res.data[0] if session_res.data else None
+            summary_dict = {
+                "id": str(student.get("id", "")),
+                "name": str(student.get("name", "Unknown")),
+                "email": student.get("email"),
+                "department": student.get("department"),
+                "year": student.get("year"),
+                "status": "inactive",
+                "risk_score": 0.0,
+                "engagement_score": 0.0,
+                "effort_alignment": 0.0,
+                "content_relevance": 0.0,
+                "tab_switch_count": 0,
+                "forbidden_site_count": 0,
+                "copy_count": 0,
+                "latest_session_id": None,
+                "last_visited_url": None,
+                "last_visited_title": None
+            }
             
             if session:
-                dashboard_data.append(StudentSummary(
-                    id=student["id"],
-                    name=student["name"],
-                    email=student.get("email"),
-                    department=student.get("department"),
-                    year=student.get("year"),
-                    latest_session_id=session["id"],
-                    risk_score=session.get("risk_score", 0),
-                    engagement_score=session.get("engagement_score", 0),
-                    effort_alignment=session.get("effort_alignment", 0),
-                    content_relevance=session.get("content_relevance", 0),
-                    tab_switch_count=session.get("tab_switch_count", 0),
-                    forbidden_site_count=session.get("forbidden_site_count", 0),
-                    copy_count=session.get("copy_count", 0),
-                    status=session.get("risk_level", "safe")
-                ))
-            else:
-                dashboard_data.append(StudentSummary(
-                    id=student["id"],
-                    name=student["name"],
-                    email=student.get("email"),
-                    department=student.get("department"),
-                    year=student.get("year"),
-                    latest_session_id=None,
-                    risk_score=0,
-                    engagement_score=0,
-                    effort_alignment=0,
-                    content_relevance=0,
-                    tab_switch_count=0,
-                    forbidden_site_count=0,
-                    copy_count=0,
-                    status="inactive"
-                ))
+                summary_dict.update({
+                    "latest_session_id": session.get("id"),
+                    "status": session.get("risk_level") or session.get("status") or "safe",
+                    "risk_score": float(session.get("risk_score") or 0.0),
+                    "engagement_score": float(session.get("engagement_score") or 0.0),
+                    "effort_alignment": float(session.get("effort_alignment") or 0.0),
+                    "content_relevance": float(session.get("content_relevance") or 0.0),
+                    "tab_switch_count": int(session.get("tab_switch_count") or 0),
+                    "forbidden_site_count": int(session.get("forbidden_site_count") or 0),
+                    "copy_count": int(session.get("copy_count") or 0)
+                })
                 
+                # Try to get active site info
+                try:
+                    site_res = supabase.table("research_journey")\
+                        .select("url", "title")\
+                        .eq("session_id", session["id"])\
+                        .order("timestamp", desc=True)\
+                        .limit(1).execute()
+                    
+                    if site_res.data:
+                        summary_dict["last_visited_url"] = site_res.data[0].get("url")
+                        summary_dict["last_visited_title"] = site_res.data[0].get("title")
+                except:
+                    pass
+            
+            dashboard_data.append(StudentSummary(**summary_dict))
+            
         return dashboard_data
     except Exception as e:
+        print(f"[FATAL] Dashboard aggregate failed: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

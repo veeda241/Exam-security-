@@ -30,6 +30,9 @@ class ExamCapture {
 
     async startScreenCapture() {
         try {
+            // Stop any existing capture first
+            this.stopScreenCapture();
+
             this.screenStream = await navigator.mediaDevices.getDisplayMedia({
                 video: {
                     cursor: 'always',
@@ -62,11 +65,11 @@ class ExamCapture {
 
             return { success: true };
         } catch (error) {
-            console.error('❌ Screen capture failed:', error.name, error.message);
+            console.error('❌ Screen capture failed:', error?.name || 'Error', error?.message || error || 'Unknown');
             return {
                 success: false,
-                error: error.message,
-                errorType: error.name
+                error: error?.message || 'Permission denied',
+                errorType: error?.name || 'Error'
             };
         }
     }
@@ -104,6 +107,9 @@ class ExamCapture {
 
     async startWebcamCapture() {
         try {
+            // Stop any existing capture first
+            this.stopWebcamCapture();
+
             this.webcamStream = await navigator.mediaDevices.getUserMedia({
                 video: {
                     width: { ideal: this.config.webcamWidth },
@@ -134,11 +140,11 @@ class ExamCapture {
 
             return { success: true };
         } catch (error) {
-            console.error('❌ Webcam failed:', error.name, error.message);
+            console.error('❌ Webcam failed:', error?.name || 'Error', error?.message || error || 'Unknown');
             return {
                 success: false,
-                error: error.message,
-                errorType: error.name
+                error: error?.message || 'Permission denied',
+                errorType: error?.name || 'Error'
             };
         }
     }
@@ -269,11 +275,18 @@ class ExamCapture {
                 data: dataUrl,
             }, (response) => {
                 if (chrome.runtime.lastError) {
-                    console.warn(`${type} upload channel:`, chrome.runtime.lastError?.message || 'Port closed');
+                    // This is expected if the port closes before the response arrives (slow upload)
+                    // We only log it as info if it's the specific "message port closed" error
+                    const errMsg = chrome.runtime.lastError.message || '';
+                    if (errMsg.includes('message port closed')) {
+                        console.info(`${type} port closed (upload continues)`);
+                    } else {
+                        console.warn(`${type} upload channel:`, errMsg);
+                    }
                 }
             });
         } catch (err) {
-            console.warn(`${type} upload error:`, err.message);
+            console.warn(`${type} upload error:`, err?.message || 'Context invalidated');
         }
 
         console.log(`📷 ${type === 'screen' ? 'Screenshot' : 'Webcam frame'} #${this.captureCount[type] + 1}`);

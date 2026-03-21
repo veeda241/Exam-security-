@@ -25,3 +25,9 @@ httpx>=0.25.0
 pytesseract>=0.3.10
 opencv-python-headless>=4.8.0
 numpy>=1.24.0
+
+# External APIs & AI (missing)
+supabase>=2.3.0
+ultralytics>=8.0.0
+mediapipe>=0.10.0
+watchfiles>=0.20.0

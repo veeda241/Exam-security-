@@ -52,6 +52,25 @@ async def log_event(
         
         new_event = res.data[0]
         
+        # Research Journey tracking for single events
+        if event_data.type.upper() in ("NAVIGATION", "TAB_SWITCH") and event_data.data:
+            url = event_data.data.get("url")
+            title = event_data.data.get("title")
+            if url:
+                try:
+                    url_class = classify_url(url)
+                    category = url_class.get("category", "General") if url_class else "General"
+                    supabase.table("research_journey").insert({
+                        "id": str(uuid.uuid4()),
+                        "session_id": session_id,
+                        "url": url,
+                        "title": title or url,
+                        "category": category,
+                        "timestamp": datetime.utcnow().isoformat()
+                    }).execute()
+                except:
+                    pass
+        
         # Update session stats (async-ish)
         stat_field = _get_session_update_field(event_data.type)
         

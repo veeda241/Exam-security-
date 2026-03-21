@@ -118,6 +118,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         sendResponse({ success: false });
       }
       return true;
+
+    default:
+      console.log('❓ Unknown message type:', message.type);
+      sendResponse({ success: false, error: 'Unknown message type' });
+      return false;
   }
 });
 
@@ -1134,6 +1139,9 @@ async function uploadScreenshot(dataUrl) {
   console.log('📸 Uploading screenshot to backend...');
 
   try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 20000); // 20s timeout for large uploads
+
     const response = await fetch(`${CONFIG.API_BASE}/analysis/process`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -1142,7 +1150,9 @@ async function uploadScreenshot(dataUrl) {
         timestamp: Date.now(),
         screen_image: dataUrl,
       }),
+      signal: controller.signal
     });
+    clearTimeout(timeoutId);
 
     if (response.ok) {
       examSession.lastScreenCapture = Date.now();
@@ -1181,6 +1191,9 @@ async function uploadWebcamFrame(dataUrl) {
   console.log('📹 Uploading webcam frame to backend...');
 
   try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 20000); // 20s timeout
+
     const response = await fetch(`${CONFIG.API_BASE}/analysis/process`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -1189,7 +1202,9 @@ async function uploadWebcamFrame(dataUrl) {
         timestamp: Date.now(),
         webcam_image: dataUrl,
       }),
+      signal: controller.signal
     });
+    clearTimeout(timeoutId);
 
     if (response.ok) {
       examSession.lastWebcamCapture = Date.now();

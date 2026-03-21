@@ -75,6 +75,39 @@
     padding: 0;
 }
 
+.loading-row td {
+    height: 300px;
+    padding: 0;
+}
+
+/* Active Site Cell Styling */
+.active-site-cell {
+    max-width: 150px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    padding: 0.35rem 0.6rem;
+    display: flex;
+    align-items: center;
+    transition: all var(--transition-fast);
+}
+
+.active-site-cell:hover {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: var(--border-light);
+}
+
+.site-title {
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: block;
+    width: 100%;
+}
+
 html {
     font-size: 16px;
     scroll-behavior: smooth;

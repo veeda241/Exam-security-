@@ -100,6 +100,7 @@ export default function Dashboard() {
                     <th className="sortable" onClick={() => handleSort('name')}>Student <i className="fas fa-sort"></i></th>
                     <th className="sortable" onClick={() => handleSort('status')}>Status <i className="fas fa-sort"></i></th>
                     <th className="sortable" onClick={() => handleSort('risk_score')}>Risk <i className="fas fa-sort"></i></th>
+                    <th>Active Site</th>
                     <th>Engagement</th>
                     <th>Effort</th>
                     <th className="sortable" onClick={() => handleSort('tab_switch_count')}>
@@ -140,6 +141,11 @@ export default function Dashboard() {
                         </td>
                         <td><span className={`badge badge-${status}`}>{status.toUpperCase()}</span></td>
                         <td><span className={`risk-value ${riskClass}`}>{Math.round(student.risk_score)}</span></td>
+                        <td>
+                          <div className="active-site-cell" title={student.last_visited_url || 'No activity'}>
+                            <span className="site-title">{student.last_visited_title || (student.last_visited_url ? new URL(student.last_visited_url).hostname : 'N/A')}</span>
+                          </div>
+                        </td>
                         <td>
                           <div className="progress-bar"><div className="progress-fill blue" style={{ width: `${student.engagement_score || 0}%` }}></div></div>
                           <span className="text-muted" style={{ fontSize: '0.75rem' }}>{Math.round(student.engagement_score || 0)}%</span>
