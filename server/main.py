@@ -393,9 +393,11 @@ app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
 # Check multiple locations to ensure it works on Render and locally
 possible_dist_dirs = [
     os.path.join(os.path.dirname(__file__), "dist"),
+    os.path.join(os.getcwd(), "server", "dist"),
     os.path.join(os.getcwd(), "dist"),
     os.path.join(os.path.dirname(os.path.dirname(__file__)), "react-frontend", "dist"),
-    "/opt/render/project/src/server/dist"
+    "/opt/render/project/src/server/dist",
+    "/opt/render/project/src/dist"
 ]
 
 REACT_BUILD_DIR = None

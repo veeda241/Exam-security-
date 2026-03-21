@@ -3,21 +3,9 @@ services:
   - type: web
     name: examguard-api
     runtime: python
-    pythonVersion: 3.11.11
+    pythonVersion: 3.14.3
     rootDir: .
-    buildCommand: |
-      echo "=== Starting Build ==="
-      echo "Python version: $(python --version)"
-      # Install Python dependencies
-      pip install --upgrade pip
-      pip install -r server/requirements.txt
-      # Build frontend
-      cd react-frontend && npm install && npm run build && cd ..
-      # Copy frontend build to server/dist
-      mkdir -p server/dist
-      cp -r react-frontend/dist/* server/dist/
-      echo "=== Build Complete ==="
-      ls -la server/dist/
+    buildCommand: bash build.sh
     startCommand: bash start.sh
     envVars:
       - key: MPLBACKEND
