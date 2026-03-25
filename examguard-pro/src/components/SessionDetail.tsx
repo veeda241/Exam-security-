@@ -37,17 +37,19 @@ export function SessionDetail() {
         const res = await fetch(`${config.apiUrl}/sessions/?active_only=false&limit=100`);
         if (res.ok) {
           const data = await res.json();
-          // Find the proctor session to get the exam_id
+          // Find the proctor session (current page)
           const currentSession = data.find((s: any) => s.id === sessionId);
+          
           if (currentSession) {
             const examId = currentSession.exam_id;
             // Get all student sessions for this exam (exclude PROCTOR sessions)
             const studentSessions = data.filter(
               (s: any) => s.exam_id === examId && !s.student_id?.startsWith('PROCTOR-')
             );
+            
             setSessions(studentSessions);
-            // Check if the proctor session is still active
-            setIsEnded(!currentSession.is_active);
+            // Check status correctly (since is_active might be missing from SessionSummary)
+            setIsEnded(currentSession.status !== 'active');
           }
         }
       } catch (e) {
@@ -59,7 +61,7 @@ export function SessionDetail() {
     fetchSessions();
   }, [sessionId, refreshKey]);
 
-  // Auto-refresh every 5 seconds
+  // Auto-refresh feeds every 5 seconds to get latest frames
   useEffect(() => {
     if (isEnded) return;
     const interval = setInterval(() => {
@@ -77,9 +79,11 @@ export function SessionDetail() {
 
   const handleEndSession = async () => {
     try {
-      await fetch(`${config.apiUrl}/sessions/${sessionId}/end`, { method: 'POST' });
-      setIsEnded(true);
-      setRefreshKey(Date.now());
+      if (confirm("End this proctoring session?")) {
+        await fetch(`${config.apiUrl}/sessions/${sessionId}/end`, { method: 'POST' });
+        setIsEnded(true);
+        setRefreshKey(Date.now());
+      }
     } catch (e) {
       console.error("Failed to end session:", e);
     }
@@ -184,25 +188,32 @@ export function SessionDetail() {
               const name = getStudentName(student);
               const riskScore = student.risk_score || 0;
               const isFlagged = student.risk_level === 'high' || student.risk_level === 'critical';
+              
+              // Use real feed URL from API if available
+              const feedUrl = `${config.apiUrl}/uploads/latest/${student.id}?type=${mode === 'camera' ? 'webcam' : 'screenshot'}&t=${refreshKey}`;
+              
               return (
                 <div 
                   key={student.id} 
                   onClick={() => toggleFeedMode(student.student_id)}
-                  className={`relative bg-slate-900 rounded-2xl overflow-hidden aspect-video cursor-pointer group shadow-sm border-2 transition-colors ${
-                    isFlagged ? 'border-rose-500' : 'border-transparent hover:border-indigo-400'
+                  className={`relative bg-slate-900 rounded-2xl overflow-hidden aspect-video cursor-pointer group shadow-md border-2 transition-all hover:scale-[1.02] ${
+                    isFlagged ? 'border-rose-500 ring-4 ring-rose-500/20' : 'border-slate-800'
                   }`}
                 >
                   <img 
-                    src={`https://picsum.photos/seed/${student.student_id}-${mode}-${refreshKey}/400/300`}
+                    src={feedUrl}
+                    onError={(e) => {
+                      // Fallback to placeholder if no frames uploaded yet
+                      e.currentTarget.src = `https://api.dicebear.com/7.x/identicon/svg?seed=${student.student_id}&backgroundColor=b6e3f4`;
+                    }}
                     alt={`${name} feed`}
                     className="w-full h-full object-cover opacity-90 group-hover:opacity-100 transition-opacity"
-                    referrerPolicy="no-referrer"
                   />
                   
                   <div className="absolute inset-0 bg-gradient-to-t from-slate-900/80 via-transparent to-slate-900/30 pointer-events-none" />
                   
                   <div className="absolute top-3 left-3 flex items-center gap-2">
-                    <div className="bg-slate-900/60 backdrop-blur-md text-white text-xs px-2 py-1 rounded-md font-medium flex items-center gap-1.5">
+                    <div className="bg-slate-900/60 backdrop-blur-md text-white text-xs px-2 py-1 rounded-md font-medium flex items-center gap-1.5 border border-white/10">
                       {mode === 'camera' ? <Camera className="w-3 h-3" /> : <Layout className="w-3 h-3" />}
                       {name}
                     </div>
@@ -215,17 +226,24 @@ export function SessionDetail() {
                   )}
 
                   <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between">
-                    <div className={`px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider backdrop-blur-md ${
+                    <div className={`px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider backdrop-blur-md border border-white/10 ${
                       riskScore > 70 ? 'bg-rose-500/80 text-white' : 
                       riskScore > 30 ? 'bg-amber-500/80 text-white' : 
                       'bg-emerald-500/80 text-white'
                     }`}>
                       Risk: {riskScore}
                     </div>
-                    <div className="bg-slate-900/60 backdrop-blur-md text-white text-[10px] px-2 py-1 rounded-md font-mono flex items-center gap-1.5">
+                    <div className="bg-slate-900/60 backdrop-blur-md text-white text-[10px] px-2 py-1 rounded-md font-mono flex items-center gap-1.5 border border-white/10">
                       <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse"></span>
-                      {student.is_active ? 'LIVE' : 'ENDED'}
+                      LIVE
                     </div>
+                  </div>
+
+                  {/* Hover Overlay */}
+                  <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300 bg-slate-900/40 backdrop-blur-[1px]">
+                     <span className="bg-white px-4 py-2 rounded-full text-slate-900 text-xs font-bold shadow-xl">
+                        Switch to {mode === 'camera' ? 'Desktop' : 'Camera'}
+                     </span>
                   </div>
                 </div>
               );
@@ -236,11 +254,15 @@ export function SessionDetail() {
             key="empty"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            className="bg-white rounded-2xl border border-slate-200 shadow-sm p-12 text-center"
+            className="bg-white rounded-2xl border border-slate-200 shadow-sm p-16 text-center"
           >
-            <Users className="w-12 h-12 text-slate-300 mx-auto mb-4" />
-            <h3 className="text-lg font-semibold text-slate-900">Waiting for students...</h3>
-            <p className="text-sm text-slate-500 mt-2">Share the exam code with students to let them join via the Chrome extension.</p>
+            <div className="w-16 h-16 bg-slate-50 text-slate-300 rounded-full flex items-center justify-center mx-auto mb-6">
+               <Users className="w-8 h-8" />
+            </div>
+            <h3 className="text-xl font-bold text-slate-900">Waiting for students...</h3>
+            <p className="text-slate-500 mt-2 max-w-sm mx-auto">
+               The session is active. Share the exam code with students. Once they start proctoring, their feeds will appear here automatically.
+            </p>
           </motion.div>
         ) : (
           <motion.div 
@@ -250,7 +272,7 @@ export function SessionDetail() {
             className="space-y-6"
           >
             {/* Analytics Summary Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
               <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-4">
                 <div className="p-4 rounded-xl bg-indigo-50 text-indigo-600">
                   <ShieldAlert className="w-8 h-8" />
@@ -301,8 +323,8 @@ export function SessionDetail() {
                   <tbody className="divide-y divide-slate-100">
                     {sessions.length === 0 ? (
                       <tr>
-                        <td colSpan={4} className="px-6 py-12 text-center text-slate-500">
-                          No students joined this session.
+                        <td colSpan={4} className="px-6 py-12 text-center text-slate-500 flex flex-col items-center">
+                           No students joined this session.
                         </td>
                       </tr>
                     ) : (
@@ -312,48 +334,48 @@ export function SessionDetail() {
                         const effortScore = student.engagement_score || student.effort_alignment || 0;
                         const isFlagged = student.risk_level === 'high' || student.risk_level === 'critical';
                         return (
-                          <tr key={student.id} className="hover:bg-slate-50/80 transition-colors bg-white">
+                          <tr key={student.id} className="hover:bg-slate-50/80 transition-colors bg-white group">
                             <td className="px-6 py-4">
                               <div className="flex items-center gap-3">
-                                <div className="w-8 h-8 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold text-xs border border-indigo-200">
+                                <div className="w-10 h-10 rounded-full bg-indigo-50 text-indigo-700 flex items-center justify-center font-bold text-xs border border-indigo-100 shadow-sm group-hover:bg-indigo-600 group-hover:text-white transition-colors">
                                   {getInitials(name)}
                                 </div>
                                 <div>
-                                  <p className="font-medium text-slate-900">{name}</p>
+                                  <p className="font-bold text-slate-900">{name}</p>
                                   <p className="text-xs text-slate-500">{student.student_id}</p>
                                 </div>
                               </div>
                             </td>
                             <td className="px-6 py-4">
-                              <div className="flex items-center gap-2">
-                                <div className="w-full bg-slate-100 rounded-full h-2 max-w-[100px]">
+                              <div className="flex items-center gap-3">
+                                <div className="w-full bg-slate-100 rounded-full h-2 max-w-[120px]">
                                   <div 
-                                    className={`h-2 rounded-full ${riskScore > 70 ? 'bg-rose-500' : riskScore > 30 ? 'bg-amber-500' : 'bg-emerald-500'}`} 
+                                    className={`h-2 rounded-full transition-all duration-1000 ${riskScore > 70 ? 'bg-rose-500' : riskScore > 30 ? 'bg-amber-500' : 'bg-emerald-500'}`} 
                                     style={{ width: `${riskScore}%` }}
                                   />
                                 </div>
-                                <span className="font-medium text-slate-700">{riskScore}</span>
+                                <span className="font-bold text-slate-700">{riskScore}</span>
                               </div>
                             </td>
                             <td className="px-6 py-4">
-                              <div className="flex items-center gap-2">
-                                <div className="w-full bg-slate-100 rounded-full h-2 max-w-[100px]">
+                              <div className="flex items-center gap-3">
+                                <div className="w-full bg-slate-100 rounded-full h-2 max-w-[120px]">
                                   <div 
-                                    className="h-2 rounded-full bg-indigo-500" 
+                                    className="h-2 rounded-full bg-indigo-500 transition-all duration-1000" 
                                     style={{ width: `${effortScore}%` }}
                                   />
                                 </div>
-                                <span className="font-medium text-slate-700">{effortScore}</span>
+                                <span className="font-bold text-slate-700">{effortScore}</span>
                               </div>
                             </td>
-                            <td className="px-6 py-4">
+                            <td className="px-6 py-4 text-right">
                               {isFlagged ? (
-                                <span className="inline-flex items-center px-2 py-1 rounded-md text-[10px] font-semibold uppercase tracking-wider bg-rose-50 text-rose-700 border border-rose-200">
+                                <span className="inline-flex items-center px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-rose-50 text-rose-700 border border-rose-100">
                                   Flagged
                                 </span>
                               ) : (
-                                <span className="inline-flex items-center px-2 py-1 rounded-md text-[10px] font-semibold uppercase tracking-wider bg-emerald-50 text-emerald-600 border border-emerald-200">
-                                  {student.risk_level || 'Safe'}
+                                <span className="inline-flex items-center px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-emerald-50 text-emerald-700 border border-emerald-100">
+                                  Safe
                                 </span>
                               )}
                             </td>

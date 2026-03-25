@@ -34,7 +34,8 @@ export function Dashboard() {
   const [isNewSessionModalOpen, setIsNewSessionModalOpen] = useState(false);
   const [sessionName, setSessionName] = useState("");
   const [studentCount, setStudentCount] = useState("");
-  const [examCode, setExamCode] = useState("");
+   const [examCode, setExamCode] = useState("");
+  const [isCreating, setIsCreating] = useState(false);
   
   useEffect(() => {
     const fetchStats = async () => {
@@ -75,12 +76,15 @@ export function Dashboard() {
 
   const handleCreateSession = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isCreating) return;
+    
+    setIsCreating(true);
     try {
       const response = await fetch(`${config.apiUrl}/sessions/create`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          student_id: `PROCTOR-${Math.floor(Math.random() * 999)}`,
+          student_id: `PROCTOR-${Math.floor(Math.random() * 9999)}`,
           student_name: "Session Monitor",
           exam_id: sessionName || examCode
         })
@@ -91,6 +95,8 @@ export function Dashboard() {
       }
     } catch (e) {
       console.error("Failed to create session");
+    } finally {
+      setIsCreating(false);
     }
   };
 
@@ -397,9 +403,17 @@ export function Dashboard() {
                   </button>
                   <button 
                     type="submit" 
-                    className="px-5 py-2.5 rounded-xl text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 transition-colors shadow-sm active:scale-95"
+                    disabled={isCreating}
+                    className="px-5 py-2.5 rounded-xl text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 transition-colors shadow-sm active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center min-w-[120px]"
                   >
-                    Create Session
+                    {isCreating ? (
+                      <>
+                        <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                        Creating...
+                      </>
+                    ) : (
+                      "Create Session"
+                    )}
                   </button>
                 </div>
               </form>

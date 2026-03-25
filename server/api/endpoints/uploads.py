@@ -169,6 +169,40 @@ async def upload_webcam_frame(
     )
 
 
+@router.get("/latest/{session_id}")
+async def get_latest_upload(
+    session_id: str,
+    type: str = "webcam"
+):
+    """Retrieve the latest uploaded image for a session (from Supabase)"""
+    
+    try:
+        # Query Supabase for the latest frame URL
+        field = "latest_webcam" if type == "webcam" else "latest_screenshot"
+        res = supabase.table("exam_sessions").select(field).eq("id", session_id).execute()
+        
+        if not res.data or not res.data[0].get(field):
+            raise HTTPException(status_code=404, detail="No uploads recorded for this session yet")
+            
+        relative_url = res.data[0][field] # e.g. /uploads/webcam/webcam_uuid.jpg
+        
+        # In a real environment, we'd return a redirect or the file
+        # For this setup, we serve the file by resolving the path
+        filename = os.path.basename(relative_url)
+        target_dir = WEBCAM_DIR if type == "webcam" else SCREENSHOTS_DIR
+        file_path = os.path.join(target_dir, filename)
+        
+        if not os.path.exists(file_path):
+             raise HTTPException(status_code=404, detail="File has been cleaned or not found on disk")
+             
+        from fastapi.responses import FileResponse
+        return FileResponse(file_path)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.delete("/cleanup/{session_id}")
 async def cleanup_session_uploads(session_id: str):
     """Delete all uploaded files for a session"""
