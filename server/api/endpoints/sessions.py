@@ -26,14 +26,26 @@ async def create_session(session_data: SessionCreate):
             }).execute()
         
         # 2. Check if the exam_id is valid (pre-registered by a proctor)
-        # For simplicity, we check if there's a session with this exam_id created by "PROCTOR"
-        # unless the person currently creating the session IS a proctor.
+        # We normalize both to uppercase and trim spaces to avoid common entry errors
+        target_exam_id = session_data.exam_id.strip()
+        print(f"[Session] Student trying to join exam_id: '{target_exam_id}' as '{session_data.student_id}'")
+        
         creating_proctor = session_data.student_id.startswith("PROCTOR-")
         
         if not creating_proctor:
-            code_res = supabase.table("exam_sessions").select("id").eq("exam_id", session_data.exam_id).ilike("student_id", "PROCTOR-%").execute()
+            # Look for ANY proctor session with this exam_id (case-insensitive)
+            code_res = supabase.table("exam_sessions").select("id, exam_id")\
+                .ilike("exam_id", target_exam_id)\
+                .ilike("student_id", "PROCTOR-%")\
+                .execute()
+            
             if not code_res.data:
-                raise HTTPException(status_code=400, detail="Invalid exam code. This exam session has not been initiated by a proctor.")
+                print(f"[Session] DENIED: No proctor session found for exam_id '{target_exam_id}'")
+                raise HTTPException(status_code=400, detail=f"Invalid exam code '{target_exam_id}'. This exam has not been started by a proctor yet.")
+            
+            # Use the canonical exam_id from the proctor session to ensure exact matching
+            session_data.exam_id = code_res.data[0]["exam_id"]
+            print(f"[Session] APPROVED: Student joined exam '{session_data.exam_id}'")
 
         # 3. Create new session
         session_id = str(uuid.uuid4())

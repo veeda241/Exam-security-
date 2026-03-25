@@ -670,30 +670,39 @@ chrome.storage.local.get(['examSession'], (result) => {
 });
 
 // ==================== START FLOW ====================
+let activeStartPromise = null;
 
 async function handleStartExam(data) {
   pendingStartData = data;
+  
+  // Use a promise-resolving mechanism to wait for the capture window to be ready
+  return new Promise(async (resolve) => {
+    activeStartPromise = resolve;
+    
+    try {
+      const window = await chrome.windows.create({
+        url: chrome.runtime.getURL('capture-page.html'),
+        type: 'popup',
+        width: 650,
+        height: 550,
+        focused: true,
+      });
 
-  try {
-    const window = await chrome.windows.create({
-      url: chrome.runtime.getURL('capture-page.html'),
-      type: 'popup',
-      width: 650,
-      height: 550,
-      focused: true,
-    });
-
-    captureWindowId = window.id;
-    return { success: true, waitingForCapture: true };
-  } catch (error) {
-    console.error('Failed to open capture window:', error);
-    return { success: false, error: error.message };
-  }
+      captureWindowId = window.id;
+      // We don't resolve here. We resolve in onCaptureReady.
+    } catch (error) {
+      console.error('Failed to open capture window:', error);
+      activeStartPromise = null;
+      resolve({ success: false, error: error.message });
+    }
+  });
 }
 
-async function onCaptureReady(captureData) {
+async function onCaptureReady(captureData, sendResponse) {
   if (!pendingStartData) {
     console.warn('No pending start data');
+    if (sendResponse) sendResponse({ success: false, error: 'No session data' });
+    if (activeStartPromise) activeStartPromise({ success: false, error: 'No session data' });
     return;
   }
 
@@ -713,9 +722,20 @@ async function onCaptureReady(captureData) {
       message: 'Proctoring session started. Good luck!',
       priority: 2,
     });
+    
+    if (sendResponse) sendResponse({ success: true });
+    if (activeStartPromise) activeStartPromise({ success: true });
+  } else {
+    // If it failed, close the capture window too
+    if (captureWindowId) {
+      chrome.windows.remove(captureWindowId).catch(() => { });
+    }
+    if (sendResponse) sendResponse({ success: false, error: result.error });
+    if (activeStartPromise) activeStartPromise({ success: false, error: result.error });
   }
 
   pendingStartData = null;
+  activeStartPromise = null;
 }
 
 // ==================== SESSION MANAGEMENT ====================
@@ -724,7 +744,8 @@ async function startExamSession(data) {
   try {
     let sessionId;
 
-    // Try to create session on backend with retry
+    // 2. Try to create session on backend with retry
+    let lastError = null;
     for (let attempt = 1; attempt <= CONFIG.MAX_RETRY_ATTEMPTS; attempt++) {
       try {
         const response = await fetch(`${CONFIG.API_BASE}/sessions/create`, {
@@ -737,24 +758,34 @@ async function startExamSession(data) {
           }),
         });
 
+        const result = await response.json();
+
         if (response.ok) {
-          const result = await response.json();
           sessionId = result.session_id;
           console.log(`✅ Session created on attempt ${attempt}:`, sessionId);
           break;
+        } else {
+          lastError = result.detail || `Server error (${response.status})`;
+          console.warn(`⚠️ Attempt ${attempt} rejected by server:`, lastError);
+          // If it's a validation error (like 400), don't retry
+          if (response.status === 400) break;
         }
       } catch (error) {
-        console.warn(`⚠️ Attempt ${attempt} failed:`, error.message);
+        lastError = error.message;
+        console.warn(`⚠️ Attempt ${attempt} network/timeout failed:`, lastError);
         if (attempt < CONFIG.MAX_RETRY_ATTEMPTS) {
           await delay(CONFIG.RETRY_DELAY);
         }
       }
     }
 
-    // Fallback to local session if backend unavailable
+    // Fail if backend unavailable or rejected
     if (!sessionId) {
-      sessionId = `local-${Date.now()}-${randomId()}`;
-      console.warn('⚠️ Using local session (backend unavailable)');
+      console.error('❌ Failed to start session:', lastError);
+      return { 
+        success: false, 
+        error: lastError || 'Backend unreachable. Check your connection or ask your proctor.' 
+      };
     }
 
     examSession = {
