@@ -787,6 +787,9 @@ async function startExamSession(data) {
     // Kiosk Mode: Enforce Lockdown
     await enforceLockdown();
 
+    // Anti-Cheat: Scan for Interview Coder / Cluely
+    startCheatingToolDetection();
+
     console.log('✅ Exam session started:', sessionId);
     return { success: true, sessionId };
 
@@ -1751,4 +1754,179 @@ function notifyAllTabs(messageType) {
       chrome.tabs.sendMessage(tab.id, { type: messageType }).catch(() => { });
     });
   });
+}
+
+// ==================== CHEATING TOOL DETECTION ====================
+// Detects Interview Coder / Cluely / Free-Cluely and similar AI overlay tools
+
+let cheatingDetectionInterval = null;
+
+const CHEATING_TOOL_SIGNATURES = {
+  // Port-based detection (Cluely runs Vite dev server on these ports)
+  ports: [5180, 5173, 5174, 3000, 3001],
+
+  // Known cheating tool window title patterns
+  titlePatterns: [
+    'interview coder', 'cluely', 'free-cluely', 'free cluely',
+    'interviewcoder', 'ai overlay', 'screen overlay',
+    'cheat sheet', 'exam helper', 'answer overlay',
+    'ghostwriter', 'exam.ai',
+  ],
+
+  // Known cheating tool URLs
+  urlPatterns: [
+    'cluely.com', 'interviewcoder.co', 'free-cluely',
+    'localhost:5180', '127.0.0.1:5180',
+    'localhost:5173', '127.0.0.1:5173',
+  ],
+};
+
+function startCheatingToolDetection() {
+  if (cheatingDetectionInterval) clearInterval(cheatingDetectionInterval);
+
+  // Run immediately, then every 15 seconds
+  scanForCheatingTools();
+  cheatingDetectionInterval = setInterval(scanForCheatingTools, 15000);
+
+  console.log('🔍 Anti-cheat: Cheating tool detection started');
+}
+
+function stopCheatingToolDetection() {
+  if (cheatingDetectionInterval) {
+    clearInterval(cheatingDetectionInterval);
+    cheatingDetectionInterval = null;
+  }
+}
+
+async function scanForCheatingTools() {
+  if (!examSession.active) return;
+
+  const detections = [];
+
+  // 1. Port scan — check if Cluely/Interview Coder's local server is running
+  for (const port of CHEATING_TOOL_SIGNATURES.ports) {
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 1500);
+
+      const res = await fetch(`http://localhost:${port}`, {
+        method: 'HEAD',
+        mode: 'no-cors',
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeout);
+
+      // If we get ANY response (even opaque), something is running on that port
+      detections.push({
+        method: 'port_scan',
+        port: port,
+        message: `Suspicious local server detected on port ${port} (possible cheating tool)`,
+      });
+    } catch {
+      // Connection refused = nothing running = good
+    }
+  }
+
+  // 2. Window/Tab title scan — check open tabs for cheating tool names
+  try {
+    const tabs = await chrome.tabs.query({});
+    for (const tab of tabs) {
+      const title = (tab.title || '').toLowerCase();
+      const url = (tab.url || '').toLowerCase();
+
+      // Check title patterns
+      for (const pattern of CHEATING_TOOL_SIGNATURES.titlePatterns) {
+        if (title.includes(pattern)) {
+          detections.push({
+            method: 'title_match',
+            pattern,
+            tabId: tab.id,
+            title: tab.title,
+            url: tab.url,
+            message: `Cheating tool window detected: "${tab.title}"`,
+          });
+          break;
+        }
+      }
+
+      // Check URL patterns
+      for (const pattern of CHEATING_TOOL_SIGNATURES.urlPatterns) {
+        if (url.includes(pattern)) {
+          detections.push({
+            method: 'url_match',
+            pattern,
+            tabId: tab.id,
+            url: tab.url,
+            message: `Cheating tool URL detected: ${tab.url}`,
+          });
+          break;
+        }
+      }
+    }
+  } catch (err) {
+    console.warn('Tab scan error:', err);
+  }
+
+  // 3. Report detections
+  if (detections.length > 0) {
+    console.warn('🚨 CHEATING TOOL DETECTED:', detections);
+
+    for (const detection of detections) {
+      logEvent({
+        type: 'CHEATING_TOOL_DETECTED',
+        timestamp: Date.now(),
+        data: {
+          ...detection,
+          severity: 'CRITICAL',
+          tool_type: detection.method === 'port_scan' ? 'AI_OVERLAY_APP' : 'CHEATING_SOFTWARE',
+        }
+      });
+    }
+
+    // Send critical alert via WebSocket
+    sendViaWebSocket({
+      type: 'cheating_tool_alert',
+      session_id: examSession.sessionId,
+      detections: detections.map(d => ({
+        method: d.method,
+        message: d.message,
+        port: d.port,
+        url: d.url,
+      })),
+      severity: 'CRITICAL',
+      timestamp: Date.now(),
+    });
+
+    // Upload critical event to backend
+    try {
+      await fetch(`${CONFIG.API_BASE}/events/log`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          session_id: examSession.sessionId,
+          event_type: 'CHEATING_TOOL_DETECTED',
+          risk_level: 'critical',
+          data: {
+            detections: detections.length,
+            details: detections,
+            message: `⚠️ CRITICAL: ${detections.length} cheating tool signature(s) detected`,
+          },
+          timestamp: new Date().toISOString(),
+        }),
+      });
+    } catch (err) {
+      console.warn('Failed to report cheating tool detection:', err);
+    }
+
+    // Show notification to student (deterrent)
+    chrome.notifications.create(`cheat-detect-${Date.now()}`, {
+      type: 'basic',
+      iconUrl: 'icons/icon48.png',
+      title: '⚠️ ExamGuard Pro - Security Alert',
+      message: 'Unauthorized software detected. This has been reported to your proctor. Please close all cheating tools immediately.',
+      priority: 2,
+      requireInteraction: true,
+    });
+  }
 }

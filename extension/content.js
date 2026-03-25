@@ -370,6 +370,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         if (message.type === 'START_SCREEN_CAPTURE' || message.type === 'EXAM_STARTED') {
             domCapture.start(25000); 
             behaviorMonitor.start();
+            startOverlayDetection();
             sendResponse({ success: true });
         } else if (message.type === 'STOP_SCREEN_CAPTURE' || message.type === 'EXAM_STOPPED') {
             stopAllMonitoring();
@@ -380,3 +381,94 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     }
     return true;
 });
+
+// ==================== OVERLAY / CLUELY DETECTION ====================
+// Detects AI answer overlays injected into the DOM (Cluely, Interview Coder, etc.)
+
+let overlayObserver = null;
+
+function startOverlayDetection() {
+    if (overlayObserver) return;
+
+    // Scan existing DOM
+    scanForOverlays();
+
+    // Watch for new elements
+    overlayObserver = new MutationObserver((mutations) => {
+        for (const mutation of mutations) {
+            for (const node of mutation.addedNodes) {
+                if (node.nodeType === Node.ELEMENT_NODE) {
+                    checkElementForOverlay(node);
+                }
+            }
+        }
+    });
+
+    overlayObserver.observe(document.documentElement, {
+        childList: true,
+        subtree: true,
+    });
+}
+
+function scanForOverlays() {
+    // Check all elements with very high z-index (overlay pattern)
+    const allElements = document.querySelectorAll('*');
+    for (const el of allElements) {
+        checkElementForOverlay(el);
+    }
+}
+
+function checkElementForOverlay(el) {
+    try {
+        const style = window.getComputedStyle(el);
+        const zIndex = parseInt(style.zIndex) || 0;
+        const position = style.position;
+        const pointerEvents = style.pointerEvents;
+
+        // Cluely signature: fixed/absolute positioned, very high z-index, pointer-events: none
+        const isSuspiciousOverlay = (
+            zIndex > 9000 &&
+            (position === 'fixed' || position === 'absolute') &&
+            pointerEvents === 'none'
+        );
+
+        if (isSuspiciousOverlay) {
+            const hasText = (el.textContent || '').trim().length > 20;
+            if (hasText) {
+                safeSendMessage({
+                    type: 'BEHAVIOR_ALERT',
+                    data: {
+                        type: 'AI_OVERLAY_DETECTED',
+                        message: 'Suspicious transparent overlay with text detected (possible Cluely/Interview Coder)',
+                        zIndex,
+                        textPreview: (el.textContent || '').slice(0, 100),
+                        tagName: el.tagName,
+                        className: el.className?.toString().slice(0, 100),
+                        severity: 'CRITICAL',
+                        timestamp: Date.now(),
+                        url: window.location.href,
+                    }
+                });
+            }
+        }
+
+        // Also check for iframes pointing to localhost:5180
+        if (el.tagName === 'IFRAME') {
+            const src = (el.src || '').toLowerCase();
+            if (src.includes('localhost:5180') || src.includes('127.0.0.1:5180') || src.includes('cluely')) {
+                safeSendMessage({
+                    type: 'BEHAVIOR_ALERT',
+                    data: {
+                        type: 'CHEATING_IFRAME_DETECTED',
+                        message: `Cheating tool iframe detected: ${src}`,
+                        severity: 'CRITICAL',
+                        timestamp: Date.now(),
+                        url: window.location.href,
+                    }
+                });
+            }
+        }
+    } catch (e) {
+        // Silently fail for cross-origin elements
+    }
+}

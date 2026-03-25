@@ -8,7 +8,8 @@ const BACKEND_URL = 'https://exam-security.onrender.com';
 
 const CONFIG = {
     API_BASE: `${BACKEND_URL}/api`,
-    HEALTH_CHECK_INTERVAL: 4000, // Slightly faster check
+    HEALTH_CHECK_INTERVAL: 8000, 
+    HEALTH_CHECK_ENDPOINT: '/health-check', // Hit /api/health-check
 };
 
 // ==================== DOM ELEMENTS ====================
@@ -70,9 +71,12 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 async function checkBackendConnection() {
     try {
-        const response = await fetch(`${CONFIG.API_BASE.replace('/api', '')}/`, {
+        const url = `${CONFIG.API_BASE}${CONFIG.HEALTH_CHECK_ENDPOINT}`;
+        console.log(`[Health] Checking connection to ${url}...`);
+        
+        const response = await fetch(url, {
             method: 'GET',
-            signal: AbortSignal.timeout(3000),
+            signal: AbortSignal.timeout(30000), // 30s to handle Render cold start
         });
 
         if (response.ok) {
@@ -82,9 +86,11 @@ async function checkBackendConnection() {
             permBackend.textContent = '✅';
             permBackend.classList.add('granted');
         } else {
-            throw new Error('Backend not responding');
+            console.warn(`[Health] Backend status code: ${response.status}`);
+            throw new Error(`Backend responded with ${response.status}`);
         }
     } catch (error) {
+        console.warn('[Health] Backend check failed:', error.message);
         isBackendConnected = false;
         connectionStatus.classList.add('offline');
         connectionStatus.innerHTML = '<span class="connection-dot"></span><span>Backend Offline</span>';
