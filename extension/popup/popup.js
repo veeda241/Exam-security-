@@ -4,7 +4,7 @@
  */
 
 // ==================== CONFIGURATION ====================
-const BACKEND_URL = 'http://127.0.0.1:8000';
+const BACKEND_URL = 'https://exam-security.onrender.com';
 
 const CONFIG = {
     API_BASE: `${BACKEND_URL}/api`,
@@ -323,35 +323,6 @@ setupForm.addEventListener('submit', async (e) => {
     }
 
     startBtn.disabled = true;
-    startBtn.innerHTML = '<span class="btn-icon">⏳</span> Verifying Exam Code...';
-
-    // Step 1: Validate the exam code exists on the server
-    try {
-        const validateRes = await fetch(`${CONFIG.API_BASE}/sessions/?active_only=false&limit=100`, {
-            method: 'GET',
-            signal: AbortSignal.timeout(5000),
-        });
-
-        if (validateRes.ok) {
-            const sessions = await validateRes.json();
-            // Check if any session with this exam_id was created by a PROCTOR
-            const proctorSession = sessions.find(
-                s => s.exam_id === examId && s.student_id && s.student_id.startsWith('PROCTOR-')
-            );
-
-            if (!proctorSession) {
-                showNotification('❌ Invalid exam code! This exam has not been started by a proctor.', 'error');
-                startBtn.disabled = false;
-                startBtn.innerHTML = '<span class="btn-icon">▶️</span> Start Proctoring';
-                return;
-            }
-        }
-    } catch (err) {
-        console.warn('Exam code validation failed, proceeding anyway:', err);
-        // If validation fails due to network, let the backend handle it during session creation
-    }
-
-    // Step 2: Start the exam session
     startBtn.innerHTML = '<span class="btn-icon">⏳</span> Initializing...';
 
     try {
@@ -364,14 +335,13 @@ setupForm.addEventListener('submit', async (e) => {
 
         if (response && response.success) {
             showNotification('Please grant permissions in the new window', 'info');
-            // Close popup - capture window will handle the rest
             setTimeout(() => window.close(), 300);
         } else {
-            const errMsg = response.error || 'Failed to start exam';
+            const errMsg = response?.error || 'Failed to start exam';
             if (errMsg.includes('Invalid exam code') || errMsg.includes('not been initiated')) {
                 showNotification('❌ Invalid exam code! Ask your proctor for the correct code.', 'error');
             } else {
-                throw new Error(errMsg);
+                showNotification('Failed: ' + errMsg, 'error');
             }
         }
     } catch (error) {
