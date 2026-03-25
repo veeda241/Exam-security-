@@ -68,6 +68,25 @@ async def create_session(session_data: SessionCreate):
             
         new_session = session_res.data[0]
         
+        # 4. Broadcast join event to dashboard via WebSocket
+        try:
+            from services.realtime import get_realtime_manager, EventType, AlertLevel
+            manager = get_realtime_manager()
+            import asyncio
+            asyncio.create_task(manager.broadcast_event(
+                event_type=EventType.STUDENT_JOINED,
+                student_id=new_session["student_id"],
+                session_id=new_session["id"],
+                data={
+                    "student_name": session_data.student_name,
+                    "exam_id": new_session["exam_id"],
+                    "message": f"Student {session_data.student_name} ({session_data.student_id}) joined"
+                },
+                alert_level=AlertLevel.INFO
+            ))
+        except Exception as ws_err:
+            print(f"[WS] Failed to broadcast join event: {ws_err}")
+
         return SessionResponse(
             session_id=new_session["id"],
             student_id=new_session["student_id"],

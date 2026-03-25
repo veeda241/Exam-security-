@@ -1,16 +1,10 @@
-"""
-ExamGuard Pro - Backend Server
-Main FastAPI application entry point
-
-Updated to use organized API structure from api/ folder
-"""
-
-# Prevent matplotlib font cache build on startup (blocks port binding)
 import os
-print("\n" + "#" * 80)
-print("### LOADING MAIN.PY - CURRENT WORKING DIRECTORY: " + os.getcwd())
-print("#" * 80 + "\n")
-os.environ.setdefault("MPLBACKEND", "Agg")
+import sys
+
+# Critical: Set matplotlib backend to Agg to avoid font cache issues and X11 errors on headless servers
+os.environ["MPLBACKEND"] = "Agg"
+os.environ["MPLCONFIGDIR"] = "/tmp/matplotlib_cache"
+
 from dotenv import load_dotenv
 load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
 

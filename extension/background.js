@@ -102,7 +102,18 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     case 'UPLOAD_SCREENSHOT':
       if (examSession.active && (message.data?.image || message.data)) {
         const img = message.data?.image || message.data;
-        uploadScreenshot(img).catch(console.warn); // run async in background
+        uploadScreenshot(img).catch(console.warn); 
+        sendResponse({ success: true, queued: true });
+      } else {
+        sendResponse({ success: false, error: 'No active session' });
+      }
+      return true;
+
+    case 'WEBCAM_CAPTURE':
+    case 'UPLOAD_WEBCAM':
+      if (examSession.active && (message.data?.image || message.data)) {
+        const img = message.data?.image || message.data;
+        uploadWebcamFrame(img).catch(console.warn);
         sendResponse({ success: true, queued: true });
       } else {
         sendResponse({ success: false, error: 'No active session' });
