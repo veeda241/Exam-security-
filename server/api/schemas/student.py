@@ -64,9 +64,18 @@ class StudentSummary(BaseModel):
     tab_switch_count: Optional[int] = 0
     forbidden_site_count: Optional[int] = 0
     copy_count: Optional[int] = 0
+    multiface_count: Optional[int] = 0
+    face_absence_count: Optional[int] = 0
+    phone_detection_count: Optional[int] = 0
+    effort_score: Optional[float] = 0.0
+    browsing_risk_score: Optional[float] = 0.0
     status: Optional[str] = "inactive"  # inactive, safe, review, suspicious
+    latest_screenshot: Optional[str] = None
+    latest_webcam: Optional[str] = None
     last_visited_url: Optional[str] = None
     last_visited_title: Optional[str] = None
+    is_online: bool = False
+    last_active: Optional[str] = None
     
     class Config:
         json_schema_extra = {

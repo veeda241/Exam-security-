@@ -19,6 +19,8 @@ def _get_session_update_field(event_type: str):
         return "copy_count"
     elif evt == "FACE_ABSENT":
         return "face_absence_count"
+    elif evt == "MULTIPLE_FACES":
+        return "multiface_count"
     elif evt in ("FORBIDDEN_SITE", "FORBIDDEN_CONTENT"):
         return "forbidden_site_count"
     return None
@@ -118,27 +120,31 @@ async def log_events_batch(
         research_entries = []
         
         for event_data in batch.events:
-            risk_weight = RISK_WEIGHTS.get(event_data.type, 0)
+            evt_type = event_data.type
+            evt_data = event_data.data or {}
+            evt_ts = event_data.timestamp
+            
+            risk_weight = RISK_WEIGHTS.get(evt_type, 0)
             
             events_to_insert.append({
                 "id": str(uuid.uuid4()),
                 "session_id": session_id,
-                "event_type": event_data.type,
-                "client_timestamp": int(event_data.timestamp / 1000) if event_data.timestamp else int(datetime.utcnow().timestamp()),
-                "data": event_data.data,
+                "event_type": evt_type,
+                "client_timestamp": int(evt_ts / 1000) if evt_ts else int(datetime.utcnow().timestamp()),
+                "data": evt_data,
                 "risk_weight": risk_weight,
                 "timestamp": datetime.utcnow().isoformat()
             })
             
             # Update local session state for batch
-            stat_field = _get_session_update_field(event_data.type)
+            stat_field = _get_session_update_field(evt_type)
             if stat_field:
                 session_updates[stat_field] = (session_updates.get(stat_field) or session.get(stat_field) or 0) + 1
 
             # Research Journey tracking (record both full navigations and tab switches)
-            if event_data.type in ("NAVIGATION", "TAB_SWITCH") and event_data.data:
-                nav_url = event_data.data.get('url', 'unknown')
-                nav_title = event_data.data.get('title', 'unknown')
+            if evt_type in ("NAVIGATION", "TAB_SWITCH") and evt_data:
+                nav_url = evt_data.get('url', 'unknown')
+                nav_title = evt_data.get('title', 'unknown')
                 url_class = classify_url(nav_url)
                 
                 category = "General"
@@ -158,16 +164,17 @@ async def log_events_batch(
                         relevance = 0.2
                 
                 research_entries.append({
+                    "id": str(uuid.uuid4()),
                     "session_id": session_id,
                     "url": nav_url,
                     "title": nav_title,
-                    "timestamp": datetime.fromtimestamp(event_data.timestamp / 1000.0).isoformat(),
+                    "timestamp": datetime.fromtimestamp(evt_ts / 1000.0).isoformat() if evt_ts else datetime.utcnow().isoformat(),
                     "category": category,
                     "relevance_score": relevance
                 })
             
             logged_events.append({
-                "type": event_data.type,
+                "type": evt_type,
                 "risk_weight": risk_weight
             })
             

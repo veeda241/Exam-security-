@@ -97,7 +97,7 @@ finalBtn.addEventListener('click', async () => {
                 syncLoader.style.display = 'none';
             }
         });
-    }, 1500);
+    }, 200);
 });
 
 // ==================== UI UTILS ====================

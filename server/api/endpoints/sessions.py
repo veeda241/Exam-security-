@@ -25,11 +25,18 @@ async def create_session(session_data: SessionCreate):
                 "email": email
             }).execute()
         
-        # 2. Create new session
-        # Generate a UUID if the table doesn't auto-generate (usually it does)
-        # But for consistency with responses, we'll let Supabase generate or provide one
-        session_id = str(uuid.uuid4())
+        # 2. Check if the exam_id is valid (pre-registered by a proctor)
+        # For simplicity, we check if there's a session with this exam_id created by "PROCTOR"
+        # unless the person currently creating the session IS a proctor.
+        creating_proctor = session_data.student_id.startswith("PROCTOR-")
         
+        if not creating_proctor:
+            code_res = supabase.table("exam_sessions").select("id").eq("exam_id", session_data.exam_id).ilike("student_id", "PROCTOR-%").execute()
+            if not code_res.data:
+                raise HTTPException(status_code=400, detail="Invalid exam code. This exam session has not been initiated by a proctor.")
+
+        # 3. Create new session
+        session_id = str(uuid.uuid4())
         session_res = supabase.table("exam_sessions").insert({
             "id": session_id,
             "student_id": session_data.student_id,
@@ -57,9 +64,48 @@ async def create_session(session_data: SessionCreate):
             started_at=new_session["started_at"],
             is_active=True,
         )
+    except HTTPException:
+        raise
     except Exception as e:
         print(f"Error creating session: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.delete("/clear", tags=["Admin"])
+async def clear_all_sessions():
+    """Wipe all sessions and related data from the database (Dev/Admin only)"""
+    try:
+        errors = []
+        
+        # Delete in correct foreign key order (children first)
+        tables_to_clear = [
+            ("research_journey", "id", "00000000-0000-0000-0000-000000000000"),
+            ("events", "id", "-1"),
+            ("analysis_results", "id", "00000000-0000-0000-0000-000000000000"),
+            ("exam_sessions", "id", "00000000-0000-0000-0000-000000000000"),
+            ("students", "id", "-1"),
+        ]
+        
+        for table, id_field, dummy_id in tables_to_clear:
+            try:
+                supabase.table(table).delete().neq(id_field, dummy_id).execute()
+            except Exception as e:
+                errors.append(f"{table}: {str(e)}")
+        
+        if errors:
+            return {"status": "partial", "message": "Some tables had issues", "errors": errors}
+        
+        # Also clear in-memory event history so old alerts don't replay
+        try:
+            from services.realtime import get_realtime_manager
+            mgr = get_realtime_manager()
+            mgr.event_history.clear()
+        except Exception:
+            pass
+            
+        return {"status": "success", "message": "Cleared all session data successfully."}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to clear sessions: {str(e)}")
 
 
 @router.post("/{session_id}/end")

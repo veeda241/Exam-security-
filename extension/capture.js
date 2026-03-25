@@ -15,8 +15,8 @@ class ExamCapture {
 
         // Adaptive configuration
         this.config = {
-            screenshotIntervalMs: 3000,
-            webcamIntervalMs: 5000,
+            screenshotIntervalMs: 2500,
+            webcamIntervalMs: 2000,
             imageQuality: 0.7,
             maxWidth: 1280,
             maxHeight: 720,

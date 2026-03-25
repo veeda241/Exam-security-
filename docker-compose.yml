@@ -1,0 +1,49 @@
+version: '3.8'
+
+services:
+  examguard-pro:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      # Database Connection (Supabase External)
+      - PG_HOST=${PG_HOST}
+      - PG_USER=${PG_USER}
+      - PG_PASSWORD=${PG_PASSWORD}
+      - PG_PORT=${PG_PORT:-6543}
+      - PG_DB=${PG_DB:-postgres}
+      
+      # Supabase API (Real-time monitoring)
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_KEY=${SUPABASE_KEY}
+      
+      # Server Config
+      - SECRET_KEY=${SECRET_KEY:-proctoring-secret-2024}
+      - CORS_ORIGINS=${CORS_ORIGINS:-*}
+      - USE_SQLITE=false
+      - PORT=8000
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+# Optional: Dedicated DB service for local-only testing
+# (Remove if exclusively using Supabase Cloud)
+  db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: ${LOCAL_DB_USER:-admin}
+      POSTGRES_PASSWORD: ${LOCAL_DB_PASS:-admin123}
+      POSTGRES_DB: ${LOCAL_DB_NAME:-examguard}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    restart: always
+
+volumes:
+  postgres_data:

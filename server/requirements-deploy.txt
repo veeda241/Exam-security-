@@ -23,3 +23,13 @@ httpx>=0.25.0
 pytesseract>=0.3.10
 opencv-python-headless>=4.8.0
 numpy>=1.24.0
+
+# Database & Environment
+supabase>=2.3.0
+python-dotenv>=1.0.0
+
+# AI Modules (Essential)
+mediapipe>=0.10.0
+# ultralytics is large, but required for YOLO object detection
+ultralytics>=8.0.0
+

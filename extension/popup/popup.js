@@ -4,7 +4,7 @@
  */
 
 // ==================== CONFIGURATION ====================
-const BACKEND_URL = 'http://localhost:8000';
+const BACKEND_URL = 'http://127.0.0.1:8000';
 
 const CONFIG = {
     API_BASE: `${BACKEND_URL}/api`,
@@ -22,10 +22,13 @@ const connectionStatus = document.getElementById('connection-status');
 
 // Stats elements
 const statTabs = document.getElementById('stat-tabs');
-const statCopy = document.getElementById('stat-copy');
-const statEvents = document.getElementById('stat-events');
+const statNoFace = document.getElementById('stat-noface');
+const statMultiFace = document.getElementById('stat-multiface');
+const statPhone = document.getElementById('stat-phone');
+const statAudio = document.getElementById('stat-audio');
 const statTime = document.getElementById('stat-time');
 const sessionIdDisplay = document.getElementById('session-id-display');
+
 
 // Permission indicators
 const permScreen = document.getElementById('perm-screen');
@@ -62,6 +65,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Start health check interval
     setInterval(checkBackendConnection, CONFIG.HEALTH_CHECK_INTERVAL);
+
 });
 
 async function checkBackendConnection() {
@@ -144,9 +148,11 @@ function showActiveSession(status) {
 }
 
 function updateStats(status) {
-    animateNumber(statTabs, status.tabSwitchCount || 0);
-    animateNumber(statCopy, status.copyCount || 0);
-    animateNumber(statEvents, status.eventCount || 0);
+    if (statTabs) animateNumber(statTabs, status.tabSwitchCount || 0);
+    if (statNoFace) animateNumber(statNoFace, status.nofaceCount || 0);
+    if (statMultiFace) animateNumber(statMultiFace, status.multifaceCount || 0);
+    if (statPhone) animateNumber(statPhone, status.phoneCount || 0);
+    if (statAudio) animateNumber(statAudio, status.audioAnomalyCount || 0);
     
     // Update browsing tracker stats
     updateBrowsingStats(status.browsing);
@@ -317,6 +323,35 @@ setupForm.addEventListener('submit', async (e) => {
     }
 
     startBtn.disabled = true;
+    startBtn.innerHTML = '<span class="btn-icon">⏳</span> Verifying Exam Code...';
+
+    // Step 1: Validate the exam code exists on the server
+    try {
+        const validateRes = await fetch(`${CONFIG.API_BASE}/sessions/?active_only=false&limit=100`, {
+            method: 'GET',
+            signal: AbortSignal.timeout(5000),
+        });
+
+        if (validateRes.ok) {
+            const sessions = await validateRes.json();
+            // Check if any session with this exam_id was created by a PROCTOR
+            const proctorSession = sessions.find(
+                s => s.exam_id === examId && s.student_id && s.student_id.startsWith('PROCTOR-')
+            );
+
+            if (!proctorSession) {
+                showNotification('❌ Invalid exam code! This exam has not been started by a proctor.', 'error');
+                startBtn.disabled = false;
+                startBtn.innerHTML = '<span class="btn-icon">▶️</span> Start Proctoring';
+                return;
+            }
+        }
+    } catch (err) {
+        console.warn('Exam code validation failed, proceeding anyway:', err);
+        // If validation fails due to network, let the backend handle it during session creation
+    }
+
+    // Step 2: Start the exam session
     startBtn.innerHTML = '<span class="btn-icon">⏳</span> Initializing...';
 
     try {
@@ -330,9 +365,14 @@ setupForm.addEventListener('submit', async (e) => {
         if (response && response.success) {
             showNotification('Please grant permissions in the new window', 'info');
             // Close popup - capture window will handle the rest
-            setTimeout(() => window.close(), 1500);
+            setTimeout(() => window.close(), 300);
         } else {
-            throw new Error(response.error || 'Failed to start exam');
+            const errMsg = response.error || 'Failed to start exam';
+            if (errMsg.includes('Invalid exam code') || errMsg.includes('not been initiated')) {
+                showNotification('❌ Invalid exam code! Ask your proctor for the correct code.', 'error');
+            } else {
+                throw new Error(errMsg);
+            }
         }
     } catch (error) {
         console.error('Start exam failed:', error);

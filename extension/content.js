@@ -1,3 +1,36 @@
+/**
+ * Safely send a message to background, catching "context invalidated" errors
+ * and stopping active monitoring if the extension was reloaded.
+ */
+function safeSendMessage(message, callback) {
+    try {
+        if (!chrome.runtime || !chrome.runtime.id) {
+            throw new Error('Context invalidated');
+        }
+        chrome.runtime.sendMessage(message, (response) => {
+            if (chrome.runtime.lastError) {
+                const err = chrome.runtime.lastError.message;
+                if (err.includes('context invalidated')) {
+                    stopAllMonitoring();
+                }
+            }
+            if (callback) callback(response);
+        });
+        return true;
+    } catch (e) {
+        if (e.message.includes('context invalidated')) {
+            stopAllMonitoring();
+        }
+        return false;
+    }
+}
+
+function stopAllMonitoring() {
+    domCapture.stop();
+    behaviorMonitor.isMonitoring = false;
+    console.log('🛡️ Monitoring stopped (Extension reloaded or session ended)');
+}
+
 // ==================== ADVANCED MONITORING MODULE ====================
 class ExamMonitor {
     constructor() {
@@ -7,6 +40,7 @@ class ExamMonitor {
         this.lastInputTime = Date.now();
         this.isMonitoring = false;
         this.typingBaselines = new Map(); // fieldId -> { chars, time }
+        this.intervals = [];
 
         // Settings
         this.HEARTBEAT_INTERVAL = 30000; // 30s
@@ -39,12 +73,14 @@ class ExamMonitor {
     applyLockdown() {
         // Block Right-click
         document.addEventListener('contextmenu', e => {
+            if (!this.isMonitoring) return;
             e.preventDefault();
             this.sendAlert('CONTEXT_MENU_BLOCKED', { message: 'Attempted right-click' });
         });
 
         // Block Drag & Drop
         document.addEventListener('drop', e => {
+            if (!this.isMonitoring) return;
             e.preventDefault();
             this.sendAlert('DROP_BLOCKED', { message: 'Attempted drag-drop text' });
         });
@@ -56,6 +92,7 @@ class ExamMonitor {
 
         // Watch for new inputs
         const observer = new MutationObserver((mutations) => {
+            if (!this.isMonitoring) return;
             mutations.forEach((mutation) => {
                 mutation.addedNodes.forEach((node) => {
                     if (node.tagName === 'INPUT' || node.tagName === 'TEXTAREA') {
@@ -79,6 +116,7 @@ class ExamMonitor {
     setupEventListeners() {
         // Keystroke Dynamics & Paste Detection
         document.addEventListener('keydown', e => {
+            if (!this.isMonitoring) return;
             const now = Date.now();
             const iki = now - this.lastKeyTime;
             this.lastKeyTime = now;
@@ -96,6 +134,7 @@ class ExamMonitor {
 
         // Detect high-velocity text injection (the "0ms paste")
         document.addEventListener('input', e => {
+            if (!this.isMonitoring) return;
             if (e.inputType === 'insertFromPaste' || e.inputType === 'insertFromDrop') {
                 this.sendAlert('PASTE_DETECTED', { type: e.inputType });
                 return;
@@ -109,6 +148,7 @@ class ExamMonitor {
 
         // Mouse Entropy & Erratic Movement
         document.addEventListener('mousemove', e => {
+            if (!this.isMonitoring) return;
             this.lastInputTime = Date.now();
             const pos = { x: e.clientX, y: e.clientY, t: Date.now() };
             this.mouseMovements.push(pos);
@@ -117,6 +157,16 @@ class ExamMonitor {
             if (this.mouseMovements.length % 50 === 0) {
                 this.calculateMouseEntropy();
             }
+        });
+
+        // Copy/Cut Detection
+        document.addEventListener('copy', () => {
+            if (!this.isMonitoring) return;
+            this.sendAlert('COPY', { message: 'Text copied from exam page' });
+        });
+        document.addEventListener('cut', () => {
+            if (!this.isMonitoring) return;
+            this.sendAlert('CUT', { message: 'Text cut from exam page' });
         });
     }
 
@@ -149,20 +199,8 @@ class ExamMonitor {
         }
     }
 
-    sendAlert(type, data = {}) {
-        chrome.runtime.sendMessage({
-            type: 'BEHAVIOR_ALERT',
-            data: {
-                type: type,
-                timestamp: Date.now(),
-                url: window.location.href,
-                ...data
-            }
-        }).catch(() => {});
-    }
-
     calculateMouseEntropy() {
-        if (this.mouseMovements.length < 10) return;
+        if (!this.isMonitoring || this.mouseMovements.length < 10) return;
         
         let erraticCount = 0;
         for (let i = 2; i < this.mouseMovements.length; i++) {
@@ -179,24 +217,25 @@ class ExamMonitor {
         }
 
         const entropy = erraticCount / this.mouseMovements.length;
-        if (entropy < 0.05) { 
-            // Too robotic/straight/still
-            // Only flag if monitoring is long enough
+        if (entropy > 0.8) {
+            // Highly erratic movement
+            // this.sendAlert('ERRATIC_MOUSE', { entropy: entropy.toFixed(2) });
         }
     }
 
     startDevToolsCheck() {
-        // Method 1: Debugger timing
-        setInterval(() => {
+        const id = setInterval(() => {
+            if (!this.isMonitoring) return;
             const start = performance.now();
             debugger;
             if (performance.now() - start > 100) {
                 this.sendAlert('DEVTOOLS_DETECTED', { method: 'timing' });
             }
-        }, 3000);
+        }, 5000);
+        this.intervals.push(id);
 
-        // Method 2: Size delta (docked tools)
         window.addEventListener('resize', () => {
+            if (!this.isMonitoring) return;
             const widthDiff = window.outerWidth - window.innerWidth;
             const heightDiff = window.outerHeight - window.innerHeight;
             if (widthDiff > 160 || heightDiff > 160) {
@@ -206,12 +245,14 @@ class ExamMonitor {
     }
 
     startHeartbeat() {
-        setInterval(() => {
+        const id = setInterval(() => {
+            if (!this.isMonitoring) return;
             const idle = Date.now() - this.lastInputTime;
             if (idle > this.HEARTBEAT_INTERVAL) {
                 this.sendAlert('INPUT_IDLE', { duration: Math.round(idle / 1000) });
             }
-        }, 10000);
+        }, 30000);
+        this.intervals.push(id);
     }
 
     async checkVPN() {
@@ -222,23 +263,22 @@ class ExamMonitor {
             await pc.setLocalDescription(offer);
 
             pc.onicecandidate = (e) => {
-                if (!e.candidate) return;
+                if (!e.candidate || !this.isMonitoring) return;
                 const ipMatch = e.candidate.candidate.match(/\d+\.\d+\.\d+\.\d+/);
                 if (ipMatch) {
                     const localIp = ipMatch[0];
-                    chrome.runtime.sendMessage({ 
+                    safeSendMessage({ 
                         type: 'NETWORK_INFO', 
                         data: { localIp, timestamp: Date.now() } 
                     });
                 }
             };
-        } catch (e) {
-            console.warn('WebRTC IP leak check blocked');
-        }
+        } catch (e) {}
     }
 
-    sendAlert(type, data) {
-        chrome.runtime.sendMessage({
+    sendAlert(type, data = {}) {
+        if (!this.isMonitoring) return;
+        safeSendMessage({
             type: 'BEHAVIOR_ALERT',
             data: {
                 type,
@@ -248,105 +288,17 @@ class ExamMonitor {
             }
         });
     }
+
+    stop() {
+        this.isMonitoring = false;
+        this.intervals.forEach(id => clearInterval(id));
+        this.intervals = [];
+    }
 }
 
-// ==================== SCREEN CAPTURE MODULE ====================
 class ScreenCapture {
-    constructor() {
-        this.stream = null;
-        this.captureInterval = null;
-        this.isCapturing = false;
-    }
-
-    async startCapture(intervalMs = 5000) {
-        try {
-            this.stream = await navigator.mediaDevices.getDisplayMedia({
-                video: { mediaSource: 'screen' }
-            });
-
-            this.isCapturing = true;
-            this.captureInterval = setInterval(() => this.captureFrame(), intervalMs);
-            console.log('Screen capture started');
-            return true;
-        } catch (error) {
-            console.error('Screen capture failed:', error);
-            return false;
-        }
-    }
-
-    async captureFrame() {
-        if (!this.stream || !this.isCapturing) return null;
-
-        try {
-            const track = this.stream.getVideoTracks()[0];
-            if (!track || track.readyState !== 'live') return null;
-
-            let dataUrl;
-
-            try {
-                if ('ImageCapture' in window) {
-                    const imageCapture = new ImageCapture(track);
-                    const bitmap = await imageCapture.grabFrame();
-
-                    const canvas = document.createElement('canvas');
-                    canvas.width = bitmap.width;
-                    canvas.height = bitmap.height;
-                    const ctx = canvas.getContext('2d');
-                    ctx.drawImage(bitmap, 0, 0);
-                    bitmap.close();
-
-                    dataUrl = canvas.toDataURL('image/jpeg', 0.7);
-                } else {
-                    throw new Error('ImageCapture not available');
-                }
-            } catch (icError) {
-                const video = document.createElement('video');
-                video.srcObject = this.stream;
-                video.muted = true;
-                video.playsInline = true;
-                await new Promise((resolve) => {
-                    video.onloadedmetadata = () => { video.play().then(resolve).catch(resolve); };
-                    setTimeout(resolve, 3000);
-                });
-
-                const canvas = document.createElement('canvas');
-                canvas.width = video.videoWidth || 1280;
-                canvas.height = video.videoHeight || 720;
-                const ctx = canvas.getContext('2d');
-                ctx.drawImage(video, 0, 0);
-                video.srcObject = null;
-
-                dataUrl = canvas.toDataURL('image/jpeg', 0.7);
-            }
-
-            chrome.runtime.sendMessage({
-                type: 'SCREEN_CAPTURE',
-                data: { image: dataUrl, timestamp: Date.now() }
-            }, (response) => {
-                if (chrome.runtime.lastError) {
-                    console.warn('Screen capture send error:', chrome.runtime.lastError.message);
-                }
-            });
-
-            return dataUrl;
-        } catch (error) {
-            console.error('Frame capture error:', error);
-            return null;
-        }
-    }
-
-    stopCapture() {
-        if (this.captureInterval) {
-            clearInterval(this.captureInterval);
-            this.captureInterval = null;
-        }
-        if (this.stream) {
-            this.stream.getTracks().forEach(track => track.stop());
-            this.stream = null;
-        }
-        this.isCapturing = false;
-        console.log('Screen capture stopped');
-    }
+    startCapture() { return Promise.resolve(false); }
+    stopCapture() {}
 }
 
 // ==================== DOM CAPTURE MODULE (html2canvas) ====================
@@ -354,16 +306,15 @@ class DOMCapture {
     constructor() {
         this.captureInterval = null;
         this.isCapturing = false;
-        this.LAST_CAPTURE_HASH = '';
     }
 
-    async start(intervalMs = 15000) { // Every 15s for DOM capture (lighter than video)
+    async start(intervalMs = 15000) {
         if (this.isCapturing) return;
         this.isCapturing = true;
         
         console.log('🖼️ DOM-based monitoring started');
         this.captureInterval = setInterval(() => this.capture(), intervalMs);
-        this.capture(); // Initial capture
+        this.capture();
     }
 
     stop() {
@@ -378,15 +329,13 @@ class DOMCapture {
         if (!this.isCapturing || document.hidden) return;
 
         try {
-            // Focus on the main content area (usually body or a specific container)
             const targetElement = document.body;
-            
             const canvas = await html2canvas(targetElement, {
-                scale: 0.5, // Reduced scale for performance
+                scale: 0.5,
                 logging: false,
-                useCORS: true,
-                allowTaint: true,
-                // Only capture visible viewport for "what exactly is being watched"
+                useCORS: false,
+                allowTaint: false,
+                ignoreElements: (el) => ['iframe', 'video', 'audio', 'embed', 'object'].includes(el.tagName.toLowerCase()),
                 width: window.innerWidth,
                 height: window.innerHeight,
                 x: window.scrollX,
@@ -395,8 +344,7 @@ class DOMCapture {
 
             const dataUrl = canvas.toDataURL('image/jpeg', 0.5);
             
-            // Send capture to background
-            chrome.runtime.sendMessage({
+            safeSendMessage({
                 type: 'DOM_CONTENT_CAPTURE',
                 data: {
                     image: dataUrl,
@@ -414,21 +362,21 @@ class DOMCapture {
 }
 
 // ==================== INITIALIZATION ====================
-const screenCapture = new ScreenCapture();
 const domCapture = new DOMCapture();
 const behaviorMonitor = new ExamMonitor();
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-    if (message.type === 'START_SCREEN_CAPTURE' || message.type === 'EXAM_STARTED') {
-        screenCapture.startCapture(message.interval || 5000).then(sendResponse);
-        domCapture.start(20000); // Higher interval for DOM (save resources)
-        behaviorMonitor.start();
-        return true;
+    try {
+        if (message.type === 'START_SCREEN_CAPTURE' || message.type === 'EXAM_STARTED') {
+            domCapture.start(25000); 
+            behaviorMonitor.start();
+            sendResponse({ success: true });
+        } else if (message.type === 'STOP_SCREEN_CAPTURE' || message.type === 'EXAM_STOPPED') {
+            stopAllMonitoring();
+            sendResponse({ success: true });
+        }
+    } catch (e) {
+        // Safe fail if context is dead
     }
-    if (message.type === 'STOP_SCREEN_CAPTURE' || message.type === 'EXAM_STOPPED') {
-        screenCapture.stopCapture();
-        domCapture.stop();
-        behaviorMonitor.isMonitoring = false;
-        sendResponse({ success: true });
-    }
+    return true;
 });

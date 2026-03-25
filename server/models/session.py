@@ -9,6 +9,7 @@ class SessionStats(BaseModel):
     copy_events: int = 0
     face_absences: int = 0
     forbidden_sites: int = 0
+    phone_detections: int = 0
     total_events: int = 0
 
 class ExamSession(BaseModel):
@@ -38,6 +39,7 @@ class ExamSession(BaseModel):
     copy_count: int = 0
     face_absence_count: int = 0
     forbidden_site_count: int = 0
+    phone_detection_count: int = 0
     total_events: int = 0
 
     def to_dict(self):
@@ -49,6 +51,7 @@ class ExamSession(BaseModel):
             "copy_events": self.copy_count,
             "face_absences": self.face_absence_count,
             "forbidden_sites": self.forbidden_site_count,
+            "phone_detections": self.phone_detection_count,
             "total_events": self.total_events,
         }
         # Handle datetime serialization

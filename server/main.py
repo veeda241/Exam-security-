@@ -7,26 +7,44 @@ Updated to use organized API structure from api/ folder
 
 # Prevent matplotlib font cache build on startup (blocks port binding)
 import os
-import os
 print("\n" + "#" * 80)
 print("### LOADING MAIN.PY - CURRENT WORKING DIRECTORY: " + os.getcwd())
 print("#" * 80 + "\n")
 os.environ.setdefault("MPLBACKEND", "Agg")
 from dotenv import load_dotenv
-# Load environment variables from .env file
 load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Query
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Query, HTTPException, Request
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from contextlib import asynccontextmanager
 from typing import List, Optional
 import uvicorn
 import asyncio
+import mimetypes
+
+# Fix mime types for .js and .css files
+mimetypes.add_type('application/javascript', '.js')
+mimetypes.add_type('text/css', '.css')
 
 # Remove unused imports
 from api import register_all_routers, get_router_info
 from services.face_detection import SecureVision
+
+# Discovery of React Build Directory
+possible_dist_dirs = [
+    os.path.join(os.path.dirname(os.path.dirname(__file__)), "examguard-pro", "dist"),
+    os.path.join(os.getcwd(), "examguard-pro", "dist"),
+    os.path.join(os.path.dirname(__file__), "dist")
+]
+
+REACT_BUILD_DIR = None
+for dist_dir in possible_dist_dirs:
+    if os.path.exists(dist_dir) and os.path.isfile(os.path.join(dist_dir, "index.html")):
+        REACT_BUILD_DIR = dist_dir
+        print(f"[INFO] Mounting ExamGuard-Pro dashboard from: {REACT_BUILD_DIR}")
+        break
 from services.realtime import (
     get_realtime_manager,
     RealtimeMonitoringManager,
@@ -168,25 +186,32 @@ app = FastAPI(
 # Middleware Configuration
 # =============================================================================
 from config import CORS_ORIGINS
-# Parse CORS_ORIGINS from env if it's a string
-origins = []
+from typing import List
+
+# Type-safe CORS handling
+origins: List[str] = []
 if isinstance(CORS_ORIGINS, str):
     if CORS_ORIGINS == "*":
         origins = ["*"]
     else:
         origins = [o.strip() for o in CORS_ORIGINS.split(",")]
+elif isinstance(CORS_ORIGINS, list):
+    origins = [str(o) for o in CORS_ORIGINS]
 else:
-    origins = list(CORS_ORIGINS) if CORS_ORIGINS else []
+    origins = []
 
-# Add default dev origins if not present
-dev_origins = ["http://localhost:3000", "http://localhost:5173", "http://127.0.0.1:3000", "http://127.0.0.1:5173"]
-for o in dev_origins:
-    if o not in origins and "*" not in origins:
-        origins.append(o)
+# Ensure wildcard and dev origins are handled
+if "*" not in origins:
+    dev_origins = ["http://localhost:3000", "http://localhost:5173"]
+    for o in dev_origins:
+        if o not in origins:
+            origins.append(o)
+    # Always include wildcard for extension support in this environment
+    origins.append("*")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins if "*" not in origins else ["*"],
+    allow_origins=["*"] if "*" in origins else origins,
     allow_credentials=True if "*" not in origins else False,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -196,13 +221,15 @@ app.add_middleware(
 # =============================================================================
 # Root Endpoints
 # =============================================================================
-@app.get("/", tags=["Root"])
+@app.get("/api/health-check", tags=["Root"])
 async def root():
-    """Simple health check for extension connectivity"""
+    """Welcome message and health check (JSON)"""
     return {
         "status": "online",
-        "service": "ExamGuard Pro API",
-        "version": "2.0.0"
+        "service": "ExamGuard Pro Headless API",
+        "version": "2.0.0",
+        "dashboard": "/",
+        "docs": "/docs"
     }
 
 # =============================================================================
@@ -227,12 +254,16 @@ async def websocket_alerts(websocket: WebSocket):
     print(f"[WS] Dashboard client connecting to legacy alerts...")
     try:
         await manager.connect(websocket)
+        from starlette.websockets import WebSocketState
+        if websocket.application_state != WebSocketState.CONNECTED:
+            return
+
         while True:
             data = await websocket.receive_text()
             if data == "ping":
                 await websocket.send_text("pong")
-    except (WebSocketDisconnect, RuntimeError):
-        # RuntimeError happens if client closes before accept() completes
+    except (WebSocketDisconnect, RuntimeError, Exception) as e:
+        print(f"[WS] Dashboard legacy error: {e}")
         manager.disconnect(websocket)
 
 
@@ -256,12 +287,13 @@ async def websocket_dashboard(websocket: WebSocket):
             print("[WS] Dashboard connection check failed - closing")
             return
 
+        import datetime
         while True:
             data = await websocket.receive_text()
             
             # Handle commands from dashboard
             if data == "ping":
-                await websocket.send_json({"type": "pong", "timestamp": __import__('datetime').datetime.utcnow().isoformat()})
+                await websocket.send_json({"type": "pong", "timestamp": datetime.datetime.utcnow().isoformat()})
             elif data == "stats":
                 await websocket.send_json({"type": "stats", "data": realtime.get_stats()})
             elif data.startswith("subscribe:"):
@@ -269,8 +301,23 @@ async def websocket_dashboard(websocket: WebSocket):
                 session_id = data.split(":", 1)[1]
                 realtime.room_manager.join_room(session_id, websocket)
                 await websocket.send_json({"type": "subscribed", "session_id": session_id})
+            elif data.startswith("command:"):
+                # Dashboard can send commands to students (via broadcast_to_session)
+                import json
+                try:
+                    cmd_data = json.loads(data.split(":", 1)[1])
+                    # Try to get session_id or student_id as routing key
+                    routing_id = cmd_data.get("session_id") or cmd_data.get("student_id")
+                    if routing_id:
+                        await realtime.broadcast_to_session(routing_id, cmd_data)
+                        print(f"[WS] Dashboard command broadcasted to session: {routing_id}")
+                    else:
+                        print(f"[WS] Dashboard command missing routing ID: {cmd_data}")
+                except Exception as e:
+                    print(f"[WS] Dashboard command error: {e}")
                 
-    except (WebSocketDisconnect, RuntimeError):
+    except (WebSocketDisconnect, RuntimeError, Exception) as e:
+        print(f"[WS] Dashboard error: {e}")
         realtime.disconnect(websocket)
 
 
@@ -284,11 +331,15 @@ async def websocket_proctor(
     WebSocket endpoint for proctors monitoring a specific session.
     Receives events only for the specified session.
     """
-    print(f"[WS] Proctor client connecting to session: {session_id}")
-    realtime = get_realtime_manager()
-    await realtime.connect_proctor(websocket, session_id)
-    
     try:
+        print(f"[WS] Proctor client connecting to session: {session_id}")
+        realtime = get_realtime_manager()
+        await realtime.connect_proctor(websocket, session_id)
+        
+        from starlette.websockets import WebSocketState
+        if websocket.application_state != WebSocketState.CONNECTED:
+            return
+
         while True:
             data = await websocket.receive_text()
             
@@ -305,8 +356,17 @@ async def websocket_proctor(
                     })
                 except:
                     pass
+            elif data.startswith("command:"):
+                # Proctor can send commands to students (e.g. shutdown)
+                import json
+                try:
+                    cmd_data = json.loads(data.split(":", 1)[1])
+                    await realtime.broadcast_to_session(session_id, cmd_data)
+                except:
+                    pass
                     
-    except WebSocketDisconnect:
+    except (WebSocketDisconnect, RuntimeError, Exception) as e:
+        print(f"[WS] Proctor error (session {session_id}): {e}")
         realtime.disconnect(websocket)
 
 
@@ -323,15 +383,19 @@ async def websocket_student(
     WebSocket endpoint for students.
     Receives alerts and instructions from proctors.
     """
-    # Still none? Try to get from query params manually
-    if not student_id:
-        student_id = websocket.query_params.get("student_id", "unknown")
-
-    print(f"[WS] Incoming student connection: {student_id} (Session: {session_id})")
-    realtime = get_realtime_manager()
-    await realtime.connect_student(websocket, student_id, session_id or "default")
-    
     try:
+        # Still none? Try to get from query params manually
+        if not student_id:
+            student_id = websocket.query_params.get("student_id", "unknown")
+
+        print(f"[WS] Incoming student connection: {student_id} (Session: {session_id})")
+        realtime = get_realtime_manager()
+        await realtime.connect_student(websocket, student_id, session_id or "default")
+        
+        from starlette.websockets import WebSocketState
+        if websocket.application_state != WebSocketState.CONNECTED:
+            return
+
         while True:
             data = await websocket.receive_text()
             
@@ -363,17 +427,21 @@ async def websocket_student(
                 except:
                     pass
                     
-    except WebSocketDisconnect:
+    except (WebSocketDisconnect, RuntimeError, Exception) as e:
+        print(f"[WS] Student error ({student_id}): {e}")
         realtime.disconnect(websocket)
         
         # Broadcast student left event
-        await realtime.broadcast_event(
-            EventType.STUDENT_LEFT,
-            student_id=student_id,
-            session_id=session_id,
-            data={"message": f"Student {student_id} disconnected"},
-            alert_level=AlertLevel.INFO
-        )
+        try:
+            await realtime.broadcast_event(
+                EventType.STUDENT_LEFT,
+                student_id=student_id,
+                session_id=session_id,
+                data={"message": f"Student {student_id} disconnected"},
+                alert_level=AlertLevel.INFO
+            )
+        except:
+            pass
 
 
 @app.get("/ws/stats", tags=["WebSocket"])
@@ -398,76 +466,38 @@ for directory in [SCREENSHOTS_DIR, WEBCAM_DIR, REPORTS_DIR]:
 # Mount static files for uploaded content
 app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
 
-# Mount React frontend (monolithic deployment)
-# Check multiple locations to ensure it works on Render and locally
-possible_dist_dirs = [
-    os.path.join(os.path.dirname(__file__), "dist"),
-    os.path.join(os.getcwd(), "server", "dist"),
-    os.path.join(os.getcwd(), "dist"),
-    os.path.join(os.path.dirname(os.path.dirname(__file__)), "react-frontend", "dist"),
-    "/opt/render/project/src/server/dist",
-    "/opt/render/project/src/dist"
-]
-
-REACT_BUILD_DIR = None
-for dist_dir in possible_dist_dirs:
-    if os.path.exists(dist_dir) and os.path.isfile(os.path.join(dist_dir, "index.html")):
-        REACT_BUILD_DIR = dist_dir
-        print(f"[INFO] Mounting React frontend from: {REACT_BUILD_DIR}")
-        break
-
+# Mount specific folders for performance
 if REACT_BUILD_DIR:
-    from fastapi.responses import FileResponse
-    from starlette.exceptions import HTTPException as StarletteHTTPException
-
-    # Mount static assets
+    # Mount assets folder for JS/CSS
     assets_dir = os.path.join(REACT_BUILD_DIR, "assets")
     if os.path.exists(assets_dir):
-        app.mount("/assets", StaticFiles(directory=assets_dir), name="react-assets")
-    else:
-        # SPA files might be directly in dist (Vite default is dist/assets)
-        print(f"[WARN] No assets folder found in {REACT_BUILD_DIR}")
+        app.mount("/assets", StaticFiles(directory=assets_dir), name="assets")
 
-    # Serve index.html at root of domain and dashboard
-    @app.get("/", include_in_schema=False)
-    @app.get("/dashboard", include_in_schema=False)
-    @app.get("/sessions", include_in_schema=False)
-    @app.get("/students", include_in_schema=False)
-    @app.get("/alerts", include_in_schema=False)
-    @app.get("/reports", include_in_schema=False)
-    @app.get("/analytics", include_in_schema=False)
-    @app.get("/settings", include_in_schema=False)
-    @app.get("/student/register", include_in_schema=False)
-    @app.get("/student/{path:path}", include_in_schema=False)
-    async def serve_react_pages():
-        """Serve React SPA for known frontend routes"""
-        return FileResponse(os.path.join(REACT_BUILD_DIR, "index.html"))
-
-    # Custom 404 handler: serve React for unknown non-API paths
-    @app.exception_handler(StarletteHTTPException)
-    async def spa_fallback(request, exc):
-        if exc.status_code == 404:
-            path = request.url.path
-            # Only serve React for non-API/non-system paths
-            if not any(path.startswith(p) for p in ("/api", "/docs", "/redoc", "/openapi", "/ws", "/health", "/uploads")):
-                # Check if this might be a websocket upgrade attempt on a common path
-                if "upgrade" in request.headers.get("connection", "").lower() and "websocket" in request.headers.get("upgrade", "").lower():
-                    print(f"[WS] 404 on WebSocket upgrade for path: {path}")
-                
-                index_path = os.path.join(REACT_BUILD_DIR, "index.html")
-                if os.path.isfile(index_path):
-                    return FileResponse(index_path)
-        # For API 404s and other errors, return JSON
-        from fastapi.responses import JSONResponse
-        return JSONResponse({
-            "detail": exc.detail,
-            "path": request.url.path,
-            "method": request.method
-        }, status_code=exc.status_code)
-
-    print(f"[INFO] React frontend served from {REACT_BUILD_DIR}")
-else:
-    print(f"[INFO] React build not found at {REACT_BUILD_DIR} - skipping SPA serving")
+# Improved SPA Fallback for React Router (Catch-all)
+@app.get("/{full_path:path}", include_in_schema=False)
+async def spa_fallback(request: Request, full_path: str):
+    """Serve files if they exist, else serve index.html (SPA support)"""
+    if not REACT_BUILD_DIR:
+        return {"detail": "Dashboard not built"}
+        
+    # 1. Check API / System prefixes - ignore these
+    if any(full_path.startswith(p) for p in ("api/", "docs", "redoc", "ws/", "uploads/")):
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail="Not Found")
+    
+    # 2. Check if the literal file exists in the build dir (e.g., favicon.ico)
+    potential_file = os.path.join(REACT_BUILD_DIR, full_path)
+    if os.path.isfile(potential_file):
+        from fastapi.responses import FileResponse
+        return FileResponse(potential_file)
+        
+    # 3. Fallback to index.html for any other route (React Router)
+    index_path = os.path.join(REACT_BUILD_DIR, "index.html")
+    if os.path.exists(index_path):
+        from fastapi.responses import FileResponse
+        return FileResponse(index_path)
+    
+    return {"detail": "Index file not found"}
 
 
 # =============================================================================

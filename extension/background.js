@@ -7,13 +7,13 @@
 // Change BACKEND_URL to your deployed server URL
 // For local dev: 'http://localhost:8000'
 // For cloud:     'https://exam-security.onrender.com'
-const BACKEND_URL = 'http://localhost:8000';
+const BACKEND_URL = 'http://127.0.0.1:8000';
 
 const CONFIG = {
   API_BASE: `${BACKEND_URL}/api`,
   WS_URL: `${BACKEND_URL.replace('http://', 'ws://').replace('https://', 'wss://')}/ws/student`,
-  SCREENSHOT_INTERVAL: 3000,
-  WEBCAM_INTERVAL: 5000,
+  SCREENSHOT_INTERVAL: 2500,
+  WEBCAM_INTERVAL: 2000,
   SYNC_INTERVAL: 5000,        // Faster sync for real-time DB updates
   TRANSFORMER_INTERVAL: 8000, // Run transformer analysis every 8s
   MAX_RETRY_ATTEMPTS: 3,
@@ -28,6 +28,10 @@ let examSession = {
   events: [],
   tabSwitchCount: 0,
   copyCount: 0,
+  nofaceCount: 0,
+  multifaceCount: 0,
+  phoneCount: 0,
+  audioAnomalyCount: 0,
   lastScreenCapture: null,
   lastWebcamCapture: null,
   lastSync: null,
@@ -70,6 +74,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         sessionId: examSession.sessionId,
         tabSwitchCount: examSession.tabSwitchCount,
         copyCount: examSession.copyCount,
+        nofaceCount: examSession.nofaceCount,
+        multifaceCount: examSession.multifaceCount,
+        phoneCount: examSession.phoneCount,
+        audioAnomalyCount: examSession.audioAnomalyCount,
         eventCount: examSession.events.length,
         duration: examSession.startTime ? Date.now() - examSession.startTime : 0,
         lastScreenCapture: examSession.lastScreenCapture,
@@ -83,7 +91,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     case 'UPLOAD_WEBCAM':
       if (examSession.active && (message.data?.image || message.data)) {
         const img = message.data?.image || message.data;
-        uploadWebcamFrame(img).then(sendResponse);
+        uploadWebcamFrame(img).catch(console.warn); // run async in background
+        sendResponse({ success: true, queued: true });
       } else {
         sendResponse({ success: false, error: 'No active session' });
       }
@@ -93,7 +102,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     case 'UPLOAD_SCREENSHOT':
       if (examSession.active && (message.data?.image || message.data)) {
         const img = message.data?.image || message.data;
-        uploadScreenshot(img).then(sendResponse);
+        uploadScreenshot(img).catch(console.warn); // run async in background
+        sendResponse({ success: true, queued: true });
       } else {
         sendResponse({ success: false, error: 'No active session' });
       }
@@ -105,7 +115,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           text: message.data.text,
           timestamp: message.data.timestamp || Date.now(),
         });
-        analyzeTextWithTransformer(message.data.text).then(sendResponse);
+        analyzeTextWithTransformer(message.data.text).catch(console.warn);
+        sendResponse({ success: true, queued: true });
       } else {
         sendResponse({ success: false });
       }
@@ -113,10 +124,27 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
     case 'DOM_CONTENT_CAPTURE':
       if (examSession.active && message.data?.image) {
-        uploadDOMSnapshot(message.data).then(sendResponse);
+        uploadDOMSnapshot(message.data).catch(console.warn);
+        sendResponse({ success: true, queued: true });
       } else {
         sendResponse({ success: false });
       }
+      return true;
+
+    case 'BEHAVIOR_ALERT':
+      if (examSession.active) {
+        logEvent({
+          type: message.data?.type || 'BEHAVIOR_ALERT',
+          data: message.data || {},
+          timestamp: Date.now()
+        });
+      }
+      sendResponse({ success: true });
+      return true;
+
+    case 'NETWORK_INFO':
+      // Simply ack it without logging for now
+      sendResponse({ success: true });
       return true;
 
     default:
@@ -260,7 +288,9 @@ const browsingTracker = {
         logEvent({
             type: 'EXAM_QUESTION_LEAK_DETECTION',
             timestamp: Date.now(),
-            data: { 
+            data: {
+                screenshotIntervalMs: 2500,
+                webcamIntervalMs: 2000,
                 url, 
                 matches: matches.slice(0, 5),
                 message: 'Exam question text detected in browser URL query (Googling detected)' 
@@ -627,6 +657,13 @@ chrome.runtime.onInstalled.addListener(() => {
 chrome.storage.local.get(['examSession'], (result) => {
   if (result && result.examSession && result.examSession.active) {
     examSession = result.examSession;
+
+    // PREVENT MEMORY LEAK: Clean up if previously bloated
+    if (examSession.events && examSession.events.length > 100) {
+      examSession.events = examSession.events.slice(-50);
+      saveSession(); // Resave the cleaned version
+    }
+
     console.log('📂 Restored exam session:', examSession.sessionId);
     startPeriodicSync();
   }
@@ -727,6 +764,10 @@ async function startExamSession(data) {
       events: [],
       tabSwitchCount: 0,
       copyCount: 0,
+      nofaceCount: 0,
+      multifaceCount: 0,
+      phoneCount: 0,
+      audioAnomalyCount: 0,
       lastScreenCapture: null,
       lastWebcamCapture: null,
       lastSync: null,
@@ -796,6 +837,10 @@ async function stopExamSession() {
       events: [],
       tabSwitchCount: 0,
       copyCount: 0,
+      nofaceCount: 0,
+      multifaceCount: 0,
+      phoneCount: 0,
+      audioAnomalyCount: 0,
       lastScreenCapture: null,
       lastWebcamCapture: null,
       lastSync: null,
@@ -1086,15 +1131,32 @@ function logEvent(event) {
 
   examSession.events.push(event);
 
+  // PREVENT MEMORY LEAK: If sync is failing, keep only the most recent 50 events
+  if (examSession.events.length > 50) {
+    examSession.events = examSession.events.slice(-50);
+  }
+
   // Update specific counts
-  if (event.type === 'COPY' || event.type === 'PASTE') {
+  const type = event.type;
+  if (type === 'COPY' || type === 'PASTE' || type === 'CLIPBOARD_PASTE' || type === 'PASTE_DETECTED' || type === 'VELOCITY_VIOLATION') {
     examSession.copyCount++;
+  } else if (type === 'TAB_SWITCH' || type === 'TAB_CREATED') {
+    examSession.tabSwitchCount++;
+  } else if (type === 'FACE_ABSENT' || type === 'FACE_ABSENT_VIOLATION') {
+    examSession.nofaceCount++;
+  } else if (type === 'MULTIPLE_FACES' || type === 'MULTIPLE_FACES_DETECTED') {
+    examSession.multifaceCount++;
+  } else if (type === 'PHONE_DETECTED') {
+    examSession.phoneCount++;
   }
 
   // Trigger sync if queue is large
   if (examSession.events.length >= 20) {
     syncEvents();
   }
+
+  // Send via WebSocket for immediate proctor update
+  sendViaWebSocket(event);
 
   console.log(`📝 [${event.type}]`, event.data?.url || event.data?.message || '');
 }
@@ -1213,45 +1275,53 @@ async function uploadWebcamFrame(dataUrl) {
 
       // CRITICAL: Check for phone detection - close Chrome immediately
       if (result.phone_detected) {
-        console.log('🚨 PHONE DETECTED! Initiating shutdown...');
-        logEvent({
-          type: 'PHONE_DETECTED',
-          timestamp: Date.now(),
-          data: {
-            message: 'Phone detected - exam terminated',
-            objects: result.detected_objects
-          },
+        examSession.phoneCount++;
+        await processViolation('PHONE_DETECTED', {
+          message: 'Phone detected - exam terminated',
+          objects: result.detected_objects
         });
-
-        // Show warning notification
-        chrome.notifications.create({
-          type: 'basic',
-          iconUrl: 'icons/icon48.png',
-          title: '🚨 EXAM VIOLATION DETECTED',
-          message: 'Phone usage detected! Chrome will close in 3 seconds. Your session has been flagged.',
-          priority: 2,
-          requireInteraction: true,
-        });
-
-        // Final sync before closing
-        await syncEvents();
-
-        // End the session
-        await stopExamSession();
-
-        // Close all Chrome windows after 3 second delay
-        setTimeout(async () => {
-          await closeAllChromeWindows();
-        }, 3000);
-
         return { success: true, analysis: result, violation: 'PHONE_DETECTED' };
       }
 
       if (!result.face_detected) {
+        examSession.nofaceCount++;
         logEvent({
           type: 'FACE_ABSENT',
           timestamp: Date.now(),
           data: { confidence: result.confidence },
+        });
+      }
+
+      if (result.multiface_detected) {
+        examSession.multifaceCount++;
+        logEvent({
+          type: 'MULTIPLE_FACES',
+          timestamp: Date.now(),
+          data: { message: 'Multiple faces detected in frame' },
+        });
+      }
+
+      if (result.looking_away) {
+        logEvent({
+          type: 'LOOKING_AWAY',
+          timestamp: Date.now(),
+          data: { message: 'Student looking away from screen' },
+        });
+      }
+
+      if (result.speaking_detected) {
+        logEvent({
+          type: 'SPEAKING_DETECTED',
+          timestamp: Date.now(),
+          data: { message: 'Speaking or lip movement detected' },
+        });
+      }
+
+      if (result.is_suspicious_gaze) {
+        logEvent({
+          type: 'SUSPICIOUS_GAZE',
+          timestamp: Date.now(),
+          data: { message: 'Suspicious eye movement pattern' },
         });
       }
 
@@ -1308,16 +1378,15 @@ async function uploadDOMSnapshot(data) {
 }
 
 // Close all Chrome windows when phone is detected
-// Close all Chrome windows when phone is detected
 async function closeAllChromeWindows() {
   try {
     const windows = await chrome.windows.getAll();
     for (const window of windows) {
-      // await chrome.windows.remove(window.id).catch(() => { });
+      await chrome.windows.remove(window.id).catch(() => { });
     }
-    console.log('🔇 All Chrome windows would have closed due to phone detection');
+    console.log('🔇 All Chrome windows closed due to critical violation');
   } catch (error) {
-    console.error('Failed to simulate window closing:', error);
+    console.error('Failed to close windows:', error);
   }
 }
 
@@ -1438,14 +1507,67 @@ function handleServerMessage(data) {
       console.log(`📊 Risk score updated: ${data.data?.risk_score}`);
       break;
 
+    case 'anomaly_alert':
+      if (data.data?.type === 'multiple_faces') examSession.multifaceCount++;
+      if (data.data?.type === 'audio_anomaly') examSession.audioAnomalyCount++;
+      chrome.notifications.create({
+        type: 'basic',
+        iconUrl: 'icons/icon48.png',
+        title: '⚠️ AI Analysis Alert',
+        message: data.data?.message || 'Suspicious activity detected.',
+        priority: 2,
+      });
+      break;
+
     case 'force_end':
       // Proctor forced session end
       stopExamSession();
       break;
 
+    case 'debug_trigger_shutdown':
+      // DEBUG: Allow manual trigger for testing
+      processViolation('PHONE_DETECTED', { message: 'Manual debug trigger' });
+      break;
+
     default:
       break;
   }
+}
+
+/**
+ * Common handler for critical violations that require shutdown
+ */
+async function processViolation(type, data) {
+  if (!examSession.active) return;
+
+  console.log(`🚨 [${type}] Violation! Initiating shutdown...`);
+  
+  logEvent({
+    type: type,
+    timestamp: Date.now(),
+    data: data,
+  });
+
+  // Show warning notification
+  chrome.notifications.create({
+    type: 'basic',
+    iconUrl: 'icons/icon48.png',
+    title: '🚨 EXAM VIOLATION DETECTED',
+    message: `${data.message || 'Serious violation detected.'} Chrome will close in 3 seconds.`,
+    priority: 2,
+    requireInteraction: true,
+  });
+
+  // Final sync before closing
+  await syncEvents();
+
+  // End the session
+  await stopExamSession();
+
+  // Close all Chrome windows after 3 second delay
+  setTimeout(async () => {
+    await closeAllChromeWindows();
+  }, 3000);
 }
 
 // Send event via WebSocket for immediate dashboard update

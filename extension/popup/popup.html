@@ -82,27 +82,38 @@
         </div>
 
         <div class="stats-grid">
-          <div class="stat-card">
+          <div class="stat-card" title="Number of times you switched tabs or left the exam page">
             <span class="stat-icon">🔄</span>
             <span class="stat-value" id="stat-tabs">0</span>
-            <span class="stat-label">Tab Switches</span>
+            <span class="stat-label">Tab Switch</span>
           </div>
-          <div class="stat-card">
-            <span class="stat-icon">📋</span>
-            <span class="stat-value" id="stat-copy">0</span>
-            <span class="stat-label">Copy/Paste</span>
+          <div class="stat-card" title="Number of times your face was missing from the webcam">
+            <span class="stat-icon">👤</span>
+            <span class="stat-value" id="stat-noface">0</span>
+            <span class="stat-label">Face Not Found</span>
           </div>
-          <div class="stat-card">
-            <span class="stat-icon">📝</span>
-            <span class="stat-value" id="stat-events">0</span>
-            <span class="stat-label">Total Events</span>
+          <div class="stat-card" title="Number of times more than one person was detected">
+            <span class="stat-icon">👥</span>
+            <span class="stat-value" id="stat-multiface">0</span>
+            <span class="stat-label">Multi Face</span>
           </div>
-          <div class="stat-card">
+          <div class="stat-card" title="Number of times a mobile phone was detected in view">
+            <span class="stat-icon">📱</span>
+            <span class="stat-value" id="stat-phone">0</span>
+            <span class="stat-label">Phone Detected</span>
+          </div>
+          <div class="stat-card" title="Number of times background noise or talking was detected">
+            <span class="stat-icon">🔊</span>
+            <span class="stat-value" id="stat-audio">0</span>
+            <span class="stat-label">Audio Anomaly</span>
+          </div>
+          <div class="stat-card" title="Current duration of the exam session">
             <span class="stat-icon">⏱️</span>
             <span class="stat-value" id="stat-time">00:00</span>
             <span class="stat-label">Duration</span>
           </div>
         </div>
+
 
         <div class="capture-status">
           <div class="capture-item">

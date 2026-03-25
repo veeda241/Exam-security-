@@ -26,24 +26,26 @@ from auth.config import (
 # Password Hashing
 # =============================================================================
 
-# Password context for bcrypt hashing
-pwd_context = CryptContext(
-    schemes=["bcrypt"],
-    deprecated="auto",
-    bcrypt__rounds=BCRYPT_ROUNDS
-)
-
+# Password context for bcrypt hashing with safe truncation
+import bcrypt
 
 def hash_password(password: str) -> str:
     """Hash a password using bcrypt (max 72 bytes)"""
     # Truncate to 72 bytes to avoid bcrypt limitation
-    return pwd_context.hash(password[:72])
+    pwd_bytes = password[:72].encode('utf-8')
+    salt = bcrypt.gensalt(rounds=BCRYPT_ROUNDS)
+    hashed = bcrypt.hashpw(pwd_bytes, salt)
+    return hashed.decode('utf-8')
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """Verify a password against its hash (max 72 bytes)"""
-    # Truncate to 72 bytes to avoid bcrypt limitation
-    return pwd_context.verify(plain_password[:72], hashed_password)
+    try:
+        pw_bytes = plain_password[:72].encode('utf-8')
+        hashed_bytes = hashed_password.encode('utf-8')
+        return bcrypt.checkpw(pw_bytes, hashed_bytes)
+    except Exception:
+        return False
 
 
 # =============================================================================

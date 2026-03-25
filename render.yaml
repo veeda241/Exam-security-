@@ -3,7 +3,7 @@ services:
   - type: web
     name: examguard-api
     runtime: python
-    pythonVersion: 3.14.3
+    pythonVersion: 3.11.0
     rootDir: .
     buildCommand: bash build.sh
     startCommand: bash start.sh

@@ -32,6 +32,11 @@ class AnalysisResponse(BaseModel):
     status: str = "processed"
     risk_score: float = 0.0
     face_detected: Optional[bool] = None
+    multiface_detected: Optional[bool] = False
+    phone_detected: Optional[bool] = False
+    looking_away: Optional[bool] = False
+    speaking_detected: Optional[bool] = False
+    is_suspicious_gaze: Optional[bool] = False
     forbidden_detected: Optional[bool] = None
     similarity_score: Optional[float] = None
     details: Optional[Dict[str, Any]] = None

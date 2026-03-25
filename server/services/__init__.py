@@ -29,6 +29,7 @@ __all__ = [
     "get_forensics_service",
     "AudioAnalysisService",
     "get_audio_service",
+    "get_website_category",
 ]
 
 # Mapping of public name -> (submodule, attribute)
@@ -51,6 +52,7 @@ _LAZY_MAP = {
     "get_forensics_service":    ("browser_forensics",    "get_forensics_service"),
     "AudioAnalysisService":     ("audio_analysis",       "AudioAnalysisService"),
     "get_audio_service":        ("audio_analysis",       "get_audio_service"),
+    "get_website_category":     ("website_classification", "get_website_category"),
 }
 
 

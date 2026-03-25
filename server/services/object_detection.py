@@ -21,7 +21,11 @@ class ObjectDetector:
             return
         # Load nano model for speed
         # Will auto-download on first run
-        self.model = YOLO("yolov8n.pt")
+        # Move weight to models/weights for organization
+        weights_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "models", "weights", "yolov8n.pt")
+        # Ensure directory exists if we download it
+        os.makedirs(os.path.dirname(weights_path), exist_ok=True)
+        self.model = YOLO(weights_path)
         
         # COCO Classes of interest
         self.FORBIDDEN_CLASSES = {
@@ -51,7 +55,7 @@ class ObjectDetector:
                 cls_id = int(box.cls[0])
                 conf = float(box.conf[0])
                 
-                if cls_id in self.FORBIDDEN_CLASSES and conf > 0.5:
+                if cls_id in self.FORBIDDEN_CLASSES and conf > 0.4:
                     obj_name = self.FORBIDDEN_CLASSES[cls_id]
                     detected_objects.append({
                         "object": obj_name,
