@@ -26,7 +26,6 @@ function safeSendMessage(message, callback) {
 }
 
 function stopAllMonitoring() {
-    domCapture.stop();
     behaviorMonitor.isMonitoring = false;
     console.log('🛡️ Monitoring stopped (Extension reloaded or session ended)');
 }
@@ -67,7 +66,61 @@ class ExamMonitor {
         // 5. VPN Detection
         this.checkVPN();
 
+        // 6. Audio Monitoring (New)
+        this.startAudioMonitoring();
+
         console.log('🛡️ Advanced monitoring active');
+    }
+
+    async startAudioMonitoring() {
+        try {
+            this.audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            const source = audioContext.createMediaStreamSource(this.audioStream);
+            const analyser = audioContext.createAnalyser();
+            analyser.fftSize = 512;
+            source.connect(analyser);
+
+            const bufferLength = analyser.frequencyBinCount;
+            const dataArray = new Uint8Array(bufferLength);
+            let thresholdCount = 0;
+
+            const checkAudio = () => {
+                if (!this.isMonitoring) {
+                    audioContext.close();
+                    return;
+                }
+
+                analyser.getByteFrequencyData(dataArray);
+                let sum = 0;
+                for (let i = 0; i < bufferLength; i++) {
+                    sum += dataArray[i];
+                }
+                const average = sum / bufferLength;
+
+                // Simple peak detection (adjust 60 based on environment if needed)
+                if (average > 60) {
+                    thresholdCount++;
+                    // Only alert if sustained noise detected (reduce false positives)
+                    if (thresholdCount > 3) {
+                        this.sendAlert('AUDIO_ANOMALY', { 
+                            intensity: Math.round(average),
+                            message: 'Sustained suspicious background noise detected' 
+                        });
+                        thresholdCount = 0;
+                    }
+                } else {
+                    thresholdCount = Math.max(0, thresholdCount - 1);
+                }
+
+                this.audioInterval = setTimeout(checkAudio, 1000);
+            };
+
+            checkAudio();
+            console.log('🎤 Microphone monitoring active');
+        } catch (e) {
+            console.warn('🎤 Audio monitoring could not start:', e.message);
+        }
     }
 
     applyLockdown() {
@@ -293,6 +346,13 @@ class ExamMonitor {
         this.isMonitoring = false;
         this.intervals.forEach(id => clearInterval(id));
         this.intervals = [];
+
+        if (this.audioInterval) {
+            clearTimeout(this.audioInterval);
+        }
+        if (this.audioStream) {
+            this.audioStream.getTracks().forEach(track => track.stop());
+        }
     }
 }
 
@@ -301,74 +361,12 @@ class ScreenCapture {
     stopCapture() {}
 }
 
-// ==================== DOM CAPTURE MODULE (html2canvas) ====================
-class DOMCapture {
-    constructor() {
-        this.captureInterval = null;
-        this.isCapturing = false;
-    }
-
-    async start(intervalMs = 15000) {
-        if (this.isCapturing) return;
-        this.isCapturing = true;
-        
-        console.log('🖼️ DOM-based monitoring started');
-        this.captureInterval = setInterval(() => this.capture(), intervalMs);
-        this.capture();
-    }
-
-    stop() {
-        if (this.captureInterval) {
-            clearInterval(this.captureInterval);
-            this.captureInterval = null;
-        }
-        this.isCapturing = false;
-    }
-
-    async capture() {
-        if (!this.isCapturing || document.hidden) return;
-
-        try {
-            const targetElement = document.body;
-            const canvas = await html2canvas(targetElement, {
-                scale: 0.5,
-                logging: false,
-                useCORS: false,
-                allowTaint: false,
-                ignoreElements: (el) => ['iframe', 'video', 'audio', 'embed', 'object'].includes(el.tagName.toLowerCase()),
-                width: window.innerWidth,
-                height: window.innerHeight,
-                x: window.scrollX,
-                y: window.scrollY
-            });
-
-            const dataUrl = canvas.toDataURL('image/jpeg', 0.5);
-            
-            safeSendMessage({
-                type: 'DOM_CONTENT_CAPTURE',
-                data: {
-                    image: dataUrl,
-                    url: window.location.href,
-                    title: document.title,
-                    timestamp: Date.now(),
-                    scrollPos: { x: window.scrollX, y: window.scrollY }
-                }
-            });
-
-        } catch (error) {
-            console.warn('DOM capture failed:', error.message);
-        }
-    }
-}
-
 // ==================== INITIALIZATION ====================
-const domCapture = new DOMCapture();
 const behaviorMonitor = new ExamMonitor();
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     try {
         if (message.type === 'START_SCREEN_CAPTURE' || message.type === 'EXAM_STARTED') {
-            domCapture.start(25000); 
             behaviorMonitor.start();
             startOverlayDetection();
             sendResponse({ success: true });

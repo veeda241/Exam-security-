@@ -7,15 +7,13 @@
 // Change BACKEND_URL to your deployed server URL
 // For local dev: 'http://localhost:8000'
 // For cloud:     'https://exam-security.onrender.com'
-const BACKEND_URL = 'https://exam-security.onrender.com';
+const BACKEND_URL = 'http://127.0.0.1:8000';
 
 const CONFIG = {
   API_BASE: `${BACKEND_URL}/api`,
   WS_URL: `${BACKEND_URL.replace('http://', 'ws://').replace('https://', 'wss://')}/ws/student`,
-  SCREENSHOT_INTERVAL: 2500,
-  WEBCAM_INTERVAL: 2000,
-  SYNC_INTERVAL: 5000,        // Faster sync for real-time DB updates
-  TRANSFORMER_INTERVAL: 8000, // Run transformer analysis every 8s
+  SYNC_INTERVAL: 5000,          // Sync events every 5s
+  TRANSFORMER_INTERVAL: 15000,  // Run transformer analysis every 15s
   MAX_RETRY_ATTEMPTS: 3,
   RETRY_DELAY: 2000,
 };
@@ -35,6 +33,8 @@ let examSession = {
   lastScreenCapture: null,
   lastWebcamCapture: null,
   lastSync: null,
+  globalRiskScore: 0,
+  globalEffortScore: 100,
 };
 
 let pendingStartData = null;
@@ -45,6 +45,8 @@ let wsConnection = null;
 let wsReconnectTimer = null;
 let clipboardTexts = [];     // Buffer for transformer analysis
 let pendingAnalysis = [];    // Buffer for pending text analysis
+let domCaptureIntervalId = null;
+let webcamCaptureIntervalId = null; 
 
 // ==================== MESSAGE HANDLING (REGISTER EARLY) ====================
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -83,42 +85,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         lastScreenCapture: examSession.lastScreenCapture,
         lastWebcamCapture: examSession.lastWebcamCapture,
         lastSync: examSession.lastSync,
+        globalRiskScore: examSession.globalRiskScore || 0,
+        globalEffortScore: examSession.globalEffortScore || 100,
         browsing: examSession.active ? browsingTracker.getStats() : null,
       });
       return true;
 
-    case 'WEBCAM_CAPTURE':
-    case 'UPLOAD_WEBCAM':
-      if (examSession.active && (message.data?.image || message.data)) {
-        const img = message.data?.image || message.data;
-        uploadWebcamFrame(img).catch(console.warn); // run async in background
-        sendResponse({ success: true, queued: true });
-      } else {
-        sendResponse({ success: false, error: 'No active session' });
-      }
-      return true;
-
-    case 'SCREEN_CAPTURE':
-    case 'UPLOAD_SCREENSHOT':
-      if (examSession.active && (message.data?.image || message.data)) {
-        const img = message.data?.image || message.data;
-        uploadScreenshot(img).catch(console.warn); 
-        sendResponse({ success: true, queued: true });
-      } else {
-        sendResponse({ success: false, error: 'No active session' });
-      }
-      return true;
-
-    case 'WEBCAM_CAPTURE':
-    case 'UPLOAD_WEBCAM':
-      if (examSession.active && (message.data?.image || message.data)) {
-        const img = message.data?.image || message.data;
-        uploadWebcamFrame(img).catch(console.warn);
-        sendResponse({ success: true, queued: true });
-      } else {
-        sendResponse({ success: false, error: 'No active session' });
-      }
-      return true;
 
     case 'CLIPBOARD_TEXT':
       if (examSession.active && message.data?.text) {
@@ -156,6 +128,37 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     case 'NETWORK_INFO':
       // Simply ack it without logging for now
       sendResponse({ success: true });
+      return true;
+
+    case 'WEBRTC_SIGNAL_OUT':
+      if (wsConnection && wsConnection.readyState === WebSocket.OPEN) {
+        console.log('📡 Sending WebRTC signal to server:', message.payload?.sdp?.type || 'ICE candidate');
+        wsConnection.send(`webrtc:${JSON.stringify(message.payload)}`);
+      } else {
+        console.warn('📡 WebRTC signal not sent - WebSocket not ready');
+      }
+      sendResponse({ success: true });
+      return true;
+
+    case 'STREAM_CHUNK':
+      // Relay binary MediaRecorder data to backend WebSocket as raw bytes
+      if (wsConnection && wsConnection.readyState === WebSocket.OPEN) {
+          // Chrome Extension's message passing sometimes serializes TypedArrays differently.
+          // For reliability, we send the chunk directly to the open WebSocket.
+          if (message.data) {
+              wsConnection.send(message.data);
+          }
+      }
+      sendResponse({ success: true });
+      return true;
+
+    case 'WEBCAM_CAPTURE':
+      if (examSession.active && message.data?.image) {
+        uploadWebcamFrame(message.data.image).catch(console.warn);
+        sendResponse({ success: true });
+      } else {
+        sendResponse({ success: false });
+      }
       return true;
 
     default:
@@ -459,18 +462,20 @@ const browsingTracker = {
     const aiTimeRatio = this.timeByCategory.ai / totalTime;
     const cheatingTimeRatio = this.timeByCategory.cheating / totalTime;
     const entertainmentTimeRatio = this.timeByCategory.entertainment / totalTime;
+    const otherTimeRatio = this.timeByCategory.other / totalTime;
     
     risk += aiTimeRatio * 50;              // AI usage: up to 50 risk (Semi-risk)
     risk += cheatingTimeRatio * 100;       // Cheating: up to 100 risk
     risk += entertainmentTimeRatio * 100;  // Entertainment: up to 100 risk (Max Risk)
+    risk += otherTimeRatio * 40;           // Unclassified sites: up to 40 risk (Distraction)
     
     // Count-based risk (unique flagged sites)
     const flaggedSites = this.visitedSites.filter(s => ['ai', 'cheating', 'entertainment'].includes(s.category));
-    risk += Math.min(flaggedSites.length * 10, 50); 
+    risk += Math.min(flaggedSites.length * 15, 60); 
     
     // Open tabs risk bonus
     const flaggedOpenTabs = this.openTabs.filter(t => t.riskLevel !== 'none').length;
-    risk += Math.min(flaggedOpenTabs * 5, 25);
+    risk += Math.min(flaggedOpenTabs * 10, 40);
     
     this.browsingRiskScore = Math.min(Math.round(risk), 100);
     
@@ -478,25 +483,19 @@ const browsingTracker = {
     // If student spends 100% on exam + learning => effort 100. If 0% => effort 0.
     const productiveTime = this.timeByCategory.exam + (this.timeByCategory.learning || 0);
     const productiveRatio = productiveTime / totalTime;
-    const distractionTime = this.timeByCategory.ai + this.timeByCategory.cheating + this.timeByCategory.entertainment;
+    const distractionTime = this.timeByCategory.ai + this.timeByCategory.cheating + this.timeByCategory.entertainment + this.timeByCategory.other;
     const distractionRatio = distractionTime / totalTime;
-    const otherRatio = this.timeByCategory.other / totalTime;
     
-    // Base effort: productive time (exam + learning) drives it up
+    // Base effort: strictly productive time (exam + learning) drives it up
     let effort = productiveRatio * 100;
     
-    // "Other" (unknown/unclassified sites) gets very little credit
-    effort += otherRatio * 10;
-    
-    // Extra penalty for known distraction sites beyond ratio
-    effort -= Math.min(flaggedSites.length * 4, 25);
-    
-    // Time-based Bonus: increase effort rapidly! +1% for every 5 seconds of productive time
-    const productiveSeconds = productiveTime / 1000;
-    effort += (productiveSeconds / 5);
-    
-    // Ratio Bonus: if >50% exam/learning time, big bonus.
-    if (productiveRatio > 0.5) effort += 20;
+    // Unclassified sites (other) do NOT give effort anymore, they act as distractions
+    // Ratio Bonus: only if productive ratio is dominant (>70%)
+    if (productiveRatio > 0.7) {
+        effort += 20; 
+    } else if (productiveRatio < 0.3) {
+        effort -= 20; // Massive penalty for lack of focus
+    }
     
     this.effortScore = Math.min(Math.max(Math.round(effort), 0), 100);
   },
@@ -603,6 +602,7 @@ const ENTERTAINMENT_SITES = [
   'threads.net', 'mastodon.social', 'linkedin.com',
   'buzzfeed.com', '9gag.com', 'imgur.com',
   'whatsapp.com', 'web.telegram.org', 'messenger.com',
+  'cinehd.cc', 'cinehd.to', 'cinehd.ws'
 ];
 
 // Cheating / Academic dishonesty sites - Critical risk
@@ -813,6 +813,8 @@ async function startExamSession(data) {
       lastScreenCapture: null,
       lastWebcamCapture: null,
       lastSync: null,
+      globalRiskScore: 0,
+      globalEffortScore: 100,
     };
 
     await chrome.storage.local.set({ examSession });
@@ -823,11 +825,25 @@ async function startExamSession(data) {
     // Start periodic sync
     startPeriodicSync();
 
-    // Start browsing tracker
-    browsingTracker.start();
+    // REMOVED: High-frequency frame polling (user requested live stream instead)
+    // if (domCaptureIntervalId) clearInterval(domCaptureIntervalId);
+    // domCaptureIntervalId = setInterval(triggerNativeDOMCapture, 25000);
+    // if (webcamCaptureIntervalId) clearInterval(webcamCaptureIntervalId);
+    // webcamCaptureIntervalId = setInterval(triggerWebcamCapture, 4000);
 
     // Kiosk Mode: Enforce Lockdown
     await enforceLockdown();
+
+    // Start Live Streaming (MediaRecorder) via Capture Window
+    try {
+        chrome.tabs.sendMessage(await getCaptureTabId(), { 
+            type: 'START_STREAMING', 
+            interval: 1000 
+        });
+        console.log('🎥 Triggered live stream for session:', sessionId);
+    } catch (e) {
+        console.warn('🎥 Failed to trigger live stream:', e.message);
+    }
 
     // Anti-Cheat: Scan for Interview Coder / Cluely
     startCheatingToolDetection();
@@ -847,24 +863,19 @@ async function stopExamSession() {
   }
 
   try {
-    // Final sync
-    await syncEvents();
-
-    // Stop browsing tracker and send final summary
+    // Add final browsing summary event to the queue
     const browsingSummary = browsingTracker.generateSummaryEvent();
-    logEvent(browsingSummary);
-    await syncEvents(); // Sync the browsing summary
+    if (browsingSummary) logEvent(browsingSummary);
     browsingTracker.stop();
 
-    // End session on backend
-    try {
-      await fetch(`${CONFIG.API_BASE}/sessions/${examSession.sessionId}/end`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-      });
-    } catch (error) {
-      console.warn('Backend session end failed:', error.message);
-    }
+    // Perform a SINGLE final sync for all remaining events
+    await syncEvents();
+
+    // End session on backend (async, don't block UI summary)
+    fetch(`${CONFIG.API_BASE}/sessions/${examSession.sessionId}/end`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+    }).catch(error => console.warn('Backend session end failed:', error.message));
 
     const summary = {
       sessionId: examSession.sessionId,
@@ -889,12 +900,22 @@ async function stopExamSession() {
       lastScreenCapture: null,
       lastWebcamCapture: null,
       lastSync: null,
+      globalRiskScore: 0,
+      globalEffortScore: 100,
     };
 
     await chrome.storage.local.set({ examSession: null });
 
     // Stop periodic sync
     stopPeriodicSync();
+    if (domCaptureIntervalId) {
+      clearInterval(domCaptureIntervalId);
+      domCaptureIntervalId = null;
+    }
+    if (webcamCaptureIntervalId) {
+      clearInterval(webcamCaptureIntervalId);
+      webcamCaptureIntervalId = null;
+    }
 
     // Notify all tabs
     notifyAllTabs('EXAM_STOPPED');
@@ -1224,10 +1245,10 @@ async function syncEvents() {
     });
 
     if (response.ok) {
-      // Clear synced events
-      examSession.events = examSession.events.filter(e =>
-        !eventsToSync.find(s => s.id === e.id)
-      );
+      // Clear synced events using highly efficient Set-based filtering (O(N))
+      const syncedIds = new Set(eventsToSync.map(s => s.id));
+      examSession.events = examSession.events.filter(e => !syncedIds.has(e.id));
+      
       examSession.lastSync = Date.now();
       await saveSession();
       console.log(`☁️ Synced ${eventsToSync.length} events`);
@@ -1237,156 +1258,13 @@ async function syncEvents() {
   }
 }
 
-async function uploadScreenshot(dataUrl) {
-  if (!examSession.active) {
-    console.log('📸 Screenshot skipped - no active session');
-    return { success: false };
-  }
-
-  console.log('📸 Uploading screenshot to backend...');
-
-  try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 20000); // 20s timeout for large uploads
-
-    const response = await fetch(`${CONFIG.API_BASE}/analysis/process`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        session_id: examSession.sessionId,
-        timestamp: Date.now(),
-        screen_image: dataUrl,
-      }),
-      signal: controller.signal
-    });
-    clearTimeout(timeoutId);
-
-    if (response.ok) {
-      examSession.lastScreenCapture = Date.now();
-      const result = await response.json();
-      console.log('📸 Screenshot analysis result:', result);
-
-      // Store detected text for Googling cross-check (Layer 1)
-      if (result.detected_text && result.detected_text.length > 30) {
-        examSession.latestExamQuestion = result.detected_text;
-      }
-
-      if (result.forbidden_detected) {
-        logEvent({
-          type: 'FORBIDDEN_CONTENT',
-          timestamp: Date.now(),
-          data: { keywords: result.detected_keywords },
-        });
-      }
-
-      return { success: true, analysis: result };
-    }
-    console.warn('📸 Screenshot upload failed with status:', response.status);
-    return { success: false };
-  } catch (error) {
-    console.warn('📸 Screenshot upload error:', error.message);
-    return { success: false };
-  }
-}
-
-async function uploadWebcamFrame(dataUrl) {
-  if (!examSession.active) {
-    console.log('📹 Webcam skipped - no active session');
-    return { success: false };
-  }
-
-  console.log('📹 Uploading webcam frame to backend...');
-
-  try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 20000); // 20s timeout
-
-    const response = await fetch(`${CONFIG.API_BASE}/analysis/process`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        session_id: examSession.sessionId,
-        timestamp: Date.now(),
-        webcam_image: dataUrl,
-      }),
-      signal: controller.signal
-    });
-    clearTimeout(timeoutId);
-
-    if (response.ok) {
-      examSession.lastWebcamCapture = Date.now();
-      const result = await response.json();
-      console.log('📹 Webcam analysis result:', result);
-
-      // CRITICAL: Check for phone detection - close Chrome immediately
-      if (result.phone_detected) {
-        examSession.phoneCount++;
-        await processViolation('PHONE_DETECTED', {
-          message: 'Phone detected - exam terminated',
-          objects: result.detected_objects
-        });
-        return { success: true, analysis: result, violation: 'PHONE_DETECTED' };
-      }
-
-      if (!result.face_detected) {
-        examSession.nofaceCount++;
-        logEvent({
-          type: 'FACE_ABSENT',
-          timestamp: Date.now(),
-          data: { confidence: result.confidence },
-        });
-      }
-
-      if (result.multiface_detected) {
-        examSession.multifaceCount++;
-        logEvent({
-          type: 'MULTIPLE_FACES',
-          timestamp: Date.now(),
-          data: { message: 'Multiple faces detected in frame' },
-        });
-      }
-
-      if (result.looking_away) {
-        logEvent({
-          type: 'LOOKING_AWAY',
-          timestamp: Date.now(),
-          data: { message: 'Student looking away from screen' },
-        });
-      }
-
-      if (result.speaking_detected) {
-        logEvent({
-          type: 'SPEAKING_DETECTED',
-          timestamp: Date.now(),
-          data: { message: 'Speaking or lip movement detected' },
-        });
-      }
-
-      if (result.is_suspicious_gaze) {
-        logEvent({
-          type: 'SUSPICIOUS_GAZE',
-          timestamp: Date.now(),
-          data: { message: 'Suspicious eye movement pattern' },
-        });
-      }
-
-      return { success: true, analysis: result };
-    }
-    console.warn('📹 Webcam upload failed with status:', response.status);
-    return { success: false };
-  } catch (error) {
-    console.warn('📹 Webcam upload error:', error.message);
-    return { success: false };
-  }
-}
-
 /**
- * Upload high-fidelity DOM snapshot (html2canvas) for content analysis
+ * Upload high-fidelity snapshot for content analysis (native approach)
  */
 async function uploadDOMSnapshot(data) {
     if (!examSession.active) return { success: false };
 
-    console.log('📷 Uploading DOM snapshot (html2canvas) for content analysis...');
+    console.log('📷 Uploading native tab snapshot for OCR content analysis...');
     try {
         const response = await fetch(`${CONFIG.API_BASE}/analysis/process`, {
             method: 'POST',
@@ -1417,9 +1295,99 @@ async function uploadDOMSnapshot(data) {
             return { success: true, analysis: result };
         }
     } catch (err) {
-        console.warn('DOM snapshot upload failed:', err.message);
+        console.warn('Tab snapshot upload failed:', err.message);
     }
     return { success: false };
+}
+
+async function triggerNativeDOMCapture() {
+  if (!examSession.active) return;
+  
+  try {
+      const activeWindow = await chrome.windows.getCurrent();
+      const tabs = await chrome.tabs.query({ active: true, windowId: activeWindow.id });
+      if (!tabs || tabs.length === 0) return;
+      
+      const activeTab = tabs[0];
+      
+      // Fast, native native visual capture of the tab as JPEG
+      // Scale down image quality and format to minimize transmission size
+      const dataUrl = await chrome.tabs.captureVisibleTab(activeWindow.id, { format: 'jpeg', quality: 40 });
+      
+      if (dataUrl) {
+          uploadDOMSnapshot({
+              image: dataUrl,
+              url: activeTab.url,
+          }).catch(console.warn);
+      }
+  } catch (error) {
+      // It's normal for this to fail if the browser doesn't have focus or is minimized
+      console.warn('Native DOM capture failed:', error.message);
+  }
+}
+
+/**
+ * Trigger a webcam snapshot from the capture window
+ */
+async function triggerWebcamCapture() {
+    if (!examSession.active || !captureWindowId) return;
+
+    try {
+        // Since background script doesn't have the media stream, 
+        // it must ask the capture window to grab a frame.
+        chrome.tabs.sendMessage(await getCaptureTabId(), { type: 'CAPTURE_WEBCAM_FRAME' }, (response) => {
+            if (response && response.image) {
+                uploadWebcamFrame(response.image);
+            }
+        });
+    } catch (err) {
+        console.warn('Webcam capture trigger failed:', err.message);
+    }
+}
+
+/**
+ * Upload webcam frame for AI vision analysis (Face/Gaze/Phone)
+ */
+async function uploadWebcamFrame(image) {
+    if (!examSession.active) return;
+    
+    try {
+        const response = await fetch(`${CONFIG.API_BASE}/analysis/process`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                session_id: examSession.sessionId,
+                timestamp: Date.now(),
+                webcam_image: image,
+                is_dom_capture: false
+            })
+        });
+
+        if (response.ok) {
+            const result = await response.json();
+            // Process AI feedback on-the-fly (dashboard also gets this via WS)
+            if (result.phone_detected) {
+                logEvent({
+                    type: 'PHONE_DETECTED',
+                    timestamp: Date.now(),
+                    data: { message: 'Cell phone detected in your webcam feed!' }
+                });
+            }
+            if (result.face_detected === false) {
+                 examSession.nofaceCount++;
+            }
+            examSession.lastWebcamCapture = Date.now();
+        }
+    } catch (err) {
+        console.warn('Webcam AI upload failed:', err.message);
+    }
+}
+
+async function getCaptureTabId() {
+    if (!captureWindowId) throw new Error('No capture window');
+    const tabs = await chrome.tabs.query({ windowId: captureWindowId });
+    if (!tabs || tabs.length === 0) throw new Error('No tabs in capture window');
+    return tabs[0].id;
 }
 
 // Close all Chrome windows when phone is detected
@@ -1549,19 +1517,58 @@ function handleServerMessage(data) {
       break;
 
     case 'risk_score_update':
-      console.log(`📊 Risk score updated: ${data.data?.risk_score}`);
+      // Handle both formats: {data: {risk_score}} or {risk_score} directly
+      const riskData = data.data || data;
+      console.log(`📊 Risk score updated: ${riskData.risk_score}`);
+      if (examSession.active && riskData) {
+        examSession.globalRiskScore = riskData.risk_score || 0;
+        examSession.globalEffortScore = riskData.effort_alignment || riskData.engagement_score || 100;
+      }
       break;
 
     case 'anomaly_alert':
-      if (data.data?.type === 'multiple_faces') examSession.multifaceCount++;
-      if (data.data?.type === 'audio_anomaly') examSession.audioAnomalyCount++;
+      const anomalyType = (data.data?.type || data.alert_type || '').toUpperCase();
+      if (anomalyType.includes('MULTIPLE_FACES') || anomalyType.includes('MULTI_FACE')) {
+        examSession.multifaceCount++;
+      } else if (anomalyType.includes('AUDIO_ANOMALY')) {
+        examSession.audioAnomalyCount++;
+      } else if (anomalyType.includes('FACE_ABSENT') || anomalyType.includes('FACE_NOT_FOUND')) {
+        examSession.nofaceCount++;
+      } else if (anomalyType.includes('PHONE_DETECTED')) {
+        logEvent({
+          type: 'PHONE_DETECTED',
+          timestamp: Date.now(),
+          data: { message: 'Cell phone detected in your webcam feed!' }
+        });
+      }
+      
       chrome.notifications.create({
         type: 'basic',
         iconUrl: 'icons/icon48.png',
         title: '⚠️ AI Analysis Alert',
-        message: data.data?.message || 'Suspicious activity detected.',
+        message: data.data?.message || data.message || 'Suspicious activity detected.',
         priority: 2,
       });
+      saveSession();
+      break;
+
+    case 'vision_alert':
+      // Handler for alerts from the live stream analysis (direct from vision engine)
+      if (data.violations && Array.isArray(data.violations)) {
+        data.violations.forEach(v => {
+          const uv = v.toUpperCase();
+          if (uv.includes('MULTIPLE_FACES')) examSession.multifaceCount++;
+          if (uv.includes('FACE_ABSENT') || uv.includes('FACE_NOT_FOUND')) examSession.nofaceCount++;
+          if (uv.includes('PHONE_DETECTED')) {
+            logEvent({
+              type: 'PHONE_DETECTED',
+              timestamp: Date.now(),
+              data: { message: 'Cell phone detected in live stream!' }
+            });
+          }
+        });
+        saveSession();
+      }
       break;
 
     case 'force_end':
@@ -1572,6 +1579,27 @@ function handleServerMessage(data) {
     case 'debug_trigger_shutdown':
       // DEBUG: Allow manual trigger for testing
       processViolation('PHONE_DETECTED', { message: 'Manual debug trigger' });
+      break;
+
+    case 'request_webrtc_offer':
+      if (captureWindowId) {
+        chrome.tabs.query({ windowId: captureWindowId }, (tabs) => {
+          if (tabs && tabs[0]) {
+            chrome.tabs.sendMessage(tabs[0].id, { type: 'REQUEST_WEBRTC_OFFER' }).catch(() => {});
+          }
+        });
+      }
+      break;
+
+    case 'webrtc_signal':
+      // Route incoming WebRTC signals directly to the capture window (where RTCPeerConnection lives)
+      if (captureWindowId) {
+        chrome.tabs.query({ windowId: captureWindowId }, (tabs) => {
+          if (tabs && tabs[0]) {
+            chrome.tabs.sendMessage(tabs[0].id, { type: 'WEBRTC_SIGNAL_IN', payload: data.payload }).catch(() => {});
+          }
+        });
+      }
       break;
 
     default:
@@ -1805,7 +1833,7 @@ let cheatingDetectionInterval = null;
 
 const CHEATING_TOOL_SIGNATURES = {
   // Port-based detection (Cluely runs Vite dev server on these ports)
-  ports: [5180, 5173, 5174, 3000, 3001],
+  ports: [5180, 5173, 5174],
 
   // Known cheating tool window title patterns
   titlePatterns: [

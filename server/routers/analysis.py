@@ -22,7 +22,6 @@ from models.student import Student
 from config import SCREENSHOTS_DIR, WEBCAM_DIR
 # from main import vision_engine # Circular dependency
 from services.ocr import analyze_screenshot_ocr
-from services.similarity import check_text_similarity
 from services.llm import get_llm_service
 from services.realtime import get_realtime_manager, EventType, AlertLevel
 from scoring.engine import ScoringEngine
@@ -127,16 +126,35 @@ async def process_analysis_data(
         fname, fpath = save_image(webcam_frame, WEBCAM_DIR, "webcam")
         analysis_record.source_file = f"/uploads/webcam/{fname}"
         
-        # 1.1 Vision Engine Analysis (MediaPipe - optional)
+        # 1.1 Vision Engine Analysis (MediaPipe - basic)
         if vision_engine:
-            vision_results = vision_engine.analyze_frame(webcam_frame)
+            vision_results = vision_engine.analyze_frame(webcam_frame, student_id=student_id)
             analysis_record.face_detected = "FACE_NOT_FOUND" not in vision_results['violations']
-            # Calculate simple engagement confidence from gaze
-            # This is a simplification; ideally SecureVision returns a float
             analysis_record.face_confidence = 0.0 if "FACE_NOT_FOUND" in vision_results['violations'] else 0.9
             
+            # Layer 1.1b: Advanced Gaze Tracking Service
+            gaze_service = getattr(request.app.state, "gaze_service", None)
+            if gaze_service:
+                gaze_point = gaze_service.process_frame(student_id, webcam_frame)
+                gaze_analysis = gaze_service.get_analysis(student_id)
+                vision_results['advanced_gaze'] = gaze_analysis.__dict__
+                
+                # Update session engagement/risk from advanced gaze
+                if gaze_analysis.anomaly_score > 30:
+                    session.risk_score = min(100, session.risk_score + (gaze_analysis.anomaly_score / 2))
+                    await realtime.notify_suspicious_activity(
+                        student_id=student_id,
+                        session_id=session_id,
+                        activity_type="suspicious_gaze",
+                        details=f"Anomalous gaze patterns: {', '.join(gaze_analysis.anomalies)}"
+                    )
+                
+                # Send heatmap update occasionally or on request
+                # For now, just include in response
+                analysis_record.result_data["gaze_heatmap"] = gaze_service.get_heatmap(student_id)
+
             # Update session engagement score
-            if "GAZE_AWAY_LONG" in vision_results['violations']:
+            if "GAZE_AWAY_LONG" in vision_results['violations'] or "SUSPICIOUS_GAZE_PATTERN" in vision_results['violations']:
                 session.engagement_score = max(0, session.engagement_score - 5)
                 await realtime.notify_suspicious_activity(
                     student_id=student_id,
@@ -219,15 +237,8 @@ async def process_analysis_data(
         analysis_record.result_data["ocr"] = ocr_result
 
     # 3. Text Similarity (Clipboard)
-    # 3. Text Similarity (Clipboard)
     if analysis_request.clipboard_text:
-        sim_result = await check_text_similarity(analysis_request.clipboard_text)
-        analysis_record.similarity_score = sim_result.get("similarity_score", 0)
-        if sim_result.get("is_suspicious"):
-            session.effort_alignment = max(0, session.effort_alignment - 15)
-            analysis_record.risk_score_added += sim_result.get("risk_score", 0)
-        
-        analysis_record.result_data["similarity"] = sim_result
+        analysis_record.similarity_score = 0.0
 
     # 4. Smart Local LLM Analysis (Optional - if Ollama is running)
     llm = get_llm_service()

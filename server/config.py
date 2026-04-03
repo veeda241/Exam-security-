@@ -118,6 +118,26 @@ CHEATING_SITES = [
     "pastebin.com", "github.com", "gitlab.com",
 ]
 
+# Social media sites - medium-high risk
+SOCIAL_SITES = [
+    "facebook.com", "twitter.com", "x.com",
+    "instagram.com", "snapchat.com", "tiktok.com",
+    "linkedin.com", "reddit.com", "tumblr.com",
+    "pinterest.com", "threads.net", "mastodon.social",
+    "discord.com", "whatsapp.com", "web.telegram.org",
+    "messenger.com",
+]
+
+# Educational / productive sites - no risk
+EDUCATIONAL_SITES = [
+    "udemy.com", "coursera.org", "edx.org",
+    "khanacademy.org", "codecademy.com", "freecodecamp.org",
+    "w3schools.com", "mdn.io", "geeksforgeeks.org",
+    "docs.python.org", "developer.mozilla.org",
+    "google.com/search", "bing.com/search",
+    "wikipedia.org",
+]
+
 def classify_url(url: str) -> dict | None:
     """Classify a URL into a risk category. Returns dict with category/site/riskLevel or None."""
     if not url:
@@ -165,6 +185,7 @@ RISK_WEIGHTS = {
     "BROWSING_SUMMARY": 0,
     "TAB_AUDIT": 0,
     "VISUAL_FORBIDDEN_CONTENT": 45,
+    "OTHER": 0,
 }
 
 # Risk score thresholds

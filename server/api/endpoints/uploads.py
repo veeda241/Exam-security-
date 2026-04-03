@@ -111,6 +111,38 @@ async def upload_screenshot(
         with open(file_path, "wb") as f:
             f.write(image_bytes)
         
+        # Broadcast live frame to dashboard via WebSocket
+        try:
+            from services.realtime import get_realtime_manager
+            mgr = get_realtime_manager()
+            import asyncio
+            
+            # Extract clean base64 string
+            clean_b64 = upload.image_data
+            if "," in clean_b64:
+                clean_b64 = clean_b64.split(",")[1]
+            
+            # Format as valid Data URL for the <img> tag
+            data_url = f"data:image/jpeg;base64,{clean_b64}"
+            
+            # Find the exam_id to broadcast to the proctor dashboard
+            session_res = supabase.table("exam_sessions").select("exam_id").eq("id", upload.session_id).execute()
+            target_room = session_res.data[0]["exam_id"] if session_res.data else upload.session_id
+            
+            # Use background_tasks so we don't block the upload response
+            background_tasks.add_task(
+                mgr.broadcast_to_session,
+                target_room,
+                {
+                    "type": "live_frame",
+                    "student_id": upload.session_id,
+                    "frame_type": "screenshot",
+                    "data": data_url
+                }
+            )
+        except Exception as ws_err:
+            print(f"[WS] Failed to broadcast screenshot frame: {ws_err}")
+            
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Invalid image data: {str(e)}")
     
@@ -151,6 +183,37 @@ async def upload_webcam_frame(
         with open(file_path, "wb") as f:
             f.write(image_bytes)
         
+        # Broadcast live frame to dashboard via WebSocket
+        try:
+            from services.realtime import get_realtime_manager
+            mgr = get_realtime_manager()
+            import asyncio
+            
+            # Extract clean base64 string
+            clean_b64 = upload.image_data
+            if "," in clean_b64:
+                clean_b64 = clean_b64.split(",")[1]
+            
+            # Format as valid Data URL for the <img> tag
+            data_url = f"data:image/jpeg;base64,{clean_b64}"
+            
+            # Find the exam_id to broadcast to the proctor dashboard
+            session_res = supabase.table("exam_sessions").select("exam_id").eq("id", upload.session_id).execute()
+            target_room = session_res.data[0]["exam_id"] if session_res.data else upload.session_id
+            
+            background_tasks.add_task(
+                mgr.broadcast_to_session,
+                target_room,
+                {
+                    "type": "live_frame",
+                    "student_id": upload.session_id,
+                    "frame_type": "webcam",
+                    "data": data_url
+                }
+            )
+        except Exception as ws_err:
+            print(f"[WS] Failed to broadcast webcam frame: {ws_err}")
+            
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Invalid image data: {str(e)}")
     
@@ -174,29 +237,30 @@ async def get_latest_upload(
     session_id: str,
     type: str = "webcam"
 ):
-    """Retrieve the latest uploaded image for a session (from Supabase)"""
+    """Retrieve the latest uploaded image for a session from filesystem"""
     
     try:
-        # Query Supabase for the latest frame URL
-        field = "latest_webcam" if type == "webcam" else "latest_screenshot"
-        res = supabase.table("exam_sessions").select(field).eq("id", session_id).execute()
+        from fastapi.responses import FileResponse
+        target_dir = WEBCAM_DIR if type == "webcam" else SCREENSHOTS_DIR
         
-        if not res.data or not res.data[0].get(field):
+        if not os.path.exists(target_dir):
+            raise HTTPException(status_code=404, detail="Upload directory not found")
+            
+        # Find all files for this session
+        session_files = []
+        for filename in os.listdir(target_dir):
+            if session_id in filename:
+                file_path = os.path.join(target_dir, filename)
+                session_files.append((file_path, os.path.getmtime(file_path)))
+                
+        if not session_files:
             raise HTTPException(status_code=404, detail="No uploads recorded for this session yet")
             
-        relative_url = res.data[0][field] # e.g. /uploads/webcam/webcam_uuid.jpg
+        # Sort by modification time (newest first)
+        session_files.sort(key=lambda x: x[1], reverse=True)
+        latest_file = session_files[0][0]
         
-        # In a real environment, we'd return a redirect or the file
-        # For this setup, we serve the file by resolving the path
-        filename = os.path.basename(relative_url)
-        target_dir = WEBCAM_DIR if type == "webcam" else SCREENSHOTS_DIR
-        file_path = os.path.join(target_dir, filename)
-        
-        if not os.path.exists(file_path):
-             raise HTTPException(status_code=404, detail="File has been cleaned or not found on disk")
-             
-        from fastapi.responses import FileResponse
-        return FileResponse(file_path)
+        return FileResponse(latest_file, media_type="image/jpeg")
     except HTTPException:
         raise
     except Exception as e:

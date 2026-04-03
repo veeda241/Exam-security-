@@ -41,13 +41,11 @@ def process_screenshot(session_id: str, image_path: str) -> Dict[str, Any]:
 @celery_app.task(name="check_text_similarity")
 def check_similarity_task(session_id: str, text: str) -> Dict[str, Any]:
     """Check text similarity against known answers"""
-    from services.similarity import TextSimilarityChecker
-    
-    checker = TextSimilarityChecker()
-    result = checker.check_similarity(text)
+    # Feature disabled - similarity removed
     return {
         "session_id": session_id,
-        **result
+        "is_suspicious": False,
+        "similarity_score": 0.0
     }
 
 

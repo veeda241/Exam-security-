@@ -4,7 +4,7 @@
  */
 
 // ==================== CONFIGURATION ====================
-const BACKEND_URL = 'https://exam-security.onrender.com';
+const BACKEND_URL = 'http://127.0.0.1:8000';
 
 const CONFIG = {
     API_BASE: `${BACKEND_URL}/api`,
@@ -49,24 +49,39 @@ let isBackendConnected = false;
 // ==================== INITIALIZATION ====================
 
 document.addEventListener('DOMContentLoaded', async () => {
-    // Check backend connection first
-    await checkBackendConnection();
+    console.log('🚀 Popup initializing...');
+    
+    try {
+        // 1. Initial UI state - hide active until confirmed
+        activeSection.classList.add('hidden');
+        
+        // 2. Check current session status with a timeout to prevent blank screen
+        const statusPromise = getSessionStatus();
+        const timeoutPromise = new Promise(resolve => setTimeout(() => resolve({ active: false, timeout: true }), 2000));
+        
+        const status = await Promise.race([statusPromise, timeoutPromise]);
+        console.log('📊 Session status:', status);
 
-    // Check current session status
-    const status = await getSessionStatus();
+        if (status && status.active) {
+            showActiveSession(status);
+        } else {
+            console.log(status?.timeout ? '⏱️ Status check timed out' : 'ℹ️ No active session');
+            showSetupForm();
+        }
 
-    if (status && status.active) {
-        showActiveSession(status);
-    } else {
-        showSetupForm();
+        // 3. Check backend connection in background (non-blocking for UI reveal)
+        checkBackendConnection().catch(err => console.warn('Backend check error:', err));
+        
+        // 4. Check local permissions
+        checkPermissions();
+
+        // 5. Start maintenance cycles
+        setInterval(checkBackendConnection, CONFIG.HEALTH_CHECK_INTERVAL);
+        
+    } catch (error) {
+        console.error('❌ Popup initialization failed:', error);
+        showSetupForm(); // Emergency fallback to show SOMETHING
     }
-
-    // Check permissions
-    checkPermissions();
-
-    // Start health check interval
-    setInterval(checkBackendConnection, CONFIG.HEALTH_CHECK_INTERVAL);
-
 });
 
 async function checkBackendConnection() {
@@ -138,18 +153,29 @@ function showSetupForm() {
 }
 
 function showActiveSession(status) {
+    // Populate data BEFORE revealing section to prevent flickering
+    if (status.sessionId) {
+        sessionIdDisplay.textContent = status.sessionId.substring(0, 8).toUpperCase();
+    }
+    
+    // Set initial timer reference
+    startTime = Date.now() - (status.duration || 0);
+    updateTimer(); // Initial tick
+    
+    // Update initial stats
+    updateStats(status);
+    updateCaptureStatus(status);
+
+    // Reveal the correct section
     setupSection.classList.add('hidden');
     activeSection.classList.remove('hidden');
+    
+    // Update header status
     statusIndicator.classList.remove('inactive');
     statusIndicator.classList.add('active');
     statusIndicator.querySelector('.status-text').textContent = 'Live';
 
-    if (status.sessionId) {
-        sessionIdDisplay.textContent = status.sessionId.substring(0, 8).toUpperCase();
-    }
-
-    updateStats(status);
-    startTime = Date.now() - (status.duration || 0);
+    // Start background refresh
     startStatsInterval();
 }
 
@@ -161,23 +187,26 @@ function updateStats(status) {
     if (statAudio) animateNumber(statAudio, status.audioAnomalyCount || 0);
     
     // Update browsing tracker stats
-    updateBrowsingStats(status.browsing);
+    updateBrowsingStats(status.browsing, status.globalRiskScore, status.globalEffortScore);
 }
 
 /** Update the browsing monitor section in the popup */
-function updateBrowsingStats(browsing) {
+function updateBrowsingStats(browsing, globalRisk, globalEffort) {
     if (!browsing) return;
+    
+    const actualRisk = globalRisk !== undefined ? globalRisk : browsing.browsingRiskScore;
+    const actualEffort = globalEffort !== undefined ? globalEffort : browsing.effortScore;
     
     // Risk score
     const riskEl = document.getElementById('browsing-risk');
     const riskBar = document.getElementById('risk-bar');
     if (riskEl) {
-        riskEl.textContent = browsing.browsingRiskScore;
-        riskBar.style.width = `${browsing.browsingRiskScore}%`;
+        riskEl.textContent = Math.round(actualRisk);
+        riskBar.style.width = `${Math.min(100, actualRisk)}%`;
         // Color: green→yellow→red
-        if (browsing.browsingRiskScore < 30) {
+        if (actualRisk < 30) {
             riskBar.style.background = 'linear-gradient(90deg, #10b981, #34d399)';
-        } else if (browsing.browsingRiskScore < 60) {
+        } else if (actualRisk < 60) {
             riskBar.style.background = 'linear-gradient(90deg, #f59e0b, #fbbf24)';
         } else {
             riskBar.style.background = 'linear-gradient(90deg, #ef4444, #f87171)';
@@ -188,11 +217,11 @@ function updateBrowsingStats(browsing) {
     const effortEl = document.getElementById('browsing-effort');
     const effortBar = document.getElementById('effort-bar');
     if (effortEl) {
-        effortEl.textContent = browsing.effortScore;
-        effortBar.style.width = `${browsing.effortScore}%`;
-        if (browsing.effortScore > 70) {
+        effortEl.textContent = Math.round(actualEffort);
+        effortBar.style.width = `${Math.min(100, actualEffort)}%`;
+        if (actualEffort > 70) {
             effortBar.style.background = 'linear-gradient(90deg, #10b981, #34d399)';
-        } else if (browsing.effortScore > 40) {
+        } else if (actualEffort > 40) {
             effortBar.style.background = 'linear-gradient(90deg, #f59e0b, #fbbf24)';
         } else {
             effortBar.style.background = 'linear-gradient(90deg, #ef4444, #f87171)';

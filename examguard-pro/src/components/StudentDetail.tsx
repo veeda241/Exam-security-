@@ -25,7 +25,7 @@ export function StudentDetail() {
       setLoading(true);
       try {
         const token = localStorage.getItem("token");
-        const res = await fetch(`${config.apiUrl}/sessions/`, {
+        const res = await fetch(`${config.apiUrl}/sessions`, {
           headers: token ? { Authorization: `Bearer ${token}` } : {},
         });
         if (!res.ok) throw new Error("Failed to fetch sessions");

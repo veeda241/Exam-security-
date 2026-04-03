@@ -38,14 +38,14 @@ async def get_report_summary(session_id: str):
             student_name=session.get("student_name", "Unknown"),
             exam_id=session.get("exam_id", "Unknown"),
             duration_seconds=duration,
-            risk_score=session.get("risk_score", 0.0),
-            risk_level=session.get("risk_level", "low"),
+            risk_score=session.get("risk_score", 0.0) or 0.0,
+            risk_level=session.get("risk_level", "low") or "low",
             event_counts={
-                "tab_switches": session.get("tab_switch_count", 0),
-                "copy_events": session.get("copy_count", 0),
-                "face_absences": session.get("face_absence_count", 0),
-                "forbidden_sites": session.get("forbidden_site_count", 0),
-                "total": session.get("total_events", 0),
+                "tab_switches": session.get("tab_switch_count", 0) or 0,
+                "copy_events": session.get("copy_count", 0) or 0,
+                "face_absences": session.get("face_absence_count", 0) or 0,
+                "forbidden_sites": session.get("forbidden_site_count", 0) or 0,
+                "total": session.get("total_events", 0) or 0,
             },
             high_risk_events=high_risk_events,
         )
@@ -174,3 +174,4 @@ async def get_session_timeline(session_id: str):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+ 

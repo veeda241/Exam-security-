@@ -15,13 +15,10 @@ class ExamCapture {
 
         // Adaptive configuration
         this.config = {
-            screenshotIntervalMs: 2500,
-            webcamIntervalMs: 2000,
-            imageQuality: 0.7,
-            maxWidth: 1280,
-            maxHeight: 720,
-            webcamWidth: 640,
-            webcamHeight: 480,
+            maxWidth: 854,
+            maxHeight: 480,
+            webcamWidth: 320,
+            webcamHeight: 240,
             maxErrors: 5,
         };
     }
@@ -48,13 +45,6 @@ class ExamCapture {
             // Reset error count on success
             this.errorCount.screen = 0;
 
-            // Start interval
-            this.screenshotInterval = setInterval(() => {
-                this.takeScreenshot();
-            }, this.config.screenshotIntervalMs);
-
-            // First capture immediately
-            this.takeScreenshot();
 
             // Handle stream end
             this.screenStream.getVideoTracks()[0].onended = () => {
@@ -74,34 +64,7 @@ class ExamCapture {
         }
     }
 
-    async takeScreenshot() {
-        if (!this.screenStream || !this.screenStream.active) {
-            this.errorCount.screen++;
-            if (this.errorCount.screen >= this.config.maxErrors) {
-                console.warn('⚠️ Too many screen capture errors, stopping');
-                this.stopScreenCapture();
-            }
-            return;
-        }
 
-        try {
-            const videoTrack = this.screenStream.getVideoTracks()[0];
-            if (!videoTrack || videoTrack.readyState !== 'live') return;
-
-            // Use ImageCapture API if available for better performance
-            if ('ImageCapture' in window) {
-                await this.captureWithImageCapture(videoTrack, 'screen');
-            } else {
-                await this.captureWithCanvas(this.screenStream, 'screen');
-            }
-
-            this.captureCount.screen++;
-            this.errorCount.screen = 0;
-        } catch (error) {
-            console.error('Screenshot error:', error?.message || error || 'Unknown');
-            this.errorCount.screen++;
-        }
-    }
 
     // ==================== WEBCAM CAPTURE ====================
 
@@ -123,13 +86,6 @@ class ExamCapture {
             console.log('📹 Webcam capture initialized');
             this.errorCount.webcam = 0;
 
-            // Start interval
-            this.webcamInterval = setInterval(() => {
-                this.captureWebcamFrame();
-            }, this.config.webcamIntervalMs);
-
-            // First capture immediately
-            this.captureWebcamFrame();
 
             // Handle track end
             this.webcamStream.getVideoTracks()[0].onended = () => {
@@ -149,148 +105,8 @@ class ExamCapture {
         }
     }
 
-    async captureWebcamFrame() {
-        if (!this.webcamStream || !this.webcamStream.active) {
-            this.errorCount.webcam++;
-            if (this.errorCount.webcam >= this.config.maxErrors) {
-                console.warn('⚠️ Too many webcam errors, stopping');
-                this.stopWebcamCapture();
-            }
-            return;
-        }
 
-        try {
-            const videoTrack = this.webcamStream.getVideoTracks()[0];
-            if (!videoTrack || videoTrack.readyState !== 'live') return;
 
-            if ('ImageCapture' in window) {
-                await this.captureWithImageCapture(videoTrack, 'webcam');
-            } else {
-                await this.captureWithCanvas(this.webcamStream, 'webcam');
-            }
-
-            this.captureCount.webcam++;
-            this.errorCount.webcam = 0;
-        } catch (error) {
-            console.error('Webcam capture error:', error?.message || error || 'Unknown');
-            this.errorCount.webcam++;
-        }
-    }
-
-    // ==================== CAPTURE METHODS ====================
-
-    async captureWithImageCapture(videoTrack, type) {
-        try {
-            const imageCapture = new ImageCapture(videoTrack);
-            // Use grabFrame (always supported) instead of takePhoto
-            // takePhoto calls setPhotoOptions which fails on screen capture tracks
-            const bitmap = await imageCapture.grabFrame();
-
-            let width = bitmap.width;
-            let height = bitmap.height;
-            const maxW = type === 'screen' ? this.config.maxWidth : this.config.webcamWidth;
-            const maxH = type === 'screen' ? this.config.maxHeight : this.config.webcamHeight;
-
-            if (width > maxW) {
-                const ratio = maxW / width;
-                width = maxW;
-                height = Math.round(height * ratio);
-            }
-            if (height > maxH) {
-                const ratio = maxH / height;
-                height = maxH;
-                width = Math.round(width * ratio);
-            }
-
-            const canvas = document.createElement('canvas');
-            canvas.width = width;
-            canvas.height = height;
-            const ctx = canvas.getContext('2d');
-            ctx.drawImage(bitmap, 0, 0, width, height);
-            bitmap.close();
-
-            const dataUrl = canvas.toDataURL('image/jpeg', this.config.imageQuality);
-            this.sendCapture(type, dataUrl);
-        } catch (err) {
-            // Fallback to canvas method if ImageCapture fails
-            console.warn(`ImageCapture failed for ${type}, falling back to canvas:`, err?.message || err);
-            const stream = type === 'screen' ? this.screenStream : this.webcamStream;
-            if (stream) {
-                await this.captureWithCanvas(stream, type);
-            }
-        }
-    }
-
-    async captureWithCanvas(stream, type) {
-        const video = document.createElement('video');
-        video.srcObject = stream;
-        video.muted = true;
-        video.playsInline = true;
-
-        await new Promise((resolve, reject) => {
-            video.onloadedmetadata = () => {
-                video.play().then(resolve).catch(err => reject(err || new Error('Video play failed')));
-            };
-            video.onerror = (e) => reject(new Error('Video stream error'));
-            setTimeout(() => reject(new Error('Video load timeout')), 5000);
-        });
-
-        // Calculate dimensions
-        let width = video.videoWidth;
-        let height = video.videoHeight;
-
-        if (type === 'screen') {
-            if (width > this.config.maxWidth) {
-                const ratio = this.config.maxWidth / width;
-                width = this.config.maxWidth;
-                height = Math.round(height * ratio);
-            }
-            if (height > this.config.maxHeight) {
-                const ratio = this.config.maxHeight / height;
-                height = this.config.maxHeight;
-                width = Math.round(width * ratio);
-            }
-        }
-
-        const canvas = document.createElement('canvas');
-        canvas.width = width;
-        canvas.height = height;
-
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(video, 0, 0, width, height);
-
-        const dataUrl = canvas.toDataURL('image/jpeg', this.config.imageQuality);
-
-        video.srcObject = null;
-        this.sendCapture(type, dataUrl);
-    }
-
-    sendCapture(type, dataUrl) {
-        const messageType = type === 'screen' ? 'UPLOAD_SCREENSHOT' : 'UPLOAD_WEBCAM';
-
-        // Use callback-style sendMessage to avoid channel-closed errors
-        try {
-            chrome.runtime.sendMessage({
-                type: messageType,
-                data: dataUrl,
-            }, (response) => {
-                if (chrome.runtime.lastError) {
-                    // This is expected if the port closes before the response arrives (slow upload)
-                    // We only log it as info if it's the specific "message port closed" error
-                    const errMsg = chrome.runtime.lastError.message || '';
-                    if (errMsg.includes('message port closed')) {
-                        console.info(`${type} port closed (upload continues)`);
-                    } else {
-                        console.warn(`${type} upload channel:`, errMsg);
-                    }
-                }
-            });
-        } catch (err) {
-            console.warn(`${type} upload error:`, err?.message || 'Context invalidated');
-        }
-
-        console.log(`📷 ${type === 'screen' ? 'Screenshot' : 'Webcam frame'} #${this.captureCount[type] + 1}`);
-    }
 
     // ==================== STOP METHODS ====================
 
@@ -322,6 +138,38 @@ class ExamCapture {
         console.log('📹 Webcam capture stopped');
     }
 
+    /**
+     * Capture a single frame from the active webcam stream
+     * @returns {string|null} Base64 JPEG data URL
+     */
+    captureWebcamFrame() {
+        if (!this.webcamStream || !this.webcamStream.active) return null;
+
+        try {
+            // Create a temporary video element to play the stream if not already playing
+            if (!this._captureVideo) {
+                this._captureVideo = document.createElement('video');
+                this._captureVideo.srcObject = this.webcamStream;
+                this._captureVideo.muted = true;
+                this._captureVideo.play();
+            }
+
+            const canvas = document.createElement('canvas');
+            canvas.width = this.config.webcamWidth;
+            canvas.height = this.config.webcamHeight;
+            const ctx = canvas.getContext('2d');
+            
+            // Draw current video frame to canvas
+            ctx.drawImage(this._captureVideo, 0, 0, canvas.width, canvas.height);
+            
+            // Return as compressed JPEG
+            return canvas.toDataURL('image/jpeg', 0.6);
+        } catch (error) {
+            console.warn('Webcam frame capture failed:', error);
+            return null;
+        }
+    }
+
     // ==================== UNIFIED CONTROLS ====================
 
     async startAll() {
@@ -334,6 +182,9 @@ class ExamCapture {
             this.startWebcamCapture(),
         ]);
 
+        // Kick off WebRTC P2P signaling using the gathered streams
+        this.initWebRTC();
+
         return {
             screen: screenResult.status === 'fulfilled' ? screenResult.value : { success: false, error: screenResult.reason },
             webcam: webcamResult.status === 'fulfilled' ? webcamResult.value : { success: false, error: webcamResult.reason },
@@ -342,8 +193,56 @@ class ExamCapture {
 
     stopAll() {
         this.isCapturing = false;
+        if (this.pc) {
+            this.pc.close();
+            this.pc = null;
+        }
+        this.stopMediaRecorder();
         this.stopScreenCapture();
         this.stopWebcamCapture();
+    }
+
+    // ==================== LIVE STREAMING (MEDIA RECORDER) ====================
+
+    startMediaRecorder(intervalMs = 1000) {
+        if (!this.screenStream || !this.screenStream.active) {
+            console.warn('❌ Cannot start MediaRecorder: Screen stream inactive');
+            return;
+        }
+
+        try {
+            // Options for high performance / low latency
+            const options = {
+                mimeType: 'video/webm; codecs=vp8',
+                videoBitsPerSecond: 800000 // 800 Kbps (Balance quality/bandwidth)
+            };
+
+            this.mediaRecorder = new MediaRecorder(this.screenStream, options);
+
+            this.mediaRecorder.ondataavailable = (event) => {
+                if (event.data.size > 0 && this.isCapturing) {
+                    // Send binary chunk to background script
+                    // Note: Chrome extensions can send Blobs/ArrayBuffers via sendMessage
+                    chrome.runtime.sendMessage({
+                        type: 'STREAM_CHUNK',
+                        data: event.data
+                    }).catch(() => { });
+                }
+            };
+
+            this.mediaRecorder.start(intervalMs);
+            console.log('🎥 Live streaming started (MediaRecorder)');
+        } catch (e) {
+            console.error('🎥 MediaRecorder start failed:', e);
+        }
+    }
+
+    stopMediaRecorder() {
+        if (this.mediaRecorder && this.mediaRecorder.state !== 'inactive') {
+            this.mediaRecorder.stop();
+            this.mediaRecorder = null;
+        }
+        console.log('🎥 Live streaming stopped');
     }
 
     getStatus() {
@@ -377,7 +276,85 @@ class ExamCapture {
             }
         }).catch(() => { });
     }
+
+    // ==================== WEBRTC INJECTION ====================
+    initWebRTC() {
+        if (this.pc) {
+            this.pc.close();
+        }
+
+        this.pc = new RTCPeerConnection({
+            iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+        });
+
+        // Add 2 generic video tracks: first webcam, second screen
+        if (this.webcamStream && this.webcamStream.getVideoTracks()[0]) {
+            this.webcamStream.getVideoTracks()[0].enabled = true;
+            this.pc.addTrack(this.webcamStream.getVideoTracks()[0], this.webcamStream);
+        }
+        if (this.screenStream && this.screenStream.getVideoTracks()[0]) {
+            this.screenStream.getVideoTracks()[0].enabled = true;
+            this.pc.addTrack(this.screenStream.getVideoTracks()[0], this.screenStream);
+        }
+
+        this.pc.onicecandidate = (event) => {
+             if (event.candidate) {
+                 chrome.runtime.sendMessage({
+                     type: 'WEBRTC_SIGNAL_OUT',
+                     payload: { candidate: event.candidate }
+                 });
+             }
+        };
+
+        // Student is the offerer. They open P2P with their ready streams
+        this.pc.createOffer().then(offer => {
+            return this.pc.setLocalDescription(offer);
+        }).then(() => {
+            chrome.runtime.sendMessage({
+                type: 'WEBRTC_SIGNAL_OUT',
+                payload: { sdp: this.pc.localDescription }
+            });
+        }).catch(err => console.error("WebRTC Offer Error:", err));
+    }
+
+    async handleWebRTCSignal(payload) {
+        console.log('[WebRTC] Received signal:', payload);
+        if (!this.pc) {
+            console.error('[WebRTC] No peer connection available');
+            return;
+        }
+        try {
+            if (payload.sdp) {
+                console.log('[WebRTC] Setting remote description:', payload.sdp.type);
+                await this.pc.setRemoteDescription(new RTCSessionDescription(payload.sdp));
+                console.log('[WebRTC] Remote description set successfully');
+            } else if (payload.candidate) {
+                console.log('[WebRTC] Adding ICE candidate');
+                await this.pc.addIceCandidate(new RTCIceCandidate(payload.candidate));
+            } else {
+                console.log('[WebRTC] Unknown signal type:', payload);
+            }
+        } catch (e) {
+            console.error("[WebRTC] Signaling Error", e);
+        }
+    }
 }
+
+// Global Message Listener for WebRTC from Background
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    if (message.type === 'WEBRTC_SIGNAL_IN' && window.ExamCaptureInstance) {
+        window.ExamCaptureInstance.handleWebRTCSignal(message.payload);
+        sendResponse({ success: true });
+        return true;
+    }
+    
+    if (message.type === 'REQUEST_WEBRTC_OFFER' && window.ExamCaptureInstance) {
+        console.log("📡 Dashboard requested WEBRTC offer, re-initializing...");
+        window.ExamCaptureInstance.initWebRTC();
+        sendResponse({ success: true });
+        return true;
+    }
+});
 
 // Export
 window.ExamCapture = ExamCapture;

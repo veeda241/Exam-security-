@@ -7,7 +7,7 @@ from api.schemas import StudentCreate, StudentUpdate, StudentResponse
 router = APIRouter()
 supabase = get_supabase()
 
-@router.post("/", response_model=StudentResponse)
+@router.post("", response_model=StudentResponse)
 async def create_student(student_data: StudentCreate):
     """Create a new student via Supabase"""
     try:
@@ -46,7 +46,7 @@ async def create_student(student_data: StudentCreate):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/", response_model=List[StudentResponse])
+@router.get("", response_model=List[StudentResponse])
 async def list_students(limit: int = 100):
     """Get all students from Supabase"""
     try:

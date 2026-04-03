@@ -12,6 +12,7 @@ const syncLoader = document.getElementById('sync-loader');
 
 // Global capture instance
 const capture = new ExamCapture();
+window.ExamCaptureInstance = capture;
 let screenGranted = false;
 let webcamGranted = false;
 
@@ -142,3 +143,28 @@ style.textContent = `
     }
 `;
 document.head.appendChild(style);
+
+
+// ==================== BACKGROUND COMMUNICATION ====================
+
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    switch (message.type) {
+        case 'CAPTURE_WEBCAM_FRAME':
+            const webcamFrame = capture.captureWebcamFrame();
+            sendResponse({ image: webcamFrame });
+            break;
+            
+        case 'START_STREAMING':
+            capture.startMediaRecorder(message.interval || 1000);
+            // Initialize WebRTC P2P streaming after MediaRecorder starts
+            capture.initWebRTC();
+            sendResponse({ success: true });
+            break;
+            
+        case 'STOP_EXAM':
+             capture.stopAll();
+             sendResponse({ success: true });
+             break;
+    }
+    return true;
+});

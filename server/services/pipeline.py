@@ -100,28 +100,14 @@ class AnalysisPipeline:
         session_id = event_data.get("session_id", "")
         event_type = event_data.get("type", "")
 
-        # Update copy_count in Supabase for COPY/PASTE events
-        if event_type in ("COPY", "PASTE"):
-            try:
-                res = supabase.table("exam_sessions").select("copy_count, risk_score, effort_alignment").eq("id", session_id).execute()
-                if res.data:
-                    session = res.data[0]
-                    updates = {
-                        "copy_count": session.get("copy_count", 0) + 1,
-                        "risk_score": min(100, session.get("risk_score", 0) + 8),
-                        "effort_alignment": max(0, session.get("effort_alignment", 100) - 5),
-                    }
-                    supabase.table("exam_sessions").update(updates).eq("id", session_id).execute()
-                    self._stats["db_updates"] += 1
-            except Exception as e:
-                print(f"[Pipeline] Copy count update error: {e}")
+        # copy_count and base risk/effort score accumulation is securely handled by events.py in batches
 
         if not text or len(text) < 10:
             return
 
         try:
-            from services.similarity import check_text_similarity
-            sim_result = await check_text_similarity(text)
+            # Feature disabled
+            sim_result = {"similarity_score": 0, "risk_score": 0, "is_suspicious": False}
 
             transformer_result = None
             try:
@@ -133,8 +119,9 @@ class AnalysisPipeline:
             except Exception as e:
                 print(f"[Pipeline] Transformer analysis skipped: {e}")
 
-            # Store result in Supabase
+            import uuid
             analysis = {
+                "id": str(uuid.uuid4()),
                 "session_id": session_id,
                 "timestamp": datetime.utcnow().isoformat(),
                 "analysis_type": "TEXT_ANALYSIS",
@@ -167,17 +154,13 @@ class AnalysisPipeline:
         if not url:
             return
 
-        # Every tab switch / navigation reduces engagement and bumps risk slightly
+        # Categorization logic for Forbidden Keywords
         res = supabase.table("exam_sessions").select("*").eq("id", session_id).execute()
         if not res.data:
             return
         session = res.data[0]
-
-        updates = {
-            "tab_switch_count": session.get("tab_switch_count", 0) + 1,
-            "engagement_score": max(0, session.get("engagement_score", 100) - 2),
-            "risk_score": min(100, session.get("risk_score", 0) + 5),
-        }
+        
+        updates = {}
 
         from config import FORBIDDEN_KEYWORDS, AI_SITES, ENTERTAINMENT_SITES, SOCIAL_SITES, EDUCATIONAL_SITES
         url_lower = url.lower()
@@ -202,8 +185,9 @@ class AnalysisPipeline:
             category = "Educational"
             risk_impact = 0
 
-        # Create analysis result for the timeline (for EVERY visit)
+        import uuid
         analysis = {
+            "id": str(uuid.uuid4()),
             "session_id": session_id,
             "timestamp": datetime.utcnow().isoformat(),
             "analysis_type": "URL_VISIT",
@@ -235,17 +219,8 @@ class AnalysisPipeline:
         self._stats["db_updates"] += 1
 
     async def _handle_focus_event(self, event_data: Dict[str, Any]):
-        """Process window blur via Supabase."""
-        session_id = event_data.get("session_id", "")
-        res = supabase.table("exam_sessions").select("engagement_score, risk_score").eq("id", session_id).execute()
-        if res.data:
-            session = res.data[0]
-            updates = {
-                "engagement_score": max(0, session.get("engagement_score", 100) - 3),
-                "risk_score": min(100, session.get("risk_score", 0) + 3),
-            }
-            supabase.table("exam_sessions").update(updates).eq("id", session_id).execute()
-            self._stats["db_updates"] += 1
+        """Process window blur via Supabase (Handled natively by events.py batch accumulation)."""
+        pass
 
     async def _handle_transformer_alert(self, event_data: Dict[str, Any]):
         """Process transformer alerts via Supabase."""
@@ -269,7 +244,7 @@ class AnalysisPipeline:
             })
 
     async def _handle_vision_event(self, event_data: Dict[str, Any]):
-        """Process vision events via Supabase."""
+        """Process vision events via Supabase and broadcast to extension/dashboard."""
         session_id = event_data.get("session_id", "")
         event_type = event_data.get("type", "")
 
@@ -280,9 +255,21 @@ class AnalysisPipeline:
             if event_type == "PHONE_DETECTED":
                 updates["risk_score"] = 100
                 updates["risk_level"] = "suspicious"
-            elif event_type == "FACE_ABSENT":
+                # Broadcast immediately for extension reaction
+                await self._push_to_dashboard(session_id, {
+                    "type": "anomaly_alert",
+                    "alert_type": "PHONE_DETECTED",
+                    "message": "Mobile phone detected in student feed!"
+                })
+            elif event_type in ("FACE_ABSENT", "FACE_ABSENT_VIOLATION"):
                 updates["face_absence_count"] = session.get("face_absence_count", 0) + 1
                 updates["engagement_score"] = max(0, session.get("engagement_score", 100) - 10)
+                # Notify extension
+                await self._push_to_dashboard(session_id, {
+                    "type": "anomaly_alert",
+                    "alert_type": "FACE_ABSENT",
+                    "message": "Student face is not visible!"
+                })
             
             if updates:
                 supabase.table("exam_sessions").update(updates).eq("id", session_id).execute()
@@ -322,8 +309,10 @@ class AnalysisPipeline:
             from services.realtime import get_realtime_manager, AlertLevel
             realtime = get_realtime_manager()
 
-            res = supabase.table("exam_sessions").select("student_id").eq("id", session_id).execute()
-            student_id = res.data[0].get("student_id", "unknown") if res.data else "unknown"
+            res = supabase.table("exam_sessions").select("student_id, exam_id").eq("id", session_id).execute()
+            session_info = res.data[0] if res.data else {}
+            student_id = session_info.get("student_id", "unknown")
+            exam_id = session_info.get("exam_id", session_id)
 
             event_type = data.get("type", "analysis_update")
             alert_level = AlertLevel.INFO
@@ -335,10 +324,13 @@ class AnalysisPipeline:
             await realtime.broadcast_event(
                 event_type=event_type,
                 student_id=student_id,
-                session_id=session_id,
-                data=data,
+                session_id=exam_id, # Broadcast to EXAM room
+                data={**data, "student_session_id": session_id}, # Keep student session ref
                 alert_level=alert_level,
             )
+            
+            # Also send directly to the student via their session_id room
+            await realtime.broadcast_to_session(session_id, data)
         except Exception as e:
             print(f"[Pipeline] WebSocket push error: {e}")
 

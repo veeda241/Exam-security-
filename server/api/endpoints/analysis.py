@@ -17,12 +17,18 @@ from api.schemas import (
 )
 from config import SCREENSHOTS_DIR, WEBCAM_DIR
 from services.ocr import analyze_screenshot_ocr
-from services.similarity import check_text_similarity
 from services.llm import get_llm_service
 from services.research_analysis import analyze_research_journey
 
 router = APIRouter()
 supabase = get_supabase()
+
+# In-memory cache for latest feed paths per session (avoids needing DB columns)
+_latest_feeds: dict = {}  # {session_id: {"webcam": "/uploads/webcam/file.jpg", "screenshot": "/uploads/screenshots/file.jpg"}}
+
+def get_latest_feeds():
+    """Get the global feeds cache — used by uploads endpoint."""
+    return _latest_feeds
 
 def decode_image(base64_string):
     """Decode base64 image string to OpenCV image"""
@@ -95,7 +101,10 @@ async def process_analysis_data(
             if webcam_frame is not None:
                 fname, fpath = save_image(webcam_frame, WEBCAM_DIR, "webcam")
                 analysis_data["source_file"] = f"/uploads/webcam/{fname}"
-                session_updates["latest_webcam"] = f"/uploads/webcam/{fname}"
+                # Store in memory cache (DB may not have this column)
+                if session["id"] not in _latest_feeds:
+                    _latest_feeds[session["id"]] = {}
+                _latest_feeds[session["id"]]["webcam"] = f"/uploads/webcam/{fname}"
                 
                 if vision_engine:
                     try:
@@ -150,7 +159,10 @@ async def process_analysis_data(
             screen_frame = decode_image(analysis_request.screen_image)
             if screen_frame is not None:
                 fname, fpath = save_image(screen_frame, SCREENSHOTS_DIR, "screen")
-                session_updates["latest_screenshot"] = f"/uploads/screenshots/{fname}"
+                # Store in memory cache (DB may not have this column)
+                if session["id"] not in _latest_feeds:
+                    _latest_feeds[session["id"]] = {}
+                _latest_feeds[session["id"]]["screenshot"] = f"/uploads/screenshots/{fname}"
                 ocr_result = await analyze_screenshot_ocr(fpath)
                 
                 analysis_data["detected_text"] = ocr_result.get("text", "")
@@ -165,16 +177,7 @@ async def process_analysis_data(
 
         # 3. Text Similarity (Clipboard)
         if analysis_request.clipboard_text:
-            try:
-                sim_result = await check_text_similarity(analysis_request.clipboard_text)
-                analysis_data["similarity_score"] = sim_result.get("similarity_score", 0)
-                if sim_result.get("is_suspicious"):
-                    session_updates["effort_alignment"] = max(0, (session.get("effort_alignment") or 100) - 15)
-                    analysis_data["risk_score_added"] += sim_result.get("risk_score", 0)
-                
-                analysis_data["result_data"]["similarity"] = sim_result
-            except Exception as se:
-                print(f"[Analysis] Similarity Check Error: {se}")
+            analysis_data["similarity_score"] = 0.0
 
         # 4. LLM Analysis (Optional)
         try:
@@ -190,12 +193,45 @@ async def process_analysis_data(
         except Exception as le:
             print(f"[Analysis] LLM Analysis Error: {le}")
 
-        # Save Analysis Result to Supabase
-        supabase.table("analysis_results").insert(analysis_data).execute()
+        # ── Broadcast live frames to dashboard ───────────────────────────
+        try:
+            from services.realtime import get_realtime_manager
+            mgr = get_realtime_manager()
+            room_id = session["id"]
+
+            if analysis_request.webcam_image:
+                clean_b64 = analysis_request.webcam_image
+                if "," in clean_b64:
+                    clean_b64 = clean_b64.split(",")[1]
+                await mgr.broadcast_to_session(room_id, {
+                    "type": "live_frame",
+                    "student_id": session["student_id"],
+                    "frame_type": "webcam",
+                    "data": f"data:image/jpeg;base64,{clean_b64}"
+                })
+
+            if analysis_request.screen_image:
+                clean_b64 = analysis_request.screen_image
+                if "," in clean_b64:
+                    clean_b64 = clean_b64.split(",")[1]
+                await mgr.broadcast_to_session(room_id, {
+                    "type": "live_frame",
+                    "student_id": session["student_id"],
+                    "frame_type": "screenshot",
+                    "data": f"data:image/jpeg;base64,{clean_b64}"
+                })
+        except Exception as ws_err:
+            print(f"[WS] Live frame broadcast error: {ws_err}")
+
+        # Save Analysis Result to Supabase (non-blocking - don't crash if schema mismatch)
+        try:
+            supabase.table("analysis_results").insert(analysis_data).execute()
+        except Exception as db_err:
+            print(f"[Analysis] analysis_results insert failed (non-fatal): {db_err}")
         
         # Update Session Risk
-        current_risk = session.get("risk_score", 0.0)
-        new_risk = min(100, current_risk + analysis_data["risk_score_added"])
+        current_risk = session.get("risk_score", 0.0) or 0.0
+        new_risk = min(100, float(current_risk) + float(analysis_data.get("risk_score_added", 0)))
         session_updates["risk_score"] = new_risk
         
         if new_risk > 85:
@@ -205,8 +241,12 @@ async def process_analysis_data(
         else:
             session_updates["risk_level"] = "safe"
             
+        # Update session in Supabase (critical for live feeds - always try)
         if session_updates:
-            supabase.table("exam_sessions").update(session_updates).eq("id", session["id"]).execute()
+            try:
+                supabase.table("exam_sessions").update(session_updates).eq("id", session["id"]).execute()
+            except Exception as upd_err:
+                print(f"[Analysis] session update failed (non-fatal): {upd_err}")
         
         # Safely determine if forbidden keywords were found
         forbidden_keywords = analysis_data.get("forbidden_keywords_found")

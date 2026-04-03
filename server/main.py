@@ -1,6 +1,12 @@
 import os
 import sys
 
+# Ensure the server directory is on sys.path so bare imports (api, config, auth, services) work
+# regardless of whether we're launched via 'uvicorn server.main:app' or 'python main.py'
+_server_dir = os.path.dirname(os.path.abspath(__file__))
+if _server_dir not in sys.path:
+    sys.path.insert(0, _server_dir)
+
 # Critical: Set matplotlib backend to Agg to avoid font cache issues and X11 errors on headless servers
 os.environ["MPLBACKEND"] = "Agg"
 os.environ["MPLCONFIGDIR"] = "/tmp/matplotlib_cache"
@@ -111,6 +117,10 @@ async def lifespan(app: FastAPI):
     # Initialize Vision Engine and store in app state
     app.state.vision_engine = SecureVision()
     
+    # Initialize Advanced Gaze Analysis Service
+    from services.gaze_tracking import get_gaze_service
+    app.state.gaze_service = get_gaze_service()
+    
     # Store connection manager in app state for access from routes
     app.state.ws_manager = manager
     app.state.realtime = get_realtime_manager()
@@ -121,9 +131,9 @@ async def lifespan(app: FastAPI):
     await pipeline.start()
     app.state.pipeline = pipeline
     
-    # Start heartbeat task
+    # Start heartbeat task (20s interval to keep Render WebSockets alive)
     heartbeat_task = asyncio.create_task(
-        app.state.realtime.start_heartbeat(interval=30)
+        app.state.realtime.start_heartbeat(interval=20)
     )
     
     # Log registered routers
@@ -173,6 +183,7 @@ app = FastAPI(
     lifespan=lifespan,
     docs_url="/docs",
     redoc_url="/redoc",
+    redirect_slashes=True,
 )
 
 
@@ -302,13 +313,34 @@ async def websocket_dashboard(websocket: WebSocket):
                     cmd_data = json.loads(data.split(":", 1)[1])
                     # Try to get session_id or student_id as routing key
                     routing_id = cmd_data.get("session_id") or cmd_data.get("student_id")
-                    if routing_id:
+                    if routing_id and routing_id != "undefined":
                         await realtime.broadcast_to_session(routing_id, cmd_data)
                         print(f"[WS] Dashboard command broadcasted to session: {routing_id}")
                     else:
                         print(f"[WS] Dashboard command missing routing ID: {cmd_data}")
                 except Exception as e:
                     print(f"[WS] Dashboard command error: {e}")
+            elif data.startswith("webrtc:"):
+                # Route WebRTC signaling from dashboard to student
+                import json
+                try:
+                    payload = json.loads(data.split(":", 1)[1])
+                    target_student = payload.get("target")
+                    signal_type = payload.get('sdp', {}).get('type', 'ICE') if payload.get('sdp') else 'ICE'
+                    print(f"[WS] Dashboard WebRTC signal: {signal_type} -> target: {target_student}")
+                    if target_student:
+                        ws_student = realtime.student_connections.get(target_student)
+                        if ws_student:
+                            print(f"[WS] Found student connection for {target_student}, sending signal")
+                            await realtime._send_to_socket(ws_student, {
+                                "type": "webrtc_signal",
+                                "from": "dashboard",
+                                "payload": payload
+                            })
+                        else:
+                            print(f"[WS] Student connection NOT FOUND for {target_student}. Available: {list(realtime.student_connections.keys())}")
+                except Exception as e:
+                    print(f"[WS] Dashboard WebRTC routing error: {e}")
                 
     except (WebSocketDisconnect, RuntimeError, Exception) as e:
         print(f"[WS] Dashboard error: {e}")
@@ -391,35 +423,58 @@ async def websocket_student(
             return
 
         while True:
-            data = await websocket.receive_text()
+            # Use general receive to handle both text and bytes
+            message = await websocket.receive()
             
-            if data == "ping":
-                await websocket.send_json({"type": "pong"})
-            elif data.startswith("event:"):
-                # Student reporting an event
-                import json
-                try:
-                    event_data = json.loads(data.split(":", 1)[1])
-                    event_type = event_data.get("type", "unknown")
-                    
-                    # Map to EventType
-                    event_map = {
-                        "tab_switch": EventType.TAB_SWITCH,
-                        "copy": EventType.COPY_PASTE,
-                        "paste": EventType.COPY_PASTE,
-                        "blur": EventType.WINDOW_BLUR,
-                    }
-                    
-                    if event_type in event_map:
-                        await realtime.broadcast_event(
-                            event_map[event_type],
-                            student_id=student_id,
-                            session_id=session_id,
-                            data=event_data,
-                            alert_level=AlertLevel.WARNING
-                        )
-                except:
-                    pass
+            if "text" in message:
+                data = message["text"]
+                if data == "ping":
+                    await websocket.send_json({"type": "pong"})
+                elif data.startswith("event:"):
+                    # Student reporting an event
+                    import json
+                    try:
+                        event_data = json.loads(data.split(":", 1)[1])
+                        event_type = event_data.get("type", "unknown")
+                        
+                        # Map to EventType
+                        event_map = {
+                            "tab_switch": EventType.TAB_SWITCH,
+                            "copy": EventType.COPY_PASTE,
+                            "paste": EventType.COPY_PASTE,
+                            "blur": EventType.WINDOW_BLUR,
+                        }
+                        
+                        if event_type in event_map:
+                            await realtime.broadcast_event(
+                                event_map[event_type],
+                                student_id=student_id,
+                                session_id=session_id,
+                                data=event_data,
+                                alert_level=AlertLevel.WARNING
+                            )
+                    except:
+                        pass
+                elif data.startswith("webrtc:"):
+                    # Route WebRTC signaling from student to dashboards monitoring this session's exam_id
+                    import json
+                    try:
+                        payload = json.loads(data.split(":", 1)[1])
+                        signal_type = payload.get('sdp', {}).get('type', 'ICE') if payload.get('sdp') else 'ICE'
+                        print(f"[WS] Student {student_id} WebRTC signal: {signal_type} -> session {session_id}")
+                        # Broadcast signal to the session_id room (dashboard listens here)
+                        await realtime.broadcast_to_session(session_id, {
+                            "type": "webrtc_signal",
+                            "student_id": student_id,
+                            "payload": payload
+                        })
+                    except Exception as e:
+                        print(f"[WS] Student WebRTC routing error: {e}")
+            
+            elif "bytes" in message:
+                # Live streaming chunks (MediaRecorder)
+                if session_id:
+                    await realtime.broadcast_binary(session_id, message["bytes"])
                     
     except (WebSocketDisconnect, RuntimeError, Exception) as e:
         print(f"[WS] Student error ({student_id}): {e}")
@@ -434,8 +489,23 @@ async def websocket_student(
                 data={"message": f"Student {student_id} disconnected"},
                 alert_level=AlertLevel.INFO
             )
-        except:
-            pass
+            
+            # Update database to mark session as ended
+            if session_id and session_id != "default":
+                from supabase_client import get_supabase
+                import datetime
+                
+                # Fetch current session to preserve risk score
+                supabase = get_supabase()
+                res = supabase.table("exam_sessions").select("risk_score, risk_level").eq("id", session_id).execute()
+                if res.data:
+                    supabase.table("exam_sessions").update({
+                        "is_active": False,
+                        "ended_at": datetime.datetime.utcnow().isoformat()
+                    }).eq("id", session_id).execute()
+                    print(f"[WS] Session {session_id} marked as ended in DB")
+        except Exception as update_err:
+            print(f"[WS] Failed to update session status on disconnect: {update_err}")
 
 
 @app.get("/ws/stats", tags=["WebSocket"])
@@ -467,32 +537,7 @@ if REACT_BUILD_DIR:
     if os.path.exists(assets_dir):
         app.mount("/assets", StaticFiles(directory=assets_dir), name="assets")
 
-# Improved SPA Fallback for React Router (Catch-all)
-@app.get("/{full_path:path}", include_in_schema=False)
-async def spa_fallback(request: Request, full_path: str):
-    """Serve files if they exist, else serve index.html (SPA support)"""
-    if not REACT_BUILD_DIR:
-        return {"detail": "Dashboard not built"}
-        
-    # 1. Check API / System prefixes - ignore these
-    if any(full_path.startswith(p) for p in ("api/", "docs", "redoc", "ws/", "uploads/")):
-        from fastapi import HTTPException
-        raise HTTPException(status_code=404, detail="Not Found")
-    
-    # 2. Check if the literal file exists in the build dir (e.g., favicon.ico)
-    potential_file = os.path.join(REACT_BUILD_DIR, full_path)
-    if os.path.isfile(potential_file):
-        from fastapi.responses import FileResponse
-        return FileResponse(potential_file)
-        
-    # 3. Fallback to index.html for any other route (React Router)
-    index_path = os.path.join(REACT_BUILD_DIR, "index.html")
-    if os.path.exists(index_path):
-        from fastapi.responses import FileResponse
-        return FileResponse(index_path)
-    
-    return {"detail": "Index file not found"}
-
+# SPA Fallback will be registered at the end (after all other routes)
 
 # =============================================================================
 # Static Files & Upload Directories
@@ -566,6 +611,35 @@ async def api_info():
             "redoc": "/redoc",
         }
     }
+
+
+# =============================================================================
+# SPA Fallback for React Router (MUST be last route)
+# =============================================================================
+@app.get("/{full_path:path}", include_in_schema=False)
+async def spa_fallback(request: Request, full_path: str):
+    """Serve files if they exist, else serve index.html (SPA support)"""
+    if not REACT_BUILD_DIR:
+        return {"detail": "Dashboard not built"}
+        
+    # 1. Check API / System prefixes - ignore these
+    if any(full_path.startswith(p) for p in ("api/", "docs", "redoc", "ws/", "uploads/")):
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail="Not Found")
+    
+    # 2. Check if the literal file exists in the build dir (e.g., favicon.ico)
+    potential_file = os.path.join(REACT_BUILD_DIR, full_path)
+    if os.path.isfile(potential_file):
+        from fastapi.responses import FileResponse
+        return FileResponse(potential_file)
+        
+    # 3. Fallback to index.html for any other route (React Router)
+    index_path = os.path.join(REACT_BUILD_DIR, "index.html")
+    if os.path.exists(index_path):
+        from fastapi.responses import FileResponse
+        return FileResponse(index_path)
+    
+    return {"detail": "Index file not found"}
 
 
 # =============================================================================

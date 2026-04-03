@@ -2,6 +2,7 @@ from fastapi import APIRouter, HTTPException, BackgroundTasks
 import uuid
 from datetime import datetime
 from typing import List
+import asyncio
 
 from supabase_client import get_supabase
 from api.schemas import EventData, EventBatch, EventResponse
@@ -13,7 +14,7 @@ supabase = get_supabase()
 def _get_session_update_field(event_type: str):
     """Map event type to session stat column"""
     evt = event_type.upper()
-    if evt == "TAB_SWITCH" or evt == "NAVIGATION":
+    if evt in ("TAB_SWITCH", "NAVIGATION"):
         return "tab_switch_count"
     elif evt in ("COPY", "PASTE", "CUT"):
         return "copy_count"
@@ -32,55 +33,97 @@ async def log_event(
     event_data: EventData,
     background_tasks: BackgroundTasks
 ):
-    """Log a single event via Supabase"""
+    """Log an event and update session metrics in Supabase"""
     
     try:
-        # Get risk weight
+        # Determine base risk weight
         risk_weight = RISK_WEIGHTS.get(event_data.type, 0)
         
-        # Create event in Supabase
+        # Enhanced tracking: for summaries, look at categories
+        category_risk = 0
+        effort_impact = 0
+        
+        if event_data.type == "BROWSING_SUMMARY" and event_data.data:
+            # Use the browsingRiskScore and effortScore directly from extension
+            browsing_risk = event_data.data.get("browsingRiskScore", 0)
+            effort_score = event_data.data.get("effortScore", 100)
+            
+            # Add browsing risk to category_risk
+            category_risk += browsing_risk * 0.1  # Scale down to avoid double counting
+            
+            # If effort is low, penalize
+            if effort_score < 50:
+                effort_impact += (50 - effort_score) * 0.1
+            
+            # Also check categories if present
+            categories = event_data.data.get("categories", [])
+            
+            # Penalize entertainment/cheating in summary
+            if any(c in categories for c in ("Entertainment", "Social", "Shopping")):
+                category_risk += 15
+                effort_impact += 10
+            if any(c in categories for c in ("Cheating", "AI", "Academic")):
+                category_risk += 40
+                effort_impact += 25
+            
+            # Check for flagged sites
+            flagged_count = event_data.data.get("flaggedSitesCount", 0)
+            category_risk += min(flagged_count * 5, 30)  # Up to 30 risk for flagged sites
+
+        # Record the event
         res = supabase.table("events").insert({
             "id": str(uuid.uuid4()),
             "session_id": session_id,
             "event_type": event_data.type,
             "client_timestamp": int(event_data.timestamp / 1000) if event_data.timestamp else int(datetime.utcnow().timestamp()),
             "data": event_data.data,
-            "risk_weight": risk_weight,
+            "risk_weight": int(max(risk_weight, category_risk)),
             "timestamp": datetime.utcnow().isoformat()
         }).execute()
         
         if not res.data:
-            raise HTTPException(status_code=500, detail="Failed to log event")
+            raise HTTPException(status_code=500, detail="Log failed")
         
         new_event = res.data[0]
         
-        # Research Journey tracking for single events
-        if event_data.type.upper() in ("NAVIGATION", "TAB_SWITCH") and event_data.data:
-            url = event_data.data.get("url")
-            title = event_data.data.get("title")
-            if url:
-                try:
-                    url_class = classify_url(url)
-                    category = url_class.get("category", "General") if url_class else "General"
-                    supabase.table("research_journey").insert({
-                        "id": str(uuid.uuid4()),
-                        "session_id": session_id,
-                        "url": url,
-                        "title": title or url,
-                        "category": category,
-                        "timestamp": datetime.utcnow().isoformat()
-                    }).execute()
-                except:
-                    pass
-        
-        # Update session stats (async-ish)
-        stat_field = _get_session_update_field(event_data.type)
-        
-        # We need to get current stats first (or use a stored procedure if available)
+        # Update Session with dynamic totals and risk
         session_res = supabase.table("exam_sessions").select("*").eq("id", session_id).execute()
         if session_res.data:
             session = session_res.data[0]
-            updates = {"total_events": (session.get("total_events") or 0) + 1}
+            
+            # Calculate new scores
+            added_risk = max(risk_weight, category_risk)
+            current_risk = float(session.get("risk_score") or 0.0)
+            new_risk = min(100.0, current_risk + added_risk)
+            
+            # Effort Alignment (slowly decrease if bad things happen, or if idle)
+            current_effort = float(session.get("engagement_score") or session.get("effort_alignment") or 100.0)
+            
+            if event_data.type == "INPUT_IDLE":
+                effort_impact += 5
+            elif event_data.type in ("TAB_SWITCH", "NAVIGATION"):
+                effort_impact += 3
+            elif event_data.type in ("COPY", "PASTE"):
+                effort_impact += 5
+                
+            new_effort = max(0.0, current_effort - effort_impact)
+            
+            # Map risk to level
+            risk_level = "safe"
+            if new_risk > 80: risk_level = "critical"
+            elif new_risk > 60: risk_level = "high"
+            elif new_risk > 30: risk_level = "medium"
+            
+            updates = {
+                "total_events": (session.get("total_events") or 0) + 1,
+                "risk_score": new_risk,
+                "risk_level": risk_level,
+                "engagement_score": new_effort,
+                "effort_alignment": new_effort
+            }
+            
+            # Field-specific stats
+            stat_field = _get_session_update_field(event_data.type)
             if stat_field:
                 updates[stat_field] = (session.get(stat_field) or 0) + 1
             
@@ -91,9 +134,10 @@ async def log_event(
             session_id=session_id,
             event_type=new_event["event_type"],
             timestamp=new_event["timestamp"],
-            risk_weight=risk_weight,
+            risk_weight=max(risk_weight, category_risk),
         )
     except Exception as e:
+        print(f"[RE-LOG ERROR] {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -110,7 +154,9 @@ async def log_events_batch(
         # Get session current state
         session_res = supabase.table("exam_sessions").select("*").eq("id", session_id).execute()
         if not session_res.data:
-            raise HTTPException(status_code=404, detail="Session not found")
+            # Session might have been ended/deleted - return success anyway to prevent extension retry loops
+            print(f"[WARN] Session {session_id} not found - events will be dropped")
+            return {"success": True, "events_logged": 0, "warning": "Session not found"}
         
         session = session_res.data[0]
         session_updates = {"total_events": (session.get("total_events") or 0) + len(batch.events)}
@@ -118,21 +164,71 @@ async def log_events_batch(
         logged_events = []
         events_to_insert = []
         research_entries = []
+        # Scoring Accumulators
+        accumulated_risk = 0.0
+        accumulated_effort_impact = 0.0
         
         for event_data in batch.events:
             evt_type = event_data.type
             evt_data = event_data.data or {}
             evt_ts = event_data.timestamp
             
-            risk_weight = RISK_WEIGHTS.get(evt_type, 0)
+            # Safely handle timestamp - ensure it's a number
+            try:
+                if evt_ts is not None:
+                    evt_ts = float(evt_ts)
+            except (TypeError, ValueError):
+                evt_ts = None
             
+            risk_weight = RISK_WEIGHTS.get(evt_type, 0)
+            category_risk = 0
+            effort_impact = 0
+            
+            if evt_type == "BROWSING_SUMMARY":
+                # Use the browsingRiskScore and effortScore directly from extension
+                browsing_risk = evt_data.get("browsingRiskScore", 0)
+                effort_score = evt_data.get("effortScore", 100)
+                
+                # Add browsing risk to accumulated risk
+                category_risk += browsing_risk * 0.1  # Scale down to avoid double counting
+                
+                # If effort is low, penalize
+                if effort_score < 50:
+                    effort_impact += (50 - effort_score) * 0.1
+                
+                # Also check categories if present
+                categories = evt_data.get("categories", [])
+                if any(c in categories for c in ("Entertainment", "Social", "Shopping")):
+                    category_risk += 15
+                    effort_impact += 10
+                if any(c in categories for c in ("Cheating", "AI", "Academic")):
+                    category_risk += 40
+                    effort_impact += 25
+                
+                # Check for flagged sites
+                flagged_count = evt_data.get("flaggedSitesCount", 0)
+                category_risk += min(flagged_count * 5, 30)  # Up to 30 risk for flagged sites
+            
+            if evt_type == "INPUT_IDLE":
+                effort_impact += 5
+            elif evt_type in ("TAB_SWITCH", "NAVIGATION"):
+                effort_impact += 3
+            elif evt_type in ("COPY", "PASTE", "PHONE_DETECTED", "MULTIPLE_FACES", "FACE_ABSENT"):
+                effort_impact += 5
+            elif evt_type in ("WINDOW_BLUR", "PAGE_HIDDEN"):
+                effort_impact += 3
+                category_risk += 3
+                
+            accumulated_risk += max(risk_weight, category_risk)
+            accumulated_effort_impact += effort_impact
+
             events_to_insert.append({
                 "id": str(uuid.uuid4()),
                 "session_id": session_id,
                 "event_type": evt_type,
                 "client_timestamp": int(evt_ts / 1000) if evt_ts else int(datetime.utcnow().timestamp()),
                 "data": evt_data,
-                "risk_weight": risk_weight,
+                "risk_weight": int(max(risk_weight, category_risk)),
                 "timestamp": datetime.utcnow().isoformat()
             })
             
@@ -141,7 +237,7 @@ async def log_events_batch(
             if stat_field:
                 session_updates[stat_field] = (session_updates.get(stat_field) or session.get(stat_field) or 0) + 1
 
-            # Research Journey tracking (record both full navigations and tab switches)
+            # Research Journey tracking
             if evt_type in ("NAVIGATION", "TAB_SWITCH") and evt_data:
                 nav_url = evt_data.get('url', 'unknown')
                 nav_title = evt_data.get('title', 'unknown')
@@ -152,16 +248,11 @@ async def log_events_batch(
                 
                 if url_class:
                     category = url_class.get("category", "General")
-                    if category == "AI": 
-                        relevance = 0.1
-                    elif category == "CHEATING": 
-                        relevance = 0.0
-                    elif category == "ENTERTAINMENT": 
-                        relevance = 0.15
-                    elif category == "EDUCATION":
-                        relevance = 0.9
-                    elif category == "SOCIAL":
-                        relevance = 0.2
+                    if category == "AI": relevance = 0.1
+                    elif category == "CHEATING": relevance = 0.0
+                    elif category == "ENTERTAINMENT": relevance = 0.15
+                    elif category == "EDUCATION": relevance = 0.9
+                    elif category == "SOCIAL": relevance = 0.2
                 
                 research_entries.append({
                     "id": str(uuid.uuid4()),
@@ -175,17 +266,46 @@ async def log_events_batch(
             
             logged_events.append({
                 "type": evt_type,
-                "risk_weight": risk_weight
+                "risk_weight": int(max(risk_weight, category_risk))
             })
             
         # Bulk Insert
         if events_to_insert:
-            supabase.table("events").insert(events_to_insert).execute()
+            try:
+                supabase.table("events").insert(events_to_insert).execute()
+            except Exception as e:
+                print(f"[ERROR] Failed to insert events: {e}")
         if research_entries:
-            supabase.table("research_journey").insert(research_entries).execute()
+            try:
+                supabase.table("research_journey").insert(research_entries).execute()
+            except Exception as e:
+                print(f"[WARN] Failed to insert research entries: {e}")
             
-        # Update Session
-        supabase.table("exam_sessions").update(session_updates).eq("id", session_id).execute()
+        # Calculate final session scores explicitly in the batch
+        current_risk = float(session.get("risk_score") or 0.0)
+        new_risk = min(100.0, current_risk + accumulated_risk)
+        
+        current_effort = float(session.get("engagement_score") or session.get("effort_alignment") or 100.0)
+        new_effort = max(0.0, current_effort - accumulated_effort_impact)
+        
+        risk_level = "safe"
+        if new_risk > 80: risk_level = "critical"
+        elif new_risk > 60: risk_level = "high"
+        elif new_risk > 30: risk_level = "medium"
+        
+        session_updates.update({
+            "risk_score": new_risk,
+            "risk_level": risk_level,
+            "engagement_score": new_effort,
+            "effort_alignment": new_effort
+        })
+        
+        # Update Session exactly once
+        try:
+            supabase.table("exam_sessions").update(session_updates).eq("id", session_id).execute()
+        except Exception as e:
+            print(f"[WARN] Failed to update session: {e}")
+
         
         # Submit events to the real-time analysis pipeline
         try:
@@ -210,6 +330,9 @@ async def log_events_batch(
             "events": logged_events
         }
     except Exception as e:
+        import traceback
+        print(f"[ERROR] Events batch failed: {e}")
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
 

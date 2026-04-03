@@ -9,6 +9,7 @@ from datetime import datetime
 from typing import Dict, Any, List, Optional, Set
 from dataclasses import dataclass, asdict
 from enum import Enum
+import numpy as np
 from fastapi import WebSocket, WebSocketDisconnect
 
 
@@ -52,6 +53,7 @@ class EventType(str, Enum):
     ANOMALY_DETECTED = "anomaly_detected"
     LOW_ENGAGEMENT = "low_engagement"
     UNUSUAL_BEHAVIOR = "unusual_behavior"
+    OBJECT_DETECTED = "object_detected" # Generic for AI results
     
     # System events
     RISK_SCORE_UPDATE = "risk_score_update"
@@ -94,7 +96,7 @@ class RoomManager:
                 del self.rooms[session_id]
     
     def get_room_members(self, session_id: str) -> Set[WebSocket]:
-        return self.rooms.get(session_id, set())
+        return self.rooms.get(session_id, set()).copy()
 
 
 class RealtimeMonitoringManager:
@@ -119,6 +121,10 @@ class RealtimeMonitoringManager:
         # Room management
         self.room_manager = RoomManager()
         
+        # Frame extraction for AI analysis on live streams
+        from services.frame_extractor import get_frame_extractor
+        self.extractor = get_frame_extractor()
+        
         # Event history (for late-joiners)
         self.event_history: List[RealtimeEvent] = []
         self.max_history = max_history
@@ -130,6 +136,68 @@ class RealtimeMonitoringManager:
             "alerts_sent": 0,
         }
     
+    # AI Analysis Callback for live streams
+    def _ai_stream_callback(self, session_id: str, frame: np.ndarray):
+        """Processes an extracted frame with the AI engines (background thread)"""
+        try:
+            # We need the engines from the app state (circular import check)
+            from main import app
+            vision_engine = getattr(app.state, "vision_engine", None)
+            from services.object_detection import get_object_detector
+            object_detector = get_object_detector()
+            
+            if vision_engine:
+                 # Standard face/gaze metrics
+                 results = vision_engine.analyze_frame(frame, student_id=session_id)
+                 if results['violations']:
+                      # Broadcast alerts to session proctors
+                      asyncio.run_coroutine_threadsafe(
+                          self.broadcast_to_session(session_id, {
+                              "type": "vision_alert",
+                              "violations": results['violations'],
+                              "engagement": results['engagement_score']
+                          }),
+                          asyncio.get_event_loop()
+                      )
+                      # Also broadcast for the extension to update its counters
+                      for v in results['violations']:
+                           asyncio.run_coroutine_threadsafe(
+                               self.broadcast_to_session(session_id, {
+                                   "type": "anomaly_alert",
+                                   "alert_type": v,
+                                   "message": f"Violation: {v}",
+                                   "data": {"type": v.lower()}
+                               }),
+                               asyncio.get_event_loop()
+                           )
+            
+            if object_detector:
+                 # YOLO object detection
+                 obj_results = object_detector.detect(frame)
+                 if obj_results['phone_detected']:
+                      # Send critical dashboard alert
+                      asyncio.run_coroutine_threadsafe(
+                          self.send_alert(
+                              "phone_detected",
+                              "Mobile phone detected in live stream!",
+                              session_id=session_id,
+                              severity=AlertLevel.CRITICAL
+                          ),
+                          asyncio.get_event_loop()
+                      )
+                      # Send immediate extension anomaly alert
+                      asyncio.run_coroutine_threadsafe(
+                           self.broadcast_to_session(session_id, {
+                               "type": "anomaly_alert",
+                               "alert_type": "PHONE_DETECTED",
+                               "message": "Mobile phone detected in your webcam feed!",
+                               "data": {"type": "phone_detected"}
+                           }),
+                           asyncio.get_event_loop()
+                      )
+        except Exception as e:
+            print(f"[AI-Stream] Analysis error: {e}")
+
     @property
     def total_connections(self) -> int:
         return (
@@ -214,20 +282,50 @@ class RealtimeMonitoringManager:
         
         # Remove from students
         student_id = None
+        session_id = None
         for sid, ws in list(self.student_connections.items()):
             if ws == websocket:
                 student_id = sid
+                # Try to find session_id if possible
+                for sess_id, members in list(self.room_manager.rooms.items()):
+                    if websocket in members:
+                        session_id = sess_id
+                        break
                 del self.student_connections[sid]
                 break
         
+        # Clean up stream buffer if this was the last student connection in a room
+        if session_id:
+            self.extractor.cleanup(session_id)
+
         # Remove from all rooms
-        for session_id, members in list(self.room_manager.rooms.items()):
+        for room_id, members in list(self.room_manager.rooms.items()):
             members.discard(websocket)
         
         if student_id:
             print(f"[WS] Student {student_id} disconnected")
         else:
             print(f"[WS] Client disconnected. Total: {self.total_connections}")
+    
+    async def broadcast_binary(self, session_id: str, data: bytes):
+        """Broadcast binary data (video stream) to all dashboards and session proctors"""
+        # 1. Forward the chunk to the AI frame extractor
+        if self.extractor:
+             self.extractor.add_chunk(session_id, data, self._ai_stream_callback)
+
+        # 2. Relay raw video chunks directly to the UI
+        room_members = self.room_manager.get_room_members(session_id)
+        targets = (room_members & self.proctor_connections) | self.dashboard_connections
+        
+        disconnected = []
+        for ws in targets:
+            try:
+                await ws.send_bytes(data)
+            except Exception:
+                disconnected.append(ws)
+        
+        for ws in disconnected:
+            self.disconnect(ws)
     
     # =========================================================================
     # Event Broadcasting
@@ -314,6 +412,7 @@ class RealtimeMonitoringManager:
     async def broadcast_to_session(self, session_id: str, message: Dict[str, Any]):
         """Broadcast to all connections in a session room"""
         room_members = self.room_manager.get_room_members(session_id)
+        print(f"[WS] Broadcasting to session {session_id}: {len(room_members)} members")
         await self._broadcast_to_set(room_members, message)
     
     # =========================================================================
@@ -491,13 +590,30 @@ class RealtimeMonitoringManager:
         """Broadcast to a set of connections"""
         disconnected = []
         
-        for ws in connections:
+        for ws in list(connections):
             try:
                 await ws.send_json(message)
             except Exception:
                 disconnected.append(ws)
         
         # Clean up
+        for ws in disconnected:
+            self.disconnect(ws)
+
+    async def broadcast_binary(self, session_id: str, data: bytes):
+        """Broadcast binary data (video stream) to all dashboards and session proctors"""
+        room_members = self.room_manager.get_room_members(session_id)
+        # Dashboard connections are global, proctors/students are room-specific
+        targets = (room_members & self.proctor_connections) | self.dashboard_connections
+        
+        disconnected = []
+        for ws in list(targets):
+            try:
+                # Binary send
+                await ws.send_bytes(data)
+            except Exception:
+                disconnected.append(ws)
+        
         for ws in disconnected:
             self.disconnect(ws)
     

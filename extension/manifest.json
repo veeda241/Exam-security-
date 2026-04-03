@@ -19,7 +19,8 @@
     "http://localhost:8000/*",
     "https://exam-security.onrender.com/*",
     "https://*/*",
-    "http://*/*"
+    "http://*/*",
+    "<all_urls>"
   ],
   "background": {
     "service_worker": "background.js",

@@ -1,8 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "motion/react";
-import { ArrowLeft, Camera, Layout, ShieldAlert, Activity, Download, Loader2, Users, AlertTriangle, CheckCircle2 } from "lucide-react";
+import { ArrowLeft, Camera, Monitor, ShieldAlert, Activity, Download, Loader2, Users, AlertTriangle, CheckCircle2, RefreshCw, Eye } from "lucide-react";
 import { config } from "../config";
+import { useWebSocket } from "../hooks/useWebSocket";
 
 interface StudentSession {
   id: string;
@@ -22,53 +23,226 @@ export function SessionDetail() {
   const { sessionId } = useParams();
   const navigate = useNavigate();
   
-  const [sessions, setSessions] = useState<StudentSession[]>([]);
+  const [students, setStudents] = useState<StudentSession[]>([]);
   const [loading, setLoading] = useState(true);
   const [isEnded, setIsEnded] = useState(false);
+  const [examId, setExamId] = useState<string | null>(null);
   const [feedModes, setFeedModes] = useState<Record<string, 'camera' | 'screen'>>({});
   const [refreshKey, setRefreshKey] = useState(Date.now());
+  const [selectedStudent, setSelectedStudent] = useState<string | null>(null);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [isPdfGenerated, setIsPdfGenerated] = useState(false);
 
-  // Fetch real session data
-  useEffect(() => {
-    const fetchSessions = async () => {
-      try {
-        const res = await fetch(`${config.apiUrl}/sessions/?active_only=false&limit=100`);
-        if (res.ok) {
-          const data = await res.json();
-          // Find the proctor session (current page)
-          const currentSession = data.find((s: any) => s.id === sessionId);
+  // Object storing WebRTC MediaStreams perfectly mapped to students and modes
+  const [rtcStreams, setRtcStreams] = useState<Record<string, { webcam?: MediaStream, screenshot?: MediaStream }>>({});
+  // Track open peer connections
+  const [peerConnections, setPeerConnections] = useState<Record<string, RTCPeerConnection>>({});
+
+  // Object storing the latest base64 data URL for each student/mode (fallback)
+  const [liveFrames, setLiveFrames] = useState<Record<string, { webcam?: string, screenshot?: string }>>({});
+
+  const webrtcSignalRef = useRef<any>(null);
+  const subscribedSessionsRef = useRef<Set<string>>(new Set());
+
+  const handleWebSocketMessage = useCallback((lastEvent: any) => {
+    const eventType = lastEvent.type || lastEvent.event_type;
+    
+    if (eventType === 'student_joined' || eventType === 'STUDENT_JOINED') {
+      const newStudent = lastEvent.data;
+      if (newStudent) {
+        setStudents(prev => {
+          const exists = prev.find(s => s.id === newStudent.id);
+          if (exists) {
+             return prev.map(s => s.id === newStudent.id ? { ...s, status: 'active' } : s);
+          }
+          // Subscribe to the new student's session room specifically for WebRTC!
+          // We can use a direct fetch or event emitter here, but the websocket manager
+          // handles re-subscriptions via another hook.
           
-          if (currentSession) {
-            const examId = currentSession.exam_id;
-            // Get all student sessions for this exam (exclude PROCTOR sessions)
-            const studentSessions = data.filter(
-              (s: any) => s.exam_id === examId && !s.student_id?.startsWith('PROCTOR-')
-            );
-            
-            setSessions(studentSessions);
-            // Check status correctly (since is_active might be missing from SessionSummary)
-            setIsEnded(currentSession.status !== 'active');
+          return [...prev, {
+            ...newStudent,
+            risk_score: newStudent.risk_score || 0,
+            engagement_score: newStudent.engagement_score || 100,
+            effort_alignment: newStudent.effort_alignment || 100,
+            risk_level: newStudent.risk_level || 'safe',
+            status: 'active',
+            started_at: newStudent.started_at || new Date().toISOString(),
+          }];
+        });
+      }
+    } else if (eventType === 'student_left' || eventType === 'STUDENT_LEFT') {
+      const leftStudentId = lastEvent.student_id || lastEvent.data?.student_id;
+      if (leftStudentId) {
+        setStudents(prev => prev.map(s => 
+          (s.student_id === leftStudentId || s.id === leftStudentId) 
+            ? { ...s, status: 'ended' } 
+            : s
+        ));
+      }
+    } else if (eventType === 'live_frame') {
+      const { student_id, frame_type, data } = lastEvent;
+      if (student_id && frame_type && data) {
+        setLiveFrames(prev => ({
+          ...prev,
+          [student_id]: {
+            ...(prev[student_id] || {}),
+            [frame_type]: data
+          }
+        }));
+      }
+    } else if (eventType === 'webrtc_signal') {
+      // Handle incoming WebRTC signaling explicitly from student extension
+      const { student_id, payload } = lastEvent;
+      if (student_id && payload && webrtcSignalRef.current) {
+         webrtcSignalRef.current(student_id, payload);
+      }
+    }
+  }, []);
+
+  // WebSocket for live student arrivals and video transmissions
+  const { messages: liveEvents, sendMessage, isConnected } = useWebSocket(sessionId || examId || undefined, handleWebSocketMessage);
+
+  useEffect(() => {
+    if (isConnected && students.length > 0) {
+      students.filter(s => s?.id).forEach(student => {
+        // Only subscribe if not already subscribed
+        if (!subscribedSessionsRef.current.has(student.id)) {
+          sendMessage(`subscribe:${student.id}`);
+          subscribedSessionsRef.current.add(student.id);
+          // Explicitly trigger a re-negotiation so we don't miss the initial stream offers
+          sendMessage(`command:{"session_id":"${student.id}", "type":"request_webrtc_offer"}`);
+        }
+      });
+    }
+  }, [isConnected, students, sendMessage]);
+
+  // Initiate or answer a WebRTC connection
+  const handleWebrtcSignal = async (studentId: string, payload: any) => {
+      let pc = peerConnections[studentId];
+      
+      if (!pc && payload.sdp?.type === 'offer') {
+          // Initialize fresh RTCPeerConnection
+          pc = new RTCPeerConnection({
+              iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+          });
+          
+          setPeerConnections(prev => ({ ...prev, [studentId]: pc }));
+
+          pc.ontrack = (event) => {
+              // The extension sends 2 generic video tracks: webcam and screen.
+              // For simplicity, we assign the first track to webcam, second to screenshot.
+              setRtcStreams(prev => {
+                  const studentStreams = prev[studentId] || {};
+                  
+                  // Use the track label/id from extension if designated, or assume by order.
+                  // Assume the first video track is webcam, second is screen.
+                  const trackLabel = event.track.label.toLowerCase();
+                  const isScreen = trackLabel.includes('screen') || trackLabel.includes('window') || event.streams[0].id.includes('screen');
+                  
+                  return {
+                      ...prev,
+                      [studentId]: {
+                          ...studentStreams,
+                          [isScreen ? 'screenshot' : 'webcam']: event.streams[0]
+                      }
+                  };
+              });
+          };
+
+          pc.onicecandidate = (event) => {
+              if (event.candidate) {
+                  sendMessage(`webrtc:${JSON.stringify({
+                      target: studentId,
+                      candidate: event.candidate
+                  })}`);
+              }
+          };
+      }
+
+      if (!pc) return;
+
+      try {
+          if (payload.sdp) {
+              await pc.setRemoteDescription(new RTCSessionDescription(payload.sdp));
+              if (payload.sdp.type === 'offer') {
+                  const answer = await pc.createAnswer();
+                  await pc.setLocalDescription(answer);
+                  sendMessage(`webrtc:${JSON.stringify({
+                      target: studentId,
+                      sdp: pc.localDescription
+                  })}`);
+              }
+          } else if (payload.candidate) {
+              await pc.addIceCandidate(new RTCIceCandidate(payload.candidate));
+          }
+      } catch (err) {
+          console.error("WebRTC Error negotiating with", studentId, err);
+      }
+  };
+
+  // Connect the ref to the handler
+  useEffect(() => {
+    webrtcSignalRef.current = handleWebrtcSignal;
+  }, [handleWebrtcSignal]);
+
+  // Fetch all sessions for this exam
+  const fetchSessions = useCallback(async () => {
+    try {
+      const res = await fetch(`${config.apiUrl}/sessions?active_only=false&limit=200`);
+      if (res.ok) {
+        const data = await res.json();
+        let currentSession = data.find((s: any) => s.id === sessionId);
+        
+        // Fallback: if session not found in bulk list, fetch it individually
+        if (!currentSession) {
+          try {
+            const singleRes = await fetch(`${config.apiUrl}/sessions/${sessionId}`);
+            if (singleRes.ok) {
+              currentSession = await singleRes.json();
+            }
+          } catch {
+            console.warn('Failed to fetch individual session');
           }
         }
-      } catch (e) {
-        console.error("Failed to fetch sessions:", e);
-      } finally {
-        setLoading(false);
+        
+        if (currentSession) {
+          const currentExamId = currentSession.exam_id;
+          setExamId(currentExamId);
+          
+          // Get all student sessions for this exam (exclude PROCTOR sessions)
+          const studentSessions = data.filter(
+            (s: any) => s.exam_id === currentExamId && !s.student_id?.startsWith('PROCTOR-')
+          );
+          
+          setStudents(studentSessions);
+          
+          // Sessions can have status 'recording' or 'active' when live
+          const isSessionActive = currentSession.status === 'active' || currentSession.status === 'recording' || currentSession.is_active === true;
+          setIsEnded(!isSessionActive);
+        }
       }
-    };
-    fetchSessions();
-  }, [sessionId, refreshKey]);
+    } catch (e) {
+      console.error("Failed to fetch sessions:", e);
+    } finally {
+      setLoading(false);
+    }
+  }, [sessionId]);
 
-  // Auto-refresh feeds every 5 seconds to get latest frames
+  useEffect(() => {
+    fetchSessions();
+  }, [fetchSessions]);
+
+  // Auto-refresh data periodically (but NOT feeds, those are strictly WebSocket-driven now)
   useEffect(() => {
     if (isEnded) return;
-    const interval = setInterval(() => {
-      setRefreshKey(Date.now());
-    }, 5000);
-    return () => clearInterval(interval);
-  }, [isEnded]);
+    // Re-fetch session data for scores less frequently
+    const dataInterval = setInterval(() => {
+      fetchSessions();
+    }, 15000);
+    return () => {
+      clearInterval(dataInterval);
+    };
+  }, [isEnded, fetchSessions]);
 
   const toggleFeedMode = (studentId: string) => {
     setFeedModes(prev => ({
@@ -89,25 +263,43 @@ export function SessionDetail() {
     }
   };
 
-  const handleDownloadPdf = () => {
+  const handleDownloadPdf = async () => {
     setIsGeneratingPdf(true);
-    setTimeout(() => {
-      setIsGeneratingPdf(false);
+    try {
+      // Call the real backend report generator
+      const res = await fetch(`${config.apiUrl}/reports/session/${sessionId}/pdf`);
+      if (!res.ok) throw new Error(`PDF generation failed (${res.status})`);
+
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `report_${examId || sessionId?.substring(0, 8)}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+
       setIsPdfGenerated(true);
       setTimeout(() => setIsPdfGenerated(false), 3000);
-    }, 2000);
+    } catch (err) {
+      console.error('PDF download error:', err);
+      alert('Failed to generate PDF report. Please try again.');
+    } finally {
+      setIsGeneratingPdf(false);
+    }
   };
 
   const getStudentName = (s: StudentSession) => s.student_name || s.student_id;
-  const getInitials = (name: string) => name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+  const getInitials = (name?: string) => (name || 'U').split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
 
-  const avgRisk = sessions.length > 0 
-    ? Math.round(sessions.reduce((acc, s) => acc + (s.risk_score || 0), 0) / sessions.length) 
+  const avgRisk = students.length > 0
+    ? Math.round(students.reduce((acc, s) => acc + (s.risk_score || 0), 0) / students.length)
     : 0;
-  const avgEffort = sessions.length > 0 
-    ? Math.round(sessions.reduce((acc, s) => acc + (s.engagement_score || s.effort_alignment || 0), 0) / sessions.length) 
+  const avgEffort = students.length > 0
+    ? Math.round(students.reduce((acc, s) => acc + (s.engagement_score || s.effort_alignment || 0), 0) / students.length)
     : 0;
-  const flaggedCount = sessions.filter(s => s.risk_level === 'high' || s.risk_level === 'critical').length;
+  const flaggedCount = students.filter(s => s.risk_level === 'review' || s.risk_level === 'suspicious').length;
 
   if (loading) {
     return (
@@ -130,15 +322,17 @@ export function SessionDetail() {
           </button>
           <div>
             <div className="flex items-center gap-3">
-              <h1 className="text-2xl font-bold text-slate-900 tracking-tight">{sessionId?.substring(0, 8).toUpperCase()}</h1>
+              <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
+                {examId || sessionId?.substring(0, 8).toUpperCase()}
+              </h1>
               <span className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold border ${
                 isEnded ? 'bg-slate-100 text-slate-700 border-slate-200' : 'bg-emerald-50 text-emerald-700 border-emerald-200 animate-pulse'
               }`}>
-                {isEnded ? 'Completed' : 'Live'}
+                {isEnded ? 'Completed' : '● Live'}
               </span>
             </div>
             <p className="text-sm text-slate-500 mt-1">
-              {sessions.length} student{sessions.length !== 1 ? 's' : ''} connected
+              {students.length} student{students.length !== 1 ? 's' : ''} connected
             </p>
           </div>
         </div>
@@ -156,8 +350,8 @@ export function SessionDetail() {
               onClick={handleDownloadPdf}
               disabled={isGeneratingPdf || isPdfGenerated}
               className={`inline-flex items-center justify-center px-5 py-2.5 font-semibold rounded-xl transition-all shadow-sm active:scale-95 ${
-                isPdfGenerated 
-                  ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' 
+                isPdfGenerated
+                  ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
                   : 'bg-indigo-600 text-white hover:bg-indigo-700'
               }`}
             >
@@ -168,176 +362,266 @@ export function SessionDetail() {
               ) : (
                 <Download className="w-4 h-4 mr-2" />
               )}
-              {isGeneratingPdf ? "Generating PDF..." : isPdfGenerated ? "Downloaded" : "Download Complete PDF"}
+              {isGeneratingPdf ? "Generating PDF..." : isPdfGenerated ? "Downloaded" : "Download Report"}
             </button>
           )}
         </div>
       </div>
 
+      {/* Summary Stats (show when live) */}
+      {!isEnded && students.length > 0 && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-4">
+            <div className="p-3 rounded-xl bg-indigo-50 text-indigo-600">
+              <ShieldAlert className="w-6 h-6" />
+            </div>
+            <div>
+              <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Avg Risk</p>
+              <p className={`text-2xl font-bold ${avgRisk > 70 ? 'text-rose-600' : avgRisk > 30 ? 'text-amber-500' : 'text-emerald-600'}`}>
+                {avgRisk}<span className="text-sm text-slate-400 font-medium">/100</span>
+              </p>
+            </div>
+          </div>
+          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-4">
+            <div className="p-3 rounded-xl bg-emerald-50 text-emerald-600">
+              <Activity className="w-6 h-6" />
+            </div>
+            <div>
+              <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Avg Effort</p>
+              <p className="text-2xl font-bold text-slate-900">
+                {avgEffort}<span className="text-sm text-slate-400 font-medium">/100</span>
+              </p>
+            </div>
+          </div>
+          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-4">
+            <div className="p-3 rounded-xl bg-rose-50 text-rose-600">
+              <AlertTriangle className="w-6 h-6" />
+            </div>
+            <div>
+              <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Flagged</p>
+              <p className="text-2xl font-bold text-slate-900">{flaggedCount}</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MAIN CONTENT: Live student feed grid */}
       <AnimatePresence mode="wait">
-        {!isEnded && sessions.length > 0 ? (
+        {students.length > 0 ? (
           <motion.div 
-            key="live-grid"
+            key="student-feeds"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
-            className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4"
-          >
-            {sessions.map((student) => {
-              const mode = feedModes[student.student_id] || 'camera';
-              const name = getStudentName(student);
-              const riskScore = student.risk_score || 0;
-              const isFlagged = student.risk_level === 'high' || student.risk_level === 'critical';
-              
-              // Use real feed URL from API if available
-              const feedUrl = `${config.apiUrl}/uploads/latest/${student.id}?type=${mode === 'camera' ? 'webcam' : 'screenshot'}&t=${refreshKey}`;
-              
-              return (
-                <div 
-                  key={student.id} 
-                  onClick={() => toggleFeedMode(student.student_id)}
-                  className={`relative bg-slate-900 rounded-2xl overflow-hidden aspect-video cursor-pointer group shadow-md border-2 transition-all hover:scale-[1.02] ${
-                    isFlagged ? 'border-rose-500 ring-4 ring-rose-500/20' : 'border-slate-800'
-                  }`}
-                >
-                  <img 
-                    src={feedUrl}
-                    onError={(e) => {
-                      // Fallback to placeholder if no frames uploaded yet
-                      e.currentTarget.src = `https://api.dicebear.com/7.x/identicon/svg?seed=${student.student_id}&backgroundColor=b6e3f4`;
-                    }}
-                    alt={`${name} feed`}
-                    className="w-full h-full object-cover opacity-90 group-hover:opacity-100 transition-opacity"
-                  />
-                  
-                  <div className="absolute inset-0 bg-gradient-to-t from-slate-900/80 via-transparent to-slate-900/30 pointer-events-none" />
-                  
-                  <div className="absolute top-3 left-3 flex items-center gap-2">
-                    <div className="bg-slate-900/60 backdrop-blur-md text-white text-xs px-2 py-1 rounded-md font-medium flex items-center gap-1.5 border border-white/10">
-                      {mode === 'camera' ? <Camera className="w-3 h-3" /> : <Layout className="w-3 h-3" />}
-                      {name}
-                    </div>
-                  </div>
-
-                  {isFlagged && (
-                    <div className="absolute top-3 right-3 bg-rose-500 text-white text-[10px] font-bold px-2 py-1 rounded-md uppercase tracking-wider animate-pulse shadow-sm">
-                      Flagged
-                    </div>
-                  )}
-
-                  <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between">
-                    <div className={`px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider backdrop-blur-md border border-white/10 ${
-                      riskScore > 70 ? 'bg-rose-500/80 text-white' : 
-                      riskScore > 30 ? 'bg-amber-500/80 text-white' : 
-                      'bg-emerald-500/80 text-white'
-                    }`}>
-                      Risk: {riskScore}
-                    </div>
-                    <div className="bg-slate-900/60 backdrop-blur-md text-white text-[10px] px-2 py-1 rounded-md font-mono flex items-center gap-1.5 border border-white/10">
-                      <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse"></span>
-                      LIVE
-                    </div>
-                  </div>
-
-                  {/* Hover Overlay */}
-                  <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300 bg-slate-900/40 backdrop-blur-[1px]">
-                     <span className="bg-white px-4 py-2 rounded-full text-slate-900 text-xs font-bold shadow-xl">
-                        Switch to {mode === 'camera' ? 'Desktop' : 'Camera'}
-                     </span>
-                  </div>
-                </div>
-              );
-            })}
-          </motion.div>
-        ) : !isEnded && sessions.length === 0 ? (
-          <motion.div
-            key="empty"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="bg-white rounded-2xl border border-slate-200 shadow-sm p-16 text-center"
-          >
-            <div className="w-16 h-16 bg-slate-50 text-slate-300 rounded-full flex items-center justify-center mx-auto mb-6">
-               <Users className="w-8 h-8" />
-            </div>
-            <h3 className="text-xl font-bold text-slate-900">Waiting for students...</h3>
-            <p className="text-slate-500 mt-2 max-w-sm mx-auto">
-               The session is active. Share the exam code with students. Once they start proctoring, their feeds will appear here automatically.
-            </p>
-          </motion.div>
-        ) : (
-          <motion.div 
-            key="analytics"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
             className="space-y-6"
           >
-            {/* Analytics Summary Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-              <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-4">
-                <div className="p-4 rounded-xl bg-indigo-50 text-indigo-600">
-                  <ShieldAlert className="w-8 h-8" />
-                </div>
-                <div>
-                  <p className="text-sm font-semibold text-slate-500 uppercase tracking-wider">Avg Risk Score</p>
-                  <p className="text-3xl font-bold text-slate-900">{avgRisk}<span className="text-lg text-slate-400 font-medium">/100</span></p>
-                </div>
+            {/* Student Feeds Grid */}
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+              <div className="p-5 border-b border-slate-200 bg-slate-50/50 flex items-center justify-between">
+                <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                  <Eye className="w-5 h-5 text-indigo-500" />
+                  Live Student Feeds
+                </h2>
+                <button 
+                  onClick={() => setRefreshKey(Date.now())}
+                  className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-colors"
+                  title="Refresh feeds"
+                >
+                  <RefreshCw className="w-4 h-4" />
+                </button>
               </div>
-              <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-4">
-                <div className="p-4 rounded-xl bg-emerald-50 text-emerald-600">
-                  <Activity className="w-8 h-8" />
-                </div>
-                <div>
-                  <p className="text-sm font-semibold text-slate-500 uppercase tracking-wider">Avg Effort Score</p>
-                  <p className="text-3xl font-bold text-slate-900">{avgEffort}<span className="text-lg text-slate-400 font-medium">/100</span></p>
-                </div>
-              </div>
-              <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-4">
-                <div className="p-4 rounded-xl bg-rose-50 text-rose-600">
-                  <AlertTriangle className="w-8 h-8" />
-                </div>
-                <div>
-                  <p className="text-sm font-semibold text-slate-500 uppercase tracking-wider">Flagged Students</p>
-                  <p className="text-3xl font-bold text-slate-900">{flaggedCount}</p>
+              
+              <div className="p-5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                  {students.filter(s => s?.id).map((student) => {
+                    const studentId = student.id;  // Use consistent ID
+                    const mode = feedModes[student.student_id] || 'camera';
+                    const name = getStudentName(student);
+                    const riskScore = student.risk_score || 0;
+                    const effortScore = student.engagement_score || student.effort_alignment || 0;
+                    const isFlagged = student.risk_level === 'review' || student.risk_level === 'suspicious';
+                    const isSelected = selectedStudent === studentId;
+
+                    // Live feed URL: either websocket frame or fallback to backend pull
+                    const targetMode = mode === 'camera' ? 'webcam' : 'screenshot';
+                    const activeStream = rtcStreams[studentId]?.[targetMode];
+                    const liveFrame = liveFrames[studentId]?.[targetMode];
+                    const feedUrl = liveFrame || `${config.apiUrl}/uploads/latest/${studentId}?type=${targetMode}&t=${refreshKey}`;
+
+                    return (
+                      <motion.div
+                        key={studentId}
+                        initial={{ opacity: 0, scale: 0.95 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        className={`relative rounded-2xl overflow-hidden shadow-md border-2 transition-all ${
+                          isSelected ? 'ring-4 ring-indigo-400/30 border-indigo-400' :
+                          isFlagged ? 'border-rose-400 ring-4 ring-rose-400/20' : 'border-slate-200 hover:border-slate-300'
+                        }`}
+                      >
+                        {/* Feed Display */}
+                        <div 
+                          className="relative bg-slate-900 aspect-video cursor-pointer group"
+                          onClick={() => toggleFeedMode(student.student_id)}
+                        >
+                          {activeStream ? (
+                              <video
+                                id={`video-${studentId}-${targetMode}`}
+                                autoPlay
+                                playsInline
+                                muted
+                                ref={(el) => { if (el && el.srcObject !== activeStream) el.srcObject = activeStream; }}
+                                className="w-full h-full object-cover"
+                              />
+                          ) : (
+                              <img
+                                src={feedUrl}
+                                onError={(e) => {
+                                  e.currentTarget.style.display = 'none';
+                                  const placeholder = e.currentTarget.nextElementSibling as HTMLElement;
+                                  if (placeholder) placeholder.style.display = 'flex';
+                                }}
+                                onLoad={(e) => {
+                                  e.currentTarget.style.display = 'block';
+                                  const placeholder = e.currentTarget.nextElementSibling as HTMLElement;
+                                  if (placeholder) placeholder.style.display = 'none';
+                                }}
+                                alt={`${name} ${mode} feed`}
+                                className="w-full h-full object-cover"
+                              />
+                          )}
+                          {/* Placeholder when no image */}
+                          <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-800 text-slate-400" style={{ display: 'none' }}>
+                            <Camera className="w-10 h-10 mb-2 opacity-30" />
+                            <span className="text-xs opacity-50">Waiting for feed...</span>
+                          </div>
+
+                          {/* Gradient overlay */}
+                          <div className="absolute inset-0 bg-gradient-to-t from-slate-900/80 via-transparent to-slate-900/30 pointer-events-none" />
+
+                          {/* Top left: Name + mode */}
+                          <div className="absolute top-3 left-3 flex items-center gap-2">
+                            <div className="bg-slate-900/60 backdrop-blur-md text-white text-xs px-2.5 py-1 rounded-lg font-medium flex items-center gap-1.5 border border-white/10">
+                              {mode === 'camera' ? <Camera className="w-3 h-3" /> : <Monitor className="w-3 h-3" />}
+                              {name}
+                            </div>
+                          </div>
+
+                          {/* Top right: Flag badge */}
+                          {isFlagged && (
+                            <div className="absolute top-3 right-3 bg-rose-500 text-white text-[10px] font-bold px-2 py-1 rounded-lg uppercase tracking-wider animate-pulse shadow-lg">
+                              ⚠ Flagged
+                            </div>
+                          )}
+
+                          {/* Bottom: Risk + Live indicator */}
+                          <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between">
+                            <div className={`px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider backdrop-blur-md border border-white/10 ${
+                              riskScore > 70 ? 'bg-rose-500/80 text-white' :
+                              riskScore > 30 ? 'bg-amber-500/80 text-white' :
+                              'bg-emerald-500/80 text-white'
+                            }`}>
+                              Risk: {riskScore}
+                            </div>
+                            <div className="bg-slate-900/60 backdrop-blur-md text-white text-[10px] px-2 py-1 rounded-lg font-mono flex items-center gap-1.5 border border-white/10">
+                              {student.status === 'active' ? (
+                                <>
+                                  <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse"></span>
+                                  LIVE
+                                </>
+                              ) : (
+                                <>
+                                  <span className="w-1.5 h-1.5 rounded-full bg-slate-500"></span>
+                                  OFFLINE
+                                </>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Hover overlay */}
+                          <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300 bg-slate-900/40 backdrop-blur-[1px]">
+                            <span className="bg-white px-4 py-2 rounded-full text-slate-900 text-xs font-bold shadow-xl">
+                              Switch to {mode === 'camera' ? 'Screen Share' : 'Camera'}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Student Info Bar below the feed */}
+                        <div className="bg-white p-3 border-t border-slate-100">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2.5">
+                              <div className="w-8 h-8 rounded-full bg-indigo-50 text-indigo-700 flex items-center justify-center text-[10px] font-bold border border-indigo-100">
+                                {getInitials(name)}
+                              </div>
+                              <div>
+                                <p className="text-sm font-semibold text-slate-900 leading-tight">{name}</p>
+                                <p className="text-[10px] text-slate-400">{student.student_id}</p>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-3">
+                              {/* Effort bar */}
+                              <div className="text-right hidden sm:block">
+                                <p className="text-[9px] text-slate-400 uppercase font-semibold">Effort</p>
+                                <div className="w-16 h-1.5 bg-slate-100 rounded-full mt-0.5">
+                                  <div
+                                    className={`h-full rounded-full transition-all duration-1000 ${
+                                      effortScore > 70 ? 'bg-emerald-500' : effortScore > 40 ? 'bg-amber-500' : 'bg-rose-500'
+                                    }`}
+                                    style={{ width: `${effortScore}%` }}
+                                  />
+                                </div>
+                              </div>
+                              {/* Risk bar */}
+                              <div className="text-right">
+                                <p className="text-[9px] text-slate-400 uppercase font-semibold">Risk</p>
+                                <div className="w-16 h-1.5 bg-slate-100 rounded-full mt-0.5">
+                                  <div
+                                    className={`h-full rounded-full transition-all duration-1000 ${
+                                      riskScore > 70 ? 'bg-rose-500' : riskScore > 30 ? 'bg-amber-500' : 'bg-emerald-500'
+                                    }`}
+                                    style={{ width: `${riskScore}%` }}
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </motion.div>
+                    );
+                  })}
                 </div>
               </div>
             </div>
 
-            {/* Detailed Student List */}
-            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-              <div className="p-6 border-b border-slate-200 bg-slate-50/50">
-                <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-                  <Users className="w-5 h-5 text-slate-500" />
-                  Student Performance & Risk Analysis
-                </h2>
-              </div>
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-sm">
-                  <thead className="bg-slate-50 text-slate-500 border-b border-slate-200">
-                    <tr>
-                      <th className="px-6 py-4 font-semibold text-xs uppercase tracking-wider">Student</th>
-                      <th className="px-6 py-4 font-semibold text-xs uppercase tracking-wider">Risk Score</th>
-                      <th className="px-6 py-4 font-semibold text-xs uppercase tracking-wider">Effort Score</th>
-                      <th className="px-6 py-4 font-semibold text-xs uppercase tracking-wider">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {sessions.length === 0 ? (
+            {/* Student Performance Table (below feeds) */}
+            {isEnded && (
+              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                <div className="p-6 border-b border-slate-200 bg-slate-50/50">
+                  <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                    <Users className="w-5 h-5 text-slate-500" />
+                    Student Performance & Risk Analysis
+                  </h2>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-sm">
+                    <thead className="bg-slate-50 text-slate-500 border-b border-slate-200">
                       <tr>
-                        <td colSpan={4} className="px-6 py-12 text-center text-slate-500 flex flex-col items-center">
-                           No students joined this session.
-                        </td>
+                        <th className="px-6 py-4 font-semibold text-xs uppercase tracking-wider">Student</th>
+                        <th className="px-6 py-4 font-semibold text-xs uppercase tracking-wider">Risk Score</th>
+                        <th className="px-6 py-4 font-semibold text-xs uppercase tracking-wider">Effort Score</th>
+                        <th className="px-6 py-4 font-semibold text-xs uppercase tracking-wider">Status</th>
                       </tr>
-                    ) : (
-                      sessions.map((student) => {
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {students.map((student) => {
                         const name = getStudentName(student);
                         const riskScore = student.risk_score || 0;
                         const effortScore = student.engagement_score || student.effort_alignment || 0;
-                        const isFlagged = student.risk_level === 'high' || student.risk_level === 'critical';
+                        const isFlagged = student.risk_level === 'review' || student.risk_level === 'suspicious';
                         return (
-                          <tr key={student.id} className="hover:bg-slate-50/80 transition-colors bg-white group">
+                          <tr key={student.id} className="hover:bg-slate-50/80 transition-colors bg-white">
                             <td className="px-6 py-4">
                               <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-full bg-indigo-50 text-indigo-700 flex items-center justify-center font-bold text-xs border border-indigo-100 shadow-sm group-hover:bg-indigo-600 group-hover:text-white transition-colors">
+                                <div className="w-10 h-10 rounded-full bg-indigo-50 text-indigo-700 flex items-center justify-center font-bold text-xs border border-indigo-100 shadow-sm">
                                   {getInitials(name)}
                                 </div>
                                 <div>
@@ -349,8 +633,8 @@ export function SessionDetail() {
                             <td className="px-6 py-4">
                               <div className="flex items-center gap-3">
                                 <div className="w-full bg-slate-100 rounded-full h-2 max-w-[120px]">
-                                  <div 
-                                    className={`h-2 rounded-full transition-all duration-1000 ${riskScore > 70 ? 'bg-rose-500' : riskScore > 30 ? 'bg-amber-500' : 'bg-emerald-500'}`} 
+                                  <div
+                                    className={`h-2 rounded-full transition-all duration-1000 ${riskScore > 70 ? 'bg-rose-500' : riskScore > 30 ? 'bg-amber-500' : 'bg-emerald-500'}`}
                                     style={{ width: `${riskScore}%` }}
                                   />
                                 </div>
@@ -360,8 +644,8 @@ export function SessionDetail() {
                             <td className="px-6 py-4">
                               <div className="flex items-center gap-3">
                                 <div className="w-full bg-slate-100 rounded-full h-2 max-w-[120px]">
-                                  <div 
-                                    className="h-2 rounded-full bg-indigo-500 transition-all duration-1000" 
+                                  <div
+                                    className="h-2 rounded-full bg-indigo-500 transition-all duration-1000"
                                     style={{ width: `${effortScore}%` }}
                                   />
                                 </div>
@@ -381,12 +665,28 @@ export function SessionDetail() {
                             </td>
                           </tr>
                         );
-                      })
-                    )}
-                  </tbody>
-                </table>
+                      })}
+                    </tbody>
+                  </table>
+                </div>
               </div>
+            )}
+          </motion.div>
+        ) : (
+          <motion.div
+            key="empty"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="bg-white rounded-2xl border border-slate-200 shadow-sm p-16 text-center"
+          >
+            <div className="w-16 h-16 bg-slate-50 text-slate-300 rounded-full flex items-center justify-center mx-auto mb-6">
+              <Users className="w-8 h-8" />
             </div>
+            <h3 className="text-xl font-bold text-slate-900">Waiting for students...</h3>
+            <p className="text-slate-500 mt-2 max-w-sm mx-auto">
+              The session is active. Share the exam code <strong className="text-indigo-600">{examId}</strong> with students.
+              Once they start proctoring, their camera and screen feeds will appear here automatically.
+            </p>
           </motion.div>
         )}
       </AnimatePresence>
