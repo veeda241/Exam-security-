@@ -47,6 +47,7 @@ let clipboardTexts = [];     // Buffer for transformer analysis
 let pendingAnalysis = [];    // Buffer for pending text analysis
 let domCaptureIntervalId = null;
 let webcamCaptureIntervalId = null; 
+let webcamUploadInFlight = false;
 
 // ==================== MESSAGE HANDLING (REGISTER EARLY) ====================
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -127,28 +128,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
     case 'NETWORK_INFO':
       // Simply ack it without logging for now
-      sendResponse({ success: true });
-      return true;
-
-    case 'WEBRTC_SIGNAL_OUT':
-      if (wsConnection && wsConnection.readyState === WebSocket.OPEN) {
-        console.log('📡 Sending WebRTC signal to server:', message.payload?.sdp?.type || 'ICE candidate');
-        wsConnection.send(`webrtc:${JSON.stringify(message.payload)}`);
-      } else {
-        console.warn('📡 WebRTC signal not sent - WebSocket not ready');
-      }
-      sendResponse({ success: true });
-      return true;
-
-    case 'STREAM_CHUNK':
-      // Relay binary MediaRecorder data to backend WebSocket as raw bytes
-      if (wsConnection && wsConnection.readyState === WebSocket.OPEN) {
-          // Chrome Extension's message passing sometimes serializes TypedArrays differently.
-          // For reliability, we send the chunk directly to the open WebSocket.
-          if (message.data) {
-              wsConnection.send(message.data);
-          }
-      }
       sendResponse({ success: true });
       return true;
 
@@ -304,7 +283,7 @@ const browsingTracker = {
             timestamp: Date.now(),
             data: {
                 screenshotIntervalMs: 2500,
-                webcamIntervalMs: 2000,
+              webcamIntervalMs: 2500,
                 url, 
                 matches: matches.slice(0, 5),
                 message: 'Exam question text detected in browser URL query (Googling detected)' 
@@ -825,25 +804,18 @@ async function startExamSession(data) {
     // Start periodic sync
     startPeriodicSync();
 
-    // REMOVED: High-frequency frame polling (user requested live stream instead)
-    // if (domCaptureIntervalId) clearInterval(domCaptureIntervalId);
-    // domCaptureIntervalId = setInterval(triggerNativeDOMCapture, 25000);
-    // if (webcamCaptureIntervalId) clearInterval(webcamCaptureIntervalId);
-    // webcamCaptureIntervalId = setInterval(triggerWebcamCapture, 4000);
+    if (webcamCaptureIntervalId) {
+      clearInterval(webcamCaptureIntervalId);
+      webcamCaptureIntervalId = null;
+    }
+    webcamUploadInFlight = false;
+    triggerWebcamCapture();
+    webcamCaptureIntervalId = setInterval(triggerWebcamCapture, 2500);
 
     // Kiosk Mode: Enforce Lockdown
     await enforceLockdown();
 
-    // Start Live Streaming (MediaRecorder) via Capture Window
-    try {
-        chrome.tabs.sendMessage(await getCaptureTabId(), { 
-            type: 'START_STREAMING', 
-            interval: 1000 
-        });
-        console.log('🎥 Triggered live stream for session:', sessionId);
-    } catch (e) {
-        console.warn('🎥 Failed to trigger live stream:', e.message);
-    }
+    console.log('📸 Triggered webcam snapshot capture for session:', sessionId);
 
     // Anti-Cheat: Scan for Interview Coder / Cluely
     startCheatingToolDetection();
@@ -916,6 +888,7 @@ async function stopExamSession() {
       clearInterval(webcamCaptureIntervalId);
       webcamCaptureIntervalId = null;
     }
+    webcamUploadInFlight = false;
 
     // Notify all tabs
     notifyAllTabs('EXAM_STOPPED');
@@ -1330,7 +1303,7 @@ async function triggerNativeDOMCapture() {
  * Trigger a webcam snapshot from the capture window
  */
 async function triggerWebcamCapture() {
-    if (!examSession.active || !captureWindowId) return;
+  if (!examSession.active || !captureWindowId || webcamUploadInFlight) return;
 
     try {
         // Since background script doesn't have the media stream, 
@@ -1349,7 +1322,9 @@ async function triggerWebcamCapture() {
  * Upload webcam frame for AI vision analysis (Face/Gaze/Phone)
  */
 async function uploadWebcamFrame(image) {
-    if (!examSession.active) return;
+  if (!examSession.active || webcamUploadInFlight) return;
+
+  webcamUploadInFlight = true;
     
     try {
         const response = await fetch(`${CONFIG.API_BASE}/analysis/process`, {
@@ -1380,6 +1355,8 @@ async function uploadWebcamFrame(image) {
         }
     } catch (err) {
         console.warn('Webcam AI upload failed:', err.message);
+      } finally {
+        webcamUploadInFlight = false;
     }
 }
 
@@ -1579,27 +1556,6 @@ function handleServerMessage(data) {
     case 'debug_trigger_shutdown':
       // DEBUG: Allow manual trigger for testing
       processViolation('PHONE_DETECTED', { message: 'Manual debug trigger' });
-      break;
-
-    case 'request_webrtc_offer':
-      if (captureWindowId) {
-        chrome.tabs.query({ windowId: captureWindowId }, (tabs) => {
-          if (tabs && tabs[0]) {
-            chrome.tabs.sendMessage(tabs[0].id, { type: 'REQUEST_WEBRTC_OFFER' }).catch(() => {});
-          }
-        });
-      }
-      break;
-
-    case 'webrtc_signal':
-      // Route incoming WebRTC signals directly to the capture window (where RTCPeerConnection lives)
-      if (captureWindowId) {
-        chrome.tabs.query({ windowId: captureWindowId }, (tabs) => {
-          if (tabs && tabs[0]) {
-            chrome.tabs.sendMessage(tabs[0].id, { type: 'WEBRTC_SIGNAL_IN', payload: data.payload }).catch(() => {});
-          }
-        });
-      }
       break;
 
     default:

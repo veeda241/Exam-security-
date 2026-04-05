@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException, BackgroundTasks, Request
-from typing import List
+from typing import Any, List
 from datetime import datetime
 import base64
 import os
@@ -15,7 +15,7 @@ from api.schemas import (
     StudentSummary,
     DashboardStats
 )
-from config import SCREENSHOTS_DIR, WEBCAM_DIR
+from config import SCREENSHOTS_DIR, WEBCAM_DIR, ENABLE_OBJECT_DETECTION
 from services.ocr import analyze_screenshot_ocr
 from services.llm import get_llm_service
 from services.research_analysis import analyze_research_journey
@@ -25,6 +25,28 @@ supabase = get_supabase()
 
 # In-memory cache for latest feed paths per session (avoids needing DB columns)
 _latest_feeds: dict = {}  # {session_id: {"webcam": "/uploads/webcam/file.jpg", "screenshot": "/uploads/screenshots/file.jpg"}}
+
+
+def _first_record(records: Any) -> dict[str, Any] | None:
+    if isinstance(records, list):
+        for record in records:
+            if isinstance(record, dict):
+                return record
+    return None
+
+
+def _as_int(value: Any, default: int = 0) -> int:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _as_str(value: Any, default: str = "") -> str:
+    if value is None:
+        return default
+    text = str(value)
+    return text if text else default
 
 def get_latest_feeds():
     """Get the global feeds cache — used by uploads endpoint."""
@@ -46,12 +68,36 @@ def decode_image(base64_string):
         return None
 
 
-def save_image(img, folder, prefix):
+def save_image(img, folder, prefix, session_id=None):
     """Save image to disk and return filename and path"""
-    filename = f"{prefix}_{uuid.uuid4().hex}.jpg"
+    session_part = f"_{session_id}" if session_id else ""
+    filename = f"{prefix}{session_part}_{uuid.uuid4().hex}.jpg"
     path = os.path.join(folder, filename)
     cv2.imwrite(path, img)
     return filename, path
+
+
+async def broadcast_live_frame(room_id: str, student_id: str, frame_type: str, image_data: str):
+    """Broadcast a captured frame immediately so the UI stays close to real time."""
+    if not image_data:
+        return
+
+    try:
+        from services.realtime import get_realtime_manager
+
+        mgr = get_realtime_manager()
+        clean_b64 = image_data
+        if "," in clean_b64:
+            clean_b64 = clean_b64.split(",")[1]
+
+        await mgr.broadcast_to_session(room_id, {
+            "type": "live_frame",
+            "student_id": student_id,
+            "frame_type": frame_type,
+            "data": f"data:image/jpeg;base64,{clean_b64}"
+        })
+    except Exception as ws_err:
+        print(f"[WS] Live frame broadcast error: {ws_err}")
 
 
 @router.post("/process", response_model=AnalysisResponse)
@@ -68,16 +114,17 @@ async def process_analysis_data(
         
         # 1. Verify session in Supabase
         session_res = supabase.table("exam_sessions").select("*").eq("id", analysis_request.session_id).execute()
-        if not session_res.data:
+        session_row = _first_record(session_res.data)
+        if not session_row:
             raise HTTPException(status_code=404, detail="Session not found")
-        
-        session = session_res.data[0]
+        session_id = _as_str(session_row.get("id"), analysis_request.session_id)
+        student_id = _as_str(session_row.get("student_id"))
         
         # Prepare analysis record with all optional fields initialized to prevent Supabase schema errors
         from typing import Dict, Any
         analysis_data: Dict[str, Any] = {
             "id": str(uuid.uuid4()),
-            "session_id": session["id"],
+            "session_id": session_id,
             "timestamp": datetime.utcnow().isoformat(),
             "analysis_type": "MULTI_MODAL",
             "result_data": {
@@ -99,12 +146,20 @@ async def process_analysis_data(
         if analysis_request.webcam_image:
             webcam_frame = decode_image(analysis_request.webcam_image)
             if webcam_frame is not None:
-                fname, fpath = save_image(webcam_frame, WEBCAM_DIR, "webcam")
+                fname, fpath = save_image(
+                    webcam_frame,
+                    WEBCAM_DIR,
+                    "webcam",
+                    session_id=analysis_request.session_id,
+                )
                 analysis_data["source_file"] = f"/uploads/webcam/{fname}"
                 # Store in memory cache (DB may not have this column)
-                if session["id"] not in _latest_feeds:
-                    _latest_feeds[session["id"]] = {}
-                _latest_feeds[session["id"]]["webcam"] = f"/uploads/webcam/{fname}"
+                if session_id not in _latest_feeds:
+                    _latest_feeds[session_id] = {}
+                _latest_feeds[session_id]["webcam"] = f"/uploads/webcam/{fname}"
+
+                # Broadcast immediately so the dashboard does not wait for analysis work.
+                await broadcast_live_frame(session_id, student_id, "webcam", analysis_request.webcam_image)
                 
                 if vision_engine:
                     try:
@@ -118,59 +173,68 @@ async def process_analysis_data(
                         analysis_data["face_confidence"] = 0.0 if not is_face_detected else 0.9
                         
                         if "GAZE_AWAY_LONG" in violations:
-                            session_updates["engagement_score"] = max(0, (session.get("engagement_score") or 100) - 5)
+                            session_updates["engagement_score"] = max(0, (_as_int(session_row.get("engagement_score"), 100)) - 5)
                         elif not is_face_detected:
-                            session_updates["face_absence_count"] = (session.get("face_absence_count") or 0) + 1
-                            session_updates["engagement_score"] = max(0, (session.get("engagement_score") or 100) - 10)
+                            session_updates["face_absence_count"] = _as_int(session_row.get("face_absence_count")) + 1
+                            session_updates["engagement_score"] = max(0, _as_int(session_row.get("engagement_score"), 100) - 10)
                         elif is_multiface:
-                            session_updates["multiface_count"] = (session.get("multiface_count") or 0) + 1
-                            session_updates["engagement_score"] = max(0, (session.get("engagement_score") or 100) - 15)
+                            session_updates["multiface_count"] = _as_int(session_row.get("multiface_count")) + 1
+                            session_updates["engagement_score"] = max(0, _as_int(session_row.get("engagement_score"), 100) - 15)
                         else:
-                            session_updates["engagement_score"] = min(100, (session.get("engagement_score") or 100) + 1)
+                            session_updates["engagement_score"] = min(100, _as_int(session_row.get("engagement_score"), 100) + 1)
 
                         analysis_data["result_data"]["vision"] = vision_results
                         analysis_data["risk_score_added"] += vision_results.get('integrity_score_impact', 0)
                     except Exception as ve:
                         print(f"[Analysis] Vision Engine Error: {ve}")
 
-                # Object Detection
-                try:
-                    from services.object_detection import get_object_detector
-                    yolo = get_object_detector()
-                    obj_result = yolo.detect(webcam_frame)
-                    
-                    if obj_result.get("forbidden_detected"):
-                        objects = obj_result.get("objects", [])
-                        analysis_data["result_data"]["objects"] = objects
-                        analysis_data["risk_score_added"] += obj_result.get("risk_score", 0)
+                # Object Detection (optional)
+                if ENABLE_OBJECT_DETECTION:
+                    try:
+                        from services.object_detection import get_object_detector
+                        yolo = get_object_detector()
+                        obj_result = yolo.detect(webcam_frame)
                         
-                        # Check for phone specifically
-                        has_phone = any(o.get('object', '') == 'cell phone' for o in objects)
-                        analysis_data["result_data"]["phone_detected"] = has_phone
-                        
-                        if has_phone:
-                            session_updates["phone_detection_count"] = (session.get("phone_detection_count") or 0) + 1
-                            print(f"[Analysis] phone_detected for session: {session.get('id')}")
-                except Exception as oe:
-                    print(f"[Analysis] Object detection skip: {oe}")
+                        if obj_result.get("forbidden_detected"):
+                            objects = obj_result.get("objects", [])
+                            analysis_data["result_data"]["objects"] = objects
+                            analysis_data["risk_score_added"] += obj_result.get("risk_score", 0)
+                            
+                            # Check for phone specifically
+                            has_phone = any(o.get('object', '') == 'cell phone' for o in objects)
+                            analysis_data["result_data"]["phone_detected"] = has_phone
+                            
+                            if has_phone:
+                                session_updates["phone_detection_count"] = _as_int(session_row.get("phone_detection_count")) + 1
+                                print(f"[Analysis] phone_detected for session: {session_id}")
+                    except Exception as oe:
+                        print(f"[Analysis] Object detection skip: {oe}")
 
         # 2. Screen Analysis (OCR)
         if analysis_request.screen_image:
             screen_frame = decode_image(analysis_request.screen_image)
             if screen_frame is not None:
-                fname, fpath = save_image(screen_frame, SCREENSHOTS_DIR, "screen")
+                fname, fpath = save_image(
+                    screen_frame,
+                    SCREENSHOTS_DIR,
+                    "screen",
+                    session_id=analysis_request.session_id,
+                )
                 # Store in memory cache (DB may not have this column)
-                if session["id"] not in _latest_feeds:
-                    _latest_feeds[session["id"]] = {}
-                _latest_feeds[session["id"]]["screenshot"] = f"/uploads/screenshots/{fname}"
+                if session_id not in _latest_feeds:
+                    _latest_feeds[session_id] = {}
+                _latest_feeds[session_id]["screenshot"] = f"/uploads/screenshots/{fname}"
+
+                # Broadcast immediately so the dashboard stays responsive.
+                await broadcast_live_frame(session_id, student_id, "screenshot", analysis_request.screen_image)
                 ocr_result = await analyze_screenshot_ocr(fpath)
                 
                 analysis_data["detected_text"] = ocr_result.get("text", "")
                 analysis_data["forbidden_keywords_found"] = ocr_result.get("forbidden_keywords", [])
                 
                 if ocr_result.get("forbidden_detected"):
-                    session_updates["forbidden_site_count"] = (session.get("forbidden_site_count") or 0) + 1
-                    session_updates["content_relevance"] = max(0, (session.get("content_relevance") or 100) - 20)
+                    session_updates["forbidden_site_count"] = _as_int(session_row.get("forbidden_site_count")) + 1
+                    session_updates["content_relevance"] = max(0, _as_int(session_row.get("content_relevance"), 100) - 20)
                     analysis_data["risk_score_added"] += ocr_result.get("risk_score", 0)
                 
                 analysis_data["result_data"]["ocr"] = ocr_result
@@ -180,48 +244,21 @@ async def process_analysis_data(
             analysis_data["similarity_score"] = 0.0
 
         # 4. LLM Analysis (Optional)
-        try:
-            llm = get_llm_service()
-            if await llm.check_connection():
-                llm_result = await llm.analyze_behavior(
-                    text=analysis_data.get("detected_text", ""),
-                    violations=analysis_data.get("forbidden_keywords_found", [])
-                )
-                if llm_result.get("is_cheating"):
-                    analysis_data["risk_score_added"] = float(analysis_data["risk_score_added"]) + 25
-                    analysis_data["result_data"]["llm_analysis"] = llm_result
-        except Exception as le:
-            print(f"[Analysis] LLM Analysis Error: {le}")
-
-        # ── Broadcast live frames to dashboard ───────────────────────────
-        try:
-            from services.realtime import get_realtime_manager
-            mgr = get_realtime_manager()
-            room_id = session["id"]
-
-            if analysis_request.webcam_image:
-                clean_b64 = analysis_request.webcam_image
-                if "," in clean_b64:
-                    clean_b64 = clean_b64.split(",")[1]
-                await mgr.broadcast_to_session(room_id, {
-                    "type": "live_frame",
-                    "student_id": session["student_id"],
-                    "frame_type": "webcam",
-                    "data": f"data:image/jpeg;base64,{clean_b64}"
-                })
-
-            if analysis_request.screen_image:
-                clean_b64 = analysis_request.screen_image
-                if "," in clean_b64:
-                    clean_b64 = clean_b64.split(",")[1]
-                await mgr.broadcast_to_session(room_id, {
-                    "type": "live_frame",
-                    "student_id": session["student_id"],
-                    "frame_type": "screenshot",
-                    "data": f"data:image/jpeg;base64,{clean_b64}"
-                })
-        except Exception as ws_err:
-            print(f"[WS] Live frame broadcast error: {ws_err}")
+        # Skip the LLM path for webcam-only frames; it adds latency without useful signal.
+        has_text_signal = bool(analysis_request.clipboard_text) or bool(analysis_data.get("detected_text")) or bool(analysis_data.get("forbidden_keywords_found"))
+        if has_text_signal:
+            try:
+                llm = get_llm_service()
+                if await llm.check_connection():
+                    llm_result = await llm.analyze_behavior(
+                        text=analysis_data.get("detected_text", ""),
+                        violations=analysis_data.get("forbidden_keywords_found", [])
+                    )
+                    if llm_result.get("is_cheating"):
+                        analysis_data["risk_score_added"] = float(analysis_data["risk_score_added"]) + 25
+                        analysis_data["result_data"]["llm_analysis"] = llm_result
+            except Exception as le:
+                print(f"[Analysis] LLM Analysis Error: {le}")
 
         # Save Analysis Result to Supabase (non-blocking - don't crash if schema mismatch)
         try:
@@ -230,7 +267,7 @@ async def process_analysis_data(
             print(f"[Analysis] analysis_results insert failed (non-fatal): {db_err}")
         
         # Update Session Risk
-        current_risk = session.get("risk_score", 0.0) or 0.0
+        current_risk = _as_int(session_row.get("risk_score"), 0)
         new_risk = min(100, float(current_risk) + float(analysis_data.get("risk_score_added", 0)))
         session_updates["risk_score"] = new_risk
         
@@ -244,7 +281,7 @@ async def process_analysis_data(
         # Update session in Supabase (critical for live feeds - always try)
         if session_updates:
             try:
-                supabase.table("exam_sessions").update(session_updates).eq("id", session["id"]).execute()
+                supabase.table("exam_sessions").update(session_updates).eq("id", session_id).execute()
             except Exception as upd_err:
                 print(f"[Analysis] session update failed (non-fatal): {upd_err}")
         
@@ -285,10 +322,13 @@ async def get_dashboard_data():
         sessions = sessions_res.data or []
         
         # 3. Create a mapping of student_id -> latest_session
-        latest_sessions = {}
-        for s in sessions:
-            if s["student_id"] not in latest_sessions:
-                latest_sessions[s["student_id"]] = s
+        latest_sessions: dict[str, dict[str, Any]] = {}
+        for session_row in sessions:
+            if not isinstance(session_row, dict):
+                continue
+            student_key = _as_str(session_row.get("student_id"))
+            if student_key and student_key not in latest_sessions:
+                latest_sessions[student_key] = session_row
         
         # 4. Fetch the latest research entry for EACH active session in bulk
         # Since we can't easily do a "latest by group" in a single simple Supabase query without RPC,
@@ -297,7 +337,11 @@ async def get_dashboard_data():
         
         dashboard_data = []
         for student in students:
-            session = latest_sessions.get(student["id"])
+            if not isinstance(student, dict):
+                continue
+
+            student_id_value = _as_str(student.get("id"))
+            session: dict[str, Any] | None = latest_sessions.get(student_id_value)
             
             summary_dict = {
                 "id": str(student.get("id", "")),
@@ -351,7 +395,8 @@ async def get_dashboard_data():
                     
                     if journey_res.data:
                         # Journey exists, run analysis
-                        analysis = analyze_research_journey(journey_res.data)
+                        journey_rows = [record for record in journey_res.data if isinstance(record, dict)]
+                        analysis = analyze_research_journey(journey_rows)
                         summary_dict["effort_score"] = analysis.get("effort_score", 0.0)
                         summary_dict["browsing_risk_score"] = analysis.get("browsing_risk_score", 0.0)
                         # Map browsing_risk to status if risk is high
@@ -380,9 +425,10 @@ async def get_dashboard_data():
                         .order("timestamp", desc=True)\
                         .limit(1).execute()
                     
-                    if site_res.data:
-                        summary_dict["last_visited_url"] = site_res.data[0].get("url")
-                        summary_dict["last_visited_title"] = site_res.data[0].get("title")
+                    site_row = _first_record(site_res.data)
+                    if site_row:
+                        summary_dict["last_visited_url"] = site_row.get("url")
+                        summary_dict["last_visited_title"] = site_row.get("title")
                 except:
                     pass
             
@@ -400,10 +446,11 @@ async def get_student_details(student_id: str):
     
     try:
         student_res = supabase.table("students").select("*").eq("id", student_id).execute()
-        if not student_res.data:
+        student_row = _first_record(student_res.data)
+        if not student_row:
             raise HTTPException(status_code=404, detail="Student not found")
         
-        student = student_res.data[0]
+        student = student_row
         
         sessions_res = supabase.table("exam_sessions")\
             .select("*")\
@@ -424,23 +471,23 @@ async def get_dashboard_stats():
     
     try:
         # 1. Total Students
-        students_res = supabase.table("students").select("id", count="exact").execute()
-        total_students = students_res.count if hasattr(students_res, 'count') else len(students_res.data)
+        students_res = supabase.table("students").select("id").execute()
+        total_students = len(students_res.data or [])
         
         # 2. Active Sessions
-        active_res = supabase.table("exam_sessions").select("id", count="exact").eq("is_active", True).execute()
-        active_sessions_count = active_res.count if hasattr(active_res, 'count') else len(active_res.data)
+        active_res = supabase.table("exam_sessions").select("id").eq("is_active", True).execute()
+        active_sessions_count = len(active_res.data or [])
         
         # 3. Calculate averages from all sessions
         all_sessions_res = supabase.table("exam_sessions").select("risk_score", "engagement_score").execute()
-        all_sessions = all_sessions_res.data
+        all_sessions = [record for record in (all_sessions_res.data or []) if isinstance(record, dict)]
         
         avg_engagement = 0.0
         high_risk_count = 0
         
         if all_sessions:
-            avg_engagement = sum(s.get("engagement_score", 0) for s in all_sessions) / len(all_sessions)
-            high_risk_count = sum(1 for s in all_sessions if s.get("risk_score", 0) >= 60)
+            avg_engagement = sum(_as_int(s.get("engagement_score")) for s in all_sessions) / len(all_sessions)
+            high_risk_count = sum(1 for s in all_sessions if _as_int(s.get("risk_score")) >= 60)
         
         return DashboardStats(
             total_students=total_students,
