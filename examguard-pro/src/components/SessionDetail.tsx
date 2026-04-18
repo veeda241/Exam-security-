@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "motion/react";
-import { ArrowLeft, Camera, Monitor, ShieldAlert, Activity, Download, Loader2, Users, AlertTriangle, CheckCircle2, RefreshCw, Eye } from "lucide-react";
+import { ArrowLeft, Camera, ShieldAlert, Activity, Download, Loader2, Users, AlertTriangle, CheckCircle2, RefreshCw, Eye, Monitor } from "lucide-react";
 import { config } from "../config";
 import { useWebSocket } from "../hooks/useWebSocket";
 
@@ -27,21 +27,14 @@ export function SessionDetail() {
   const [loading, setLoading] = useState(true);
   const [isEnded, setIsEnded] = useState(false);
   const [examId, setExamId] = useState<string | null>(null);
-  const [feedModes, setFeedModes] = useState<Record<string, 'camera' | 'screen'>>({});
   const [refreshKey, setRefreshKey] = useState(Date.now());
   const [selectedStudent, setSelectedStudent] = useState<string | null>(null);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [isPdfGenerated, setIsPdfGenerated] = useState(false);
 
-  // Object storing WebRTC MediaStreams perfectly mapped to students and modes
-  const [rtcStreams, setRtcStreams] = useState<Record<string, { webcam?: MediaStream, screenshot?: MediaStream }>>({});
-  // Track open peer connections
-  const [peerConnections, setPeerConnections] = useState<Record<string, RTCPeerConnection>>({});
-
   // Object storing the latest base64 data URL for each student/mode (fallback)
   const [liveFrames, setLiveFrames] = useState<Record<string, { webcam?: string, screenshot?: string }>>({});
 
-  const webrtcSignalRef = useRef<any>(null);
   const subscribedSessionsRef = useRef<Set<string>>(new Set());
 
   const handleWebSocketMessage = useCallback((lastEvent: any) => {
@@ -55,10 +48,6 @@ export function SessionDetail() {
           if (exists) {
              return prev.map(s => s.id === newStudent.id ? { ...s, status: 'active' } : s);
           }
-          // Subscribe to the new student's session room specifically for WebRTC!
-          // We can use a direct fetch or event emitter here, but the websocket manager
-          // handles re-subscriptions via another hook.
-          
           return [...prev, {
             ...newStudent,
             risk_score: newStudent.risk_score || 0,
@@ -90,12 +79,6 @@ export function SessionDetail() {
           }
         }));
       }
-    } else if (eventType === 'webrtc_signal') {
-      // Handle incoming WebRTC signaling explicitly from student extension
-      const { student_id, payload } = lastEvent;
-      if (student_id && payload && webrtcSignalRef.current) {
-         webrtcSignalRef.current(student_id, payload);
-      }
     }
   }, []);
 
@@ -104,86 +87,21 @@ export function SessionDetail() {
 
   useEffect(() => {
     if (isConnected && students.length > 0) {
-      students.filter(s => s?.id).forEach(student => {
+      students.filter(student => student?.id && isLiveStudent(student)).forEach(student => {
         // Only subscribe if not already subscribed
         if (!subscribedSessionsRef.current.has(student.id)) {
           sendMessage(`subscribe:${student.id}`);
           subscribedSessionsRef.current.add(student.id);
-          // Explicitly trigger a re-negotiation so we don't miss the initial stream offers
-          sendMessage(`command:{"session_id":"${student.id}", "type":"request_webrtc_offer"}`);
         }
       });
     }
   }, [isConnected, students, sendMessage]);
 
-  // Initiate or answer a WebRTC connection
-  const handleWebrtcSignal = async (studentId: string, payload: any) => {
-      let pc = peerConnections[studentId];
-      
-      if (!pc && payload.sdp?.type === 'offer') {
-          // Initialize fresh RTCPeerConnection
-          pc = new RTCPeerConnection({
-              iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
-          });
-          
-          setPeerConnections(prev => ({ ...prev, [studentId]: pc }));
-
-          pc.ontrack = (event) => {
-              // The extension sends 2 generic video tracks: webcam and screen.
-              // For simplicity, we assign the first track to webcam, second to screenshot.
-              setRtcStreams(prev => {
-                  const studentStreams = prev[studentId] || {};
-                  
-                  // Use the track label/id from extension if designated, or assume by order.
-                  // Assume the first video track is webcam, second is screen.
-                  const trackLabel = event.track.label.toLowerCase();
-                  const isScreen = trackLabel.includes('screen') || trackLabel.includes('window') || event.streams[0].id.includes('screen');
-                  
-                  return {
-                      ...prev,
-                      [studentId]: {
-                          ...studentStreams,
-                          [isScreen ? 'screenshot' : 'webcam']: event.streams[0]
-                      }
-                  };
-              });
-          };
-
-          pc.onicecandidate = (event) => {
-              if (event.candidate) {
-                  sendMessage(`webrtc:${JSON.stringify({
-                      target: studentId,
-                      candidate: event.candidate
-                  })}`);
-              }
-          };
-      }
-
-      if (!pc) return;
-
-      try {
-          if (payload.sdp) {
-              await pc.setRemoteDescription(new RTCSessionDescription(payload.sdp));
-              if (payload.sdp.type === 'offer') {
-                  const answer = await pc.createAnswer();
-                  await pc.setLocalDescription(answer);
-                  sendMessage(`webrtc:${JSON.stringify({
-                      target: studentId,
-                      sdp: pc.localDescription
-                  })}`);
-              }
-          } else if (payload.candidate) {
-              await pc.addIceCandidate(new RTCIceCandidate(payload.candidate));
-          }
-      } catch (err) {
-          console.error("WebRTC Error negotiating with", studentId, err);
-      }
-  };
-
-  // Connect the ref to the handler
   useEffect(() => {
-    webrtcSignalRef.current = handleWebrtcSignal;
-  }, [handleWebrtcSignal]);
+    if (isConnected && examId) {
+      sendMessage(`subscribe:${examId}`);
+    }
+  }, [isConnected, examId, sendMessage]);
 
   // Fetch all sessions for this exam
   const fetchSessions = useCallback(async () => {
@@ -244,13 +162,6 @@ export function SessionDetail() {
     };
   }, [isEnded, fetchSessions]);
 
-  const toggleFeedMode = (studentId: string) => {
-    setFeedModes(prev => ({
-      ...prev,
-      [studentId]: prev[studentId] === 'screen' ? 'camera' : 'screen'
-    }));
-  };
-
   const handleEndSession = async () => {
     try {
       if (confirm("End this proctoring session?")) {
@@ -300,6 +211,11 @@ export function SessionDetail() {
     ? Math.round(students.reduce((acc, s) => acc + (s.engagement_score || s.effort_alignment || 0), 0) / students.length)
     : 0;
   const flaggedCount = students.filter(s => s.risk_level === 'review' || s.risk_level === 'suspicious').length;
+  const isLiveStudent = (student: StudentSession) => {
+    const status = (student.status || '').toLowerCase();
+    return student.is_active === true || status === 'active' || status === 'recording';
+  };
+  const resolveSessionFeedId = (student: StudentSession) => student.id || student.student_id;
 
   if (loading) {
     return (
@@ -434,19 +350,17 @@ export function SessionDetail() {
               <div className="p-5">
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
                   {students.filter(s => s?.id).map((student) => {
-                    const studentId = student.id;  // Use consistent ID
-                    const mode = feedModes[student.student_id] || 'camera';
+                    const studentId = resolveSessionFeedId(student) || student.id;  // Use consistent ID
                     const name = getStudentName(student);
                     const riskScore = student.risk_score || 0;
                     const effortScore = student.engagement_score || student.effort_alignment || 0;
                     const isFlagged = student.risk_level === 'review' || student.risk_level === 'suspicious';
                     const isSelected = selectedStudent === studentId;
 
-                    // Live feed URL: either websocket frame or fallback to backend pull
-                    const targetMode = mode === 'camera' ? 'webcam' : 'screenshot';
-                    const activeStream = rtcStreams[studentId]?.[targetMode];
-                    const liveFrame = liveFrames[studentId]?.[targetMode];
-                    const feedUrl = liveFrame || `${config.apiUrl}/uploads/latest/${studentId}?type=${targetMode}&t=${refreshKey}`;
+                    const webcamFrame = liveFrames[studentId]?.webcam || liveFrames[student.student_id]?.webcam;
+                    const screenFrame = liveFrames[studentId]?.screenshot || liveFrames[student.student_id]?.screenshot;
+                    const webcamFeedUrl = webcamFrame || (isLiveStudent(student) && studentId ? `${config.apiUrl}/uploads/latest/${studentId}?type=webcam&t=${refreshKey}` : null);
+                    const screenFeedUrl = screenFrame || (isLiveStudent(student) && studentId ? `${config.apiUrl}/uploads/latest/${studentId}?type=screenshot&t=${refreshKey}` : null);
 
                     return (
                       <motion.div
@@ -459,89 +373,86 @@ export function SessionDetail() {
                         }`}
                       >
                         {/* Feed Display */}
-                        <div 
-                          className="relative bg-slate-900 aspect-video cursor-pointer group"
-                          onClick={() => toggleFeedMode(student.student_id)}
-                        >
-                          {activeStream ? (
-                              <video
-                                id={`video-${studentId}-${targetMode}`}
-                                autoPlay
-                                playsInline
-                                muted
-                                ref={(el) => { if (el && el.srcObject !== activeStream) el.srcObject = activeStream; }}
-                                className="w-full h-full object-cover"
-                              />
-                          ) : (
+                        <div className="p-3 bg-slate-950/95 space-y-3">
+                          <div className="relative bg-slate-900 aspect-video overflow-hidden rounded-xl">
+                            {webcamFeedUrl ? (
                               <img
-                                src={feedUrl}
-                                onError={(e) => {
-                                  e.currentTarget.style.display = 'none';
-                                  const placeholder = e.currentTarget.nextElementSibling as HTMLElement;
-                                  if (placeholder) placeholder.style.display = 'flex';
-                                }}
-                                onLoad={(e) => {
-                                  e.currentTarget.style.display = 'block';
-                                  const placeholder = e.currentTarget.nextElementSibling as HTMLElement;
-                                  if (placeholder) placeholder.style.display = 'none';
-                                }}
-                                alt={`${name} ${mode} feed`}
+                                src={webcamFeedUrl}
+                                alt={`${name} webcam snapshot`}
                                 className="w-full h-full object-cover"
                               />
-                          )}
-                          {/* Placeholder when no image */}
-                          <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-800 text-slate-400" style={{ display: 'none' }}>
-                            <Camera className="w-10 h-10 mb-2 opacity-30" />
-                            <span className="text-xs opacity-50">Waiting for feed...</span>
-                          </div>
+                            ) : (
+                              <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-800 text-slate-400">
+                                <Camera className="w-10 h-10 mb-2 opacity-30" />
+                                <span className="text-xs opacity-50">
+                                  {isLiveStudent(student) ? 'Waiting for webcam feed...' : 'No live webcam available'}
+                                </span>
+                              </div>
+                            )}
 
-                          {/* Gradient overlay */}
-                          <div className="absolute inset-0 bg-gradient-to-t from-slate-900/80 via-transparent to-slate-900/30 pointer-events-none" />
+                            <div className="absolute inset-0 bg-gradient-to-t from-slate-900/80 via-transparent to-slate-900/30 pointer-events-none" />
 
-                          {/* Top left: Name + mode */}
-                          <div className="absolute top-3 left-3 flex items-center gap-2">
-                            <div className="bg-slate-900/60 backdrop-blur-md text-white text-xs px-2.5 py-1 rounded-lg font-medium flex items-center gap-1.5 border border-white/10">
-                              {mode === 'camera' ? <Camera className="w-3 h-3" /> : <Monitor className="w-3 h-3" />}
-                              {name}
+                            <div className="absolute top-3 left-3 flex items-center gap-2">
+                              <div className="bg-slate-900/60 backdrop-blur-md text-white text-xs px-2.5 py-1 rounded-lg font-medium flex items-center gap-1.5 border border-white/10">
+                                <Camera className="w-3 h-3" />
+                                Webcam
+                              </div>
+                            </div>
+
+                            {isFlagged && (
+                              <div className="absolute top-3 right-3 bg-rose-500 text-white text-[10px] font-bold px-2 py-1 rounded-lg uppercase tracking-wider animate-pulse shadow-lg">
+                                ⚠ Flagged
+                              </div>
+                            )}
+
+                            <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between">
+                              <div className={`px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider backdrop-blur-md border border-white/10 ${
+                                riskScore > 70 ? 'bg-rose-500/80 text-white' :
+                                riskScore > 30 ? 'bg-amber-500/80 text-white' :
+                                'bg-emerald-500/80 text-white'
+                              }`}>
+                                Risk: {riskScore}
+                              </div>
+                              <div className="bg-slate-900/60 backdrop-blur-md text-white text-[10px] px-2 py-1 rounded-lg font-mono flex items-center gap-1.5 border border-white/10">
+                                {student.status === 'active' ? (
+                                  <>
+                                    <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse"></span>
+                                    LIVE
+                                  </>
+                                ) : (
+                                  <>
+                                    <span className="w-1.5 h-1.5 rounded-full bg-slate-500"></span>
+                                    OFFLINE
+                                  </>
+                                )}
+                              </div>
                             </div>
                           </div>
 
-                          {/* Top right: Flag badge */}
-                          {isFlagged && (
-                            <div className="absolute top-3 right-3 bg-rose-500 text-white text-[10px] font-bold px-2 py-1 rounded-lg uppercase tracking-wider animate-pulse shadow-lg">
-                              ⚠ Flagged
-                            </div>
-                          )}
+                          <div className="relative bg-slate-900 aspect-video overflow-hidden rounded-xl border border-slate-800">
+                            {screenFeedUrl ? (
+                              <img
+                                src={screenFeedUrl}
+                                alt={`${name} screen snapshot`}
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-800 text-slate-400">
+                                <Monitor className="w-10 h-10 mb-2 opacity-30" />
+                                <span className="text-xs opacity-50">
+                                  {isLiveStudent(student) ? 'Waiting for screen share...' : 'No live screen available'}
+                                </span>
+                              </div>
+                            )}
 
-                          {/* Bottom: Risk + Live indicator */}
-                          <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between">
-                            <div className={`px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider backdrop-blur-md border border-white/10 ${
-                              riskScore > 70 ? 'bg-rose-500/80 text-white' :
-                              riskScore > 30 ? 'bg-amber-500/80 text-white' :
-                              'bg-emerald-500/80 text-white'
-                            }`}>
-                              Risk: {riskScore}
-                            </div>
-                            <div className="bg-slate-900/60 backdrop-blur-md text-white text-[10px] px-2 py-1 rounded-lg font-mono flex items-center gap-1.5 border border-white/10">
-                              {student.status === 'active' ? (
-                                <>
-                                  <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse"></span>
-                                  LIVE
-                                </>
-                              ) : (
-                                <>
-                                  <span className="w-1.5 h-1.5 rounded-full bg-slate-500"></span>
-                                  OFFLINE
-                                </>
-                              )}
-                            </div>
-                          </div>
+                            <div className="absolute inset-0 bg-gradient-to-t from-slate-900/80 via-transparent to-slate-900/30 pointer-events-none" />
 
-                          {/* Hover overlay */}
-                          <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300 bg-slate-900/40 backdrop-blur-[1px]">
-                            <span className="bg-white px-4 py-2 rounded-full text-slate-900 text-xs font-bold shadow-xl">
-                              Switch to {mode === 'camera' ? 'Screen Share' : 'Camera'}
-                            </span>
+                            <div className="absolute top-3 left-3 flex items-center gap-2">
+                              <div className="bg-slate-900/60 backdrop-blur-md text-white text-xs px-2.5 py-1 rounded-lg font-medium flex items-center gap-1.5 border border-white/10">
+                                <Monitor className="w-3 h-3" />
+                                Screen
+                              </div>
+                            </div>
                           </div>
                         </div>
 
@@ -685,7 +596,7 @@ export function SessionDetail() {
             <h3 className="text-xl font-bold text-slate-900">Waiting for students...</h3>
             <p className="text-slate-500 mt-2 max-w-sm mx-auto">
               The session is active. Share the exam code <strong className="text-indigo-600">{examId}</strong> with students.
-              Once they start proctoring, their camera and screen feeds will appear here automatically.
+              Once they start proctoring, their webcam and screen snapshots will appear here automatically.
             </p>
           </motion.div>
         )}

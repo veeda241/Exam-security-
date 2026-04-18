@@ -3,43 +3,20 @@
  * Premium UX for handling media permissions and starting the session
  */
 
-const screenCard = document.getElementById('screen-card');
 const webcamCard = document.getElementById('webcam-card');
+const screenCard = document.getElementById('screen-card');
 const finalBtn = document.getElementById('final-btn');
-const screenStatusIcon = document.getElementById('screen-status-icon');
 const webcamStatusIcon = document.getElementById('webcam-status-icon');
+const screenStatusIcon = document.getElementById('screen-status-icon');
 const syncLoader = document.getElementById('sync-loader');
 
 // Global capture instance
 const capture = new ExamCapture();
 window.ExamCaptureInstance = capture;
-let screenGranted = false;
 let webcamGranted = false;
+let screenGranted = false;
 
 // ==================== PERMISSION REQUESTS ====================
-
-screenCard.addEventListener('click', async () => {
-    if (screenGranted) return;
-
-    screenStatusIcon.textContent = '⏳';
-    try {
-        const result = await capture.startScreenCapture();
-        if (result.success) {
-            screenGranted = true;
-            screenStatusIcon.textContent = '✅';
-            screenCard.classList.add('granted');
-            screenCard.classList.remove('denied');
-            showToast('Screen sharing enabled', 'success');
-        } else {
-            throw new Error(result.error || 'User cancelled');
-        }
-    } catch (err) {
-        screenStatusIcon.textContent = '❌';
-        screenCard.classList.add('denied');
-        showToast('Screen share required', 'error');
-    }
-    updateFinalButton();
-});
 
 webcamCard.addEventListener('click', async () => {
     if (webcamGranted) return;
@@ -64,10 +41,33 @@ webcamCard.addEventListener('click', async () => {
     updateFinalButton();
 });
 
+screenCard.addEventListener('click', async () => {
+    if (screenGranted) return;
+
+    screenStatusIcon.textContent = '⏳';
+    try {
+        const result = await capture.startScreenCapture();
+        if (result.success) {
+            screenGranted = true;
+            screenStatusIcon.textContent = '✅';
+            screenCard.classList.add('granted');
+            screenCard.classList.remove('denied');
+            showToast('Screen sharing enabled', 'success');
+        } else {
+            throw new Error(result.error || 'Permission denied');
+        }
+    } catch (err) {
+        screenStatusIcon.textContent = '❌';
+        screenCard.classList.add('denied');
+        showToast('Screen sharing required', 'error');
+    }
+    updateFinalButton();
+});
+
 // ==================== STATE MANAGEMENT ====================
 
 function updateFinalButton() {
-    finalBtn.disabled = !(screenGranted && webcamGranted);
+    finalBtn.disabled = !(webcamGranted && screenGranted);
     if (!finalBtn.disabled) {
         finalBtn.style.animation = 'pulse 2s infinite';
     }
@@ -83,8 +83,8 @@ finalBtn.addEventListener('click', async () => {
         chrome.runtime.sendMessage({
             type: 'CAPTURE_READY',
             status: {
-                screen: true,
                 webcam: true,
+                screen: true,
                 timestamp: Date.now()
             }
         }, (response) => {
@@ -153,12 +153,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             const webcamFrame = capture.captureWebcamFrame();
             sendResponse({ image: webcamFrame });
             break;
-            
-        case 'START_STREAMING':
-            capture.startMediaRecorder(message.interval || 1000);
-            // Initialize WebRTC P2P streaming after MediaRecorder starts
-            capture.initWebRTC();
-            sendResponse({ success: true });
+
+        case 'CAPTURE_SCREEN_FRAME':
+            const screenFrame = capture.captureScreenFrame();
+            sendResponse({ image: screenFrame });
             break;
             
         case 'STOP_EXAM':

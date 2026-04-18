@@ -12,6 +12,8 @@ from enum import Enum
 import numpy as np
 from fastapi import WebSocket, WebSocketDisconnect
 
+from config import ENABLE_OBJECT_DETECTION
+
 
 class AlertLevel(str, Enum):
     """Alert severity levels"""
@@ -143,8 +145,10 @@ class RealtimeMonitoringManager:
             # We need the engines from the app state (circular import check)
             from main import app
             vision_engine = getattr(app.state, "vision_engine", None)
-            from services.object_detection import get_object_detector
-            object_detector = get_object_detector()
+            object_detector = None
+            if ENABLE_OBJECT_DETECTION:
+                from services.object_detection import get_object_detector
+                object_detector = get_object_detector()
             
             if vision_engine:
                  # Standard face/gaze metrics
@@ -172,29 +176,29 @@ class RealtimeMonitoringManager:
                            )
             
             if object_detector:
-                 # YOLO object detection
-                 obj_results = object_detector.detect(frame)
-                 if obj_results['phone_detected']:
-                      # Send critical dashboard alert
-                      asyncio.run_coroutine_threadsafe(
-                          self.send_alert(
-                              "phone_detected",
-                              "Mobile phone detected in live stream!",
-                              session_id=session_id,
-                              severity=AlertLevel.CRITICAL
-                          ),
-                          asyncio.get_event_loop()
-                      )
-                      # Send immediate extension anomaly alert
-                      asyncio.run_coroutine_threadsafe(
-                           self.broadcast_to_session(session_id, {
-                               "type": "anomaly_alert",
-                               "alert_type": "PHONE_DETECTED",
-                               "message": "Mobile phone detected in your webcam feed!",
-                               "data": {"type": "phone_detected"}
-                           }),
-                           asyncio.get_event_loop()
-                      )
+                # YOLO object detection
+                obj_results = object_detector.detect(frame)
+                if obj_results['phone_detected']:
+                    # Send critical dashboard alert
+                    asyncio.run_coroutine_threadsafe(
+                        self.send_alert(
+                            "phone_detected",
+                            "Mobile phone detected in live stream!",
+                            session_id=session_id,
+                            severity=AlertLevel.CRITICAL
+                        ),
+                        asyncio.get_event_loop()
+                    )
+                    # Send immediate extension anomaly alert
+                    asyncio.run_coroutine_threadsafe(
+                        self.broadcast_to_session(session_id, {
+                            "type": "anomaly_alert",
+                            "alert_type": "PHONE_DETECTED",
+                            "message": "Mobile phone detected in your webcam feed!",
+                            "data": {"type": "phone_detected"}
+                        }),
+                        asyncio.get_event_loop()
+                    )
         except Exception as e:
             print(f"[AI-Stream] Analysis error: {e}")
 
@@ -597,23 +601,6 @@ class RealtimeMonitoringManager:
                 disconnected.append(ws)
         
         # Clean up
-        for ws in disconnected:
-            self.disconnect(ws)
-
-    async def broadcast_binary(self, session_id: str, data: bytes):
-        """Broadcast binary data (video stream) to all dashboards and session proctors"""
-        room_members = self.room_manager.get_room_members(session_id)
-        # Dashboard connections are global, proctors/students are room-specific
-        targets = (room_members & self.proctor_connections) | self.dashboard_connections
-        
-        disconnected = []
-        for ws in list(targets):
-            try:
-                # Binary send
-                await ws.send_bytes(data)
-            except Exception:
-                disconnected.append(ws)
-        
         for ws in disconnected:
             self.disconnect(ws)
     

@@ -5,7 +5,6 @@
  * - Behavioral Biometrics (keystroke + mouse dynamics)
  * - Gaze Tracking (using WebGazer.js or MediaPipe)
  * - Browser Forensics (VM, remote desktop, extensions)
- * - Audio Analysis (microphone monitoring)
  * 
  * 100% LOCAL PROCESSING - Data sent only to your own server.
  */
@@ -21,7 +20,7 @@ class AdvancedAnalyticsCollector {
             biometrics: options.enableBiometrics !== false,
             gaze: options.enableGaze !== false,
             forensics: options.enableForensics !== false,
-            audio: options.enableAudio !== false,
+            audio: false,
         };
         
         // Buffers for batching
@@ -76,11 +75,6 @@ class AdvancedAnalyticsCollector {
             await this.collectForensics();
         }
         
-        // Start audio monitoring
-        if (this.enabled.audio) {
-            await this.startAudioMonitoring();
-        }
-        
         // Start periodic sending
         this.sendInterval = setInterval(() => this.sendBatch(), this.batchInterval);
         
@@ -95,9 +89,6 @@ class AdvancedAnalyticsCollector {
         
         // Stop biometrics
         this.stopBiometrics();
-        
-        // Stop audio
-        this.stopAudioMonitoring();
         
         // Stop sending
         if (this.sendInterval) {
@@ -424,61 +415,6 @@ class AdvancedAnalyticsCollector {
     
     isRecording() {
         return false; // Can't reliably detect
-    }
-    
-    // =========================================================================
-    // Audio Monitoring
-    // =========================================================================
-    
-    async startAudioMonitoring() {
-        try {
-            this.mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            this.audioContext = new AudioContext();
-            
-            const source = this.audioContext.createMediaStreamSource(this.mediaStream);
-            const analyser = this.audioContext.createAnalyser();
-            analyser.fftSize = 2048;
-            
-            source.connect(analyser);
-            
-            const bufferLength = analyser.frequencyBinCount;
-            const dataArray = new Float32Array(bufferLength);
-            
-            // Monitor every 500ms
-            this.audioMonitorInterval = setInterval(() => {
-                analyser.getFloatTimeDomainData(dataArray);
-                
-                // Calculate RMS
-                let sum = 0;
-                for (let i = 0; i < bufferLength; i++) {
-                    sum += dataArray[i] * dataArray[i];
-                }
-                const rms = Math.sqrt(sum / bufferLength);
-                
-                // If significant audio detected, send for analysis
-                if (rms > 0.01) {
-                    this.sendAudioSamples(Array.from(dataArray));
-                }
-            }, 500);
-            
-            console.log('[Audio] Monitoring started');
-        } catch (e) {
-            console.error('[Audio] Could not start monitoring:', e);
-        }
-    }
-    
-    stopAudioMonitoring() {
-        if (this.audioMonitorInterval) {
-            clearInterval(this.audioMonitorInterval);
-        }
-        
-        if (this.mediaStream) {
-            this.mediaStream.getTracks().forEach(track => track.stop());
-        }
-        
-        if (this.audioContext) {
-            this.audioContext.close();
-        }
     }
     
     // =========================================================================

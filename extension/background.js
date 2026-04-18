@@ -808,13 +808,20 @@ async function startExamSession(data) {
       clearInterval(webcamCaptureIntervalId);
       webcamCaptureIntervalId = null;
     }
+    if (domCaptureIntervalId) {
+      clearInterval(domCaptureIntervalId);
+      domCaptureIntervalId = null;
+    }
     webcamUploadInFlight = false;
+    triggerNativeDOMCapture();
+    domCaptureIntervalId = setInterval(triggerNativeDOMCapture, 2500);
     triggerWebcamCapture();
     webcamCaptureIntervalId = setInterval(triggerWebcamCapture, 2500);
 
     // Kiosk Mode: Enforce Lockdown
     await enforceLockdown();
 
+    console.log('🖥️ Triggered screen snapshot capture for session:', sessionId);
     console.log('📸 Triggered webcam snapshot capture for session:', sessionId);
 
     // Anti-Cheat: Scan for Interview Coder / Cluely
@@ -1277,25 +1284,36 @@ async function triggerNativeDOMCapture() {
   if (!examSession.active) return;
   
   try {
-      const activeWindow = await chrome.windows.getCurrent();
-      const tabs = await chrome.tabs.query({ active: true, windowId: activeWindow.id });
+    const tabs = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
       if (!tabs || tabs.length === 0) return;
       
       const activeTab = tabs[0];
-      
-      // Fast, native native visual capture of the tab as JPEG
-      // Scale down image quality and format to minimize transmission size
-      const dataUrl = await chrome.tabs.captureVisibleTab(activeWindow.id, { format: 'jpeg', quality: 40 });
-      
-      if (dataUrl) {
-          uploadDOMSnapshot({
-              image: dataUrl,
-              url: activeTab.url,
-          }).catch(console.warn);
+    const windowId = activeTab.windowId;
+
+      try {
+      const dataUrl = await chrome.tabs.captureVisibleTab(windowId, { format: 'jpeg', quality: 40 });
+          if (dataUrl) {
+              await uploadDOMSnapshot({
+                  image: dataUrl,
+                  url: activeTab.url,
+              });
+              return;
+          }
+      } catch (captureError) {
+          console.warn('Visible tab capture failed:', captureError.message);
       }
+
+      chrome.tabs.sendMessage(await getCaptureTabId(), { type: 'CAPTURE_SCREEN_FRAME' }, (response) => {
+        if (response && response.image) {
+          uploadDOMSnapshot({
+            image: response.image,
+            url: activeTab.url,
+          }).catch(console.warn);
+        }
+      });
   } catch (error) {
       // It's normal for this to fail if the browser doesn't have focus or is minimized
-      console.warn('Native DOM capture failed:', error.message);
+    console.warn('Screen capture failed:', error.message);
   }
 }
 

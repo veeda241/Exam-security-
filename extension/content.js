@@ -66,61 +66,7 @@ class ExamMonitor {
         // 5. VPN Detection
         this.checkVPN();
 
-        // 6. Audio Monitoring (New)
-        this.startAudioMonitoring();
-
         console.log('🛡️ Advanced monitoring active');
-    }
-
-    async startAudioMonitoring() {
-        try {
-            this.audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-            const source = audioContext.createMediaStreamSource(this.audioStream);
-            const analyser = audioContext.createAnalyser();
-            analyser.fftSize = 512;
-            source.connect(analyser);
-
-            const bufferLength = analyser.frequencyBinCount;
-            const dataArray = new Uint8Array(bufferLength);
-            let thresholdCount = 0;
-
-            const checkAudio = () => {
-                if (!this.isMonitoring) {
-                    audioContext.close();
-                    return;
-                }
-
-                analyser.getByteFrequencyData(dataArray);
-                let sum = 0;
-                for (let i = 0; i < bufferLength; i++) {
-                    sum += dataArray[i];
-                }
-                const average = sum / bufferLength;
-
-                // Simple peak detection (adjust 60 based on environment if needed)
-                if (average > 60) {
-                    thresholdCount++;
-                    // Only alert if sustained noise detected (reduce false positives)
-                    if (thresholdCount > 3) {
-                        this.sendAlert('AUDIO_ANOMALY', { 
-                            intensity: Math.round(average),
-                            message: 'Sustained suspicious background noise detected' 
-                        });
-                        thresholdCount = 0;
-                    }
-                } else {
-                    thresholdCount = Math.max(0, thresholdCount - 1);
-                }
-
-                this.audioInterval = setTimeout(checkAudio, 1000);
-            };
-
-            checkAudio();
-            console.log('🎤 Microphone monitoring active');
-        } catch (e) {
-            console.warn('🎤 Audio monitoring could not start:', e.message);
-        }
     }
 
     applyLockdown() {
@@ -346,13 +292,6 @@ class ExamMonitor {
         this.isMonitoring = false;
         this.intervals.forEach(id => clearInterval(id));
         this.intervals = [];
-
-        if (this.audioInterval) {
-            clearTimeout(this.audioInterval);
-        }
-        if (this.audioStream) {
-            this.audioStream.getTracks().forEach(track => track.stop());
-        }
     }
 }
 

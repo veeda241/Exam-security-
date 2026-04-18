@@ -6,7 +6,7 @@ Endpoints for AI analysis integration and dashboard data
 from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks, UploadFile, File, Form, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-from typing import Optional, List
+from typing import Optional, List, Any, cast
 import base64
 import os
 import cv2
@@ -19,7 +19,7 @@ from database import get_db
 from models.session import ExamSession
 from models.analysis import AnalysisResult
 from models.student import Student
-from config import SCREENSHOTS_DIR, WEBCAM_DIR
+from config import SCREENSHOTS_DIR, WEBCAM_DIR, ENABLE_OBJECT_DETECTION
 # from main import vision_engine # Circular dependency
 from services.ocr import analyze_screenshot_ocr
 from services.llm import get_llm_service
@@ -75,8 +75,9 @@ def decode_image(base64_string):
         print(f"Error decoding image: {e}")
         return None
 
-def save_image(img, folder, prefix):
-    filename = f"{prefix}_{uuid.uuid4().hex}.jpg"
+def save_image(img, folder, prefix, session_id=None):
+    session_part = f"_{session_id}" if session_id else ""
+    filename = f"{prefix}{session_part}_{uuid.uuid4().hex}.jpg"
     path = os.path.join(folder, filename)
     cv2.imwrite(path, img)
     return filename, path
@@ -94,7 +95,8 @@ async def process_analysis_data(
     vision_engine = getattr(request.app.state, "vision_engine", None)
     
     # Verify session
-    result = await db.execute(select(ExamSession).where(ExamSession.id == analysis_request.session_id))
+    session_model = cast(Any, ExamSession)
+    result = await db.execute(select(session_model).where(session_model.id == analysis_request.session_id))
     session = result.scalar_one_or_none()
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
@@ -106,10 +108,13 @@ async def process_analysis_data(
         source_url=getattr(analysis_request, 'source_url', None),
         result_data={}
     )
+    analysis_result_data: dict[str, Any] = {}
+    forbidden_keywords: list[str] = []
     
     # Initialize phone detection variables
     phone_detected = False
     detected_objects = []
+    vision_results: dict[str, Any] = {}
     
     print(f"📥 Processing analysis for session: {analysis_request.session_id}")
     
@@ -123,7 +128,12 @@ async def process_analysis_data(
     if webcam_frame is not None:
         print(f"📹 Webcam frame received, size: {webcam_frame.shape}")
         # Save image (optional, maybe subsample)
-        fname, fpath = save_image(webcam_frame, WEBCAM_DIR, "webcam")
+        fname, fpath = save_image(
+            webcam_frame,
+            WEBCAM_DIR,
+            "webcam",
+            session_id=analysis_request.session_id,
+        )
         analysis_record.source_file = f"/uploads/webcam/{fname}"
         
         # 1.1 Vision Engine Analysis (MediaPipe - basic)
@@ -151,7 +161,7 @@ async def process_analysis_data(
                 
                 # Send heatmap update occasionally or on request
                 # For now, just include in response
-                analysis_record.result_data["gaze_heatmap"] = gaze_service.get_heatmap(student_id)
+                analysis_result_data["gaze_heatmap"] = gaze_service.get_heatmap(student_id)
 
             # Update session engagement score
             if "GAZE_AWAY_LONG" in vision_results['violations'] or "SUSPICIOUS_GAZE_PATTERN" in vision_results['violations']:
@@ -173,7 +183,7 @@ async def process_analysis_data(
             else:
                  session.engagement_score = min(100, session.engagement_score + 1)
 
-            analysis_record.result_data["vision"] = vision_results
+            analysis_result_data["vision"] = vision_results
             
             # Risk calculation
             analysis_record.risk_score_added += vision_results['integrity_score_impact']
@@ -182,59 +192,66 @@ async def process_analysis_data(
             analysis_record.face_detected = True
             analysis_record.face_confidence = 0.5
 
-        # 1.2 Object Detection (YOLO) - ALWAYS runs for phone detection
-        # This is critical for exam security, runs independently of vision engine
-        try:
-            from services.object_detection import get_object_detector
-            yolo = get_object_detector()
-            obj_result = yolo.detect(webcam_frame)
-            
-            if obj_result["forbidden_detected"]:
-                analysis_record.result_data["objects"] = obj_result["objects"]
-                analysis_record.risk_score_added += obj_result["risk_score"]
-                session.risk_score = min(100, session.risk_score + obj_result["risk_score"])
-                detected_objects = obj_result["objects"]
+        # 1.2 Object Detection (YOLO) - optional on platforms that support it
+        if ENABLE_OBJECT_DETECTION:
+            try:
+                from services.object_detection import get_object_detector
+                yolo = get_object_detector()
+                obj_result = yolo.detect(webcam_frame)
                 
-                # Check specifically for phone
-                for obj in obj_result["objects"]:
-                    if obj.get("object") == "cell phone":
-                        phone_detected = True
-                        # Log critical violation
-                        analysis_record.analysis_type = "PHONE_VIOLATION"
-                        session.risk_level = "suspicious"
-                        session.risk_score = 100  # Max risk for phone detection
-                        print(f"🚨 PHONE DETECTED in session {session.id}!")
-                        
-                        await realtime.send_alert(
-                            alert_type="phone_detected",
-                            message="Cell phone detected in student feed!",
-                            student_id=student_id,
-                            session_id=session_id,
-                            severity=AlertLevel.CRITICAL,
-                            data={"confidence": obj.get("confidence", 0.9)}
-                        )
-                        break
-        except Exception as e:
-            print(f"[WARN] YOLO detection failed: {e}")
+                if obj_result["forbidden_detected"]:
+                    analysis_result_data["objects"] = obj_result["objects"]
+                    analysis_record.risk_score_added += obj_result["risk_score"]
+                    session.risk_score = min(100, session.risk_score + obj_result["risk_score"])
+                    detected_objects = obj_result["objects"]
+                    
+                    # Check specifically for phone
+                    for obj in obj_result["objects"]:
+                        if obj.get("object") == "cell phone":
+                            phone_detected = True
+                            # Log critical violation
+                            analysis_record.analysis_type = "PHONE_VIOLATION"
+                            session.risk_level = "suspicious"
+                            session.risk_score = 100  # Max risk for phone detection
+                            print(f"🚨 PHONE DETECTED in session {session.id}!")
+                            
+                            await realtime.send_alert(
+                                alert_type="phone_detected",
+                                message="Cell phone detected in student feed!",
+                                student_id=student_id,
+                                session_id=session_id,
+                                severity=AlertLevel.CRITICAL,
+                                data={"confidence": obj.get("confidence", 0.9)}
+                            )
+                            break
+            except Exception as e:
+                print(f"[WARN] YOLO detection failed: {e}")
 
     # 2. Screen Analysis (OCR)
     screen_frame = decode_image(analysis_request.screen_image)
     if screen_frame is not None:
         # Save image
-        fname, fpath = save_image(screen_frame, SCREENSHOTS_DIR, "screen")
+        fname, fpath = save_image(
+            screen_frame,
+            SCREENSHOTS_DIR,
+            "screen",
+            session_id=analysis_request.session_id,
+        )
         
         # Async OCR
         ocr_result = await analyze_screenshot_ocr(fpath)
         
         analysis_record.detected_text = ocr_result.get("text", "")
         analysis_record.forbidden_keywords_found = ocr_result.get("forbidden_keywords", [])
+        if isinstance(analysis_record.forbidden_keywords_found, list):
+            forbidden_keywords = [str(keyword) for keyword in analysis_record.forbidden_keywords_found]
         
         if ocr_result.get("forbidden_detected"):
             session.forbidden_site_count += 1
             session.content_relevance = max(0, session.content_relevance - 20)
             analysis_record.risk_score_added += ocr_result.get("risk_score", 0)
         
-        analysis_record.result_data["ocr"] = ocr_result
+        analysis_result_data["ocr"] = ocr_result
 
     # 3. Text Similarity (Clipboard)
     if analysis_request.clipboard_text:
@@ -245,14 +262,15 @@ async def process_analysis_data(
     if await llm.check_connection():
         llm_result = await llm.analyze_behavior(
             text=analysis_record.detected_text or "",
-            violations=analysis_record.forbidden_keywords_found
+            violations=forbidden_keywords
         )
         if llm_result.get("is_cheating"):
             analysis_record.risk_score_added += 25
-            analysis_record.result_data["llm_analysis"] = llm_result
+            analysis_result_data["llm_analysis"] = llm_result
 
 
     # Save Analysis Result
+    analysis_record.result_data = analysis_result_data
     db.add(analysis_record)
     
     # Update Session Risk
@@ -270,7 +288,7 @@ async def process_analysis_data(
         session_id=session_id,
         risk_score=session.risk_score,
         risk_level=session.risk_level,
-        factors=analysis_record.result_data.keys()
+        factors=list(analysis_result_data.keys())
     )
     
     # Build response with phone detection and OCR text
@@ -280,7 +298,7 @@ async def process_analysis_data(
         "face_detected": analysis_record.face_detected if hasattr(analysis_record, 'face_detected') else True,
         "confidence": analysis_record.face_confidence if hasattr(analysis_record, 'face_confidence') else 1.0,
         "detected_text": analysis_record.detected_text,
-        "vision_violations": vision_results['violations'] if 'vision_results' in locals() else []
+        "vision_violations": vision_results.get('violations', [])
     }
     
     # Add phone detection info if webcam was processed
@@ -303,10 +321,11 @@ async def get_dashboard_data(db: AsyncSession = Depends(get_db)):
     
     for student in students:
         # Get latest session
+        session_model = cast(Any, ExamSession)
         session_result = await db.execute(
-            select(ExamSession)
-            .where(ExamSession.student_id == student.id)
-            .order_by(ExamSession.started_at.desc())
+            select(session_model)
+            .where(session_model.student_id == student.id)
+            .order_by(session_model.started_at.desc())
             .limit(1)
         )
         session = session_result.scalar_one_or_none()
@@ -343,7 +362,8 @@ async def get_dashboard_data(db: AsyncSession = Depends(get_db)):
 @router.get("/student/{student_id}")
 async def get_student_details(student_id: str, db: AsyncSession = Depends(get_db)):
     """Get detailed analysis for a specific student"""
-    student_res = await db.execute(select(Student).where(Student.id == student_id))
+    student_model = cast(Any, Student)
+    student_res = await db.execute(select(student_model).where(student_model.id == student_id))
     student = student_res.scalar_one_or_none()
     
     if not student:
@@ -351,9 +371,9 @@ async def get_student_details(student_id: str, db: AsyncSession = Depends(get_db
         
     # Get sessions
     sessions_res = await db.execute(
-        select(ExamSession)
-        .where(ExamSession.student_id == student_id)
-        .order_by(ExamSession.started_at.desc())
+        select(cast(Any, ExamSession))
+        .where(cast(Any, ExamSession).student_id == student_id)
+        .order_by(cast(Any, ExamSession).started_at.desc())
     )
     sessions = sessions_res.scalars().all()
     

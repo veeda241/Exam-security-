@@ -207,7 +207,7 @@ async def analyze_webcam_frame(session_id: str, file_id: str, file_path: str, db
                     await session.commit()
         else:
             # Fallback to simple face detection if engine not loaded
-            from services.face_detection import SecureVision
+            from services.face_detection import detect_face
             result = await detect_face(file_path)
             analysis = AnalysisResult(
                 session_id=session_id,

@@ -3,6 +3,7 @@ from datetime import datetime
 import base64
 import os
 import uuid
+from typing import Any
 
 from supabase_client import get_supabase
 from api.schemas import ImageUpload, UploadResponse
@@ -10,6 +11,28 @@ from config import SCREENSHOTS_DIR, WEBCAM_DIR
 
 router = APIRouter()
 supabase = get_supabase()
+
+
+def _first_record(records: Any) -> dict[str, Any] | None:
+    if isinstance(records, list):
+        for record in records:
+            if isinstance(record, dict):
+                return record
+    return None
+
+
+def _as_int(value: Any, default: int = 0) -> int:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _as_str(value: Any, default: str = "") -> str:
+    if value is None:
+        return default
+    text = str(value)
+    return text if text else default
 
 async def analyze_screenshot(
     session_id: str,
@@ -39,11 +62,11 @@ async def analyze_screenshot(
         # Update session if forbidden content found
         if ocr_result.get("forbidden_detected"):
             session_res = supabase.table("exam_sessions").select("forbidden_site_count, risk_score").eq("id", session_id).execute()
-            if session_res.data:
-                s = session_res.data[0]
+            session_row = _first_record(session_res.data)
+            if session_row:
                 supabase.table("exam_sessions").update({
-                    "forbidden_site_count": s.get("forbidden_site_count", 0) + 1,
-                    "risk_score": min(100, s.get("risk_score", 0) + ocr_result.get("risk_score", 0))
+                    "forbidden_site_count": _as_int(session_row.get("forbidden_site_count")) + 1,
+                    "risk_score": min(100, _as_int(session_row.get("risk_score")) + _as_int(ocr_result.get("risk_score")))
                 }).eq("id", session_id).execute()
         
     except Exception as e:
@@ -78,11 +101,11 @@ async def analyze_webcam_frame(
         # Update session if face not detected
         if not face_result.get("face_detected"):
             session_res = supabase.table("exam_sessions").select("face_absence_count, engagement_score").eq("id", session_id).execute()
-            if session_res.data:
-                s = session_res.data[0]
+            session_row = _first_record(session_res.data)
+            if session_row:
                 supabase.table("exam_sessions").update({
-                    "face_absence_count": s.get("face_absence_count", 0) + 1,
-                    "engagement_score": max(0, s.get("engagement_score", 100) - 5)
+                    "face_absence_count": _as_int(session_row.get("face_absence_count")) + 1,
+                    "engagement_score": max(0, _as_int(session_row.get("engagement_score"), 100) - 5)
                 }).eq("id", session_id).execute()
         
     except Exception as e:
@@ -127,7 +150,8 @@ async def upload_screenshot(
             
             # Find the exam_id to broadcast to the proctor dashboard
             session_res = supabase.table("exam_sessions").select("exam_id").eq("id", upload.session_id).execute()
-            target_room = session_res.data[0]["exam_id"] if session_res.data else upload.session_id
+            session_row = _first_record(session_res.data)
+            target_room = _as_str(session_row.get("exam_id") if session_row else None, upload.session_id)
             
             # Use background_tasks so we don't block the upload response
             background_tasks.add_task(
@@ -199,7 +223,8 @@ async def upload_webcam_frame(
             
             # Find the exam_id to broadcast to the proctor dashboard
             session_res = supabase.table("exam_sessions").select("exam_id").eq("id", upload.session_id).execute()
-            target_room = session_res.data[0]["exam_id"] if session_res.data else upload.session_id
+            session_row = _first_record(session_res.data)
+            target_room = _as_str(session_row.get("exam_id") if session_row else None, upload.session_id)
             
             background_tasks.add_task(
                 mgr.broadcast_to_session,
@@ -242,24 +267,37 @@ async def get_latest_upload(
     try:
         from fastapi.responses import FileResponse
         target_dir = WEBCAM_DIR if type == "webcam" else SCREENSHOTS_DIR
-        
-        if not os.path.exists(target_dir):
-            raise HTTPException(status_code=404, detail="Upload directory not found")
-            
-        # Find all files for this session
-        session_files = []
-        for filename in os.listdir(target_dir):
-            if session_id in filename:
-                file_path = os.path.join(target_dir, filename)
-                session_files.append((file_path, os.path.getmtime(file_path)))
-                
-        if not session_files:
+
+        # First prefer the in-memory cache populated by the analysis pipeline.
+        try:
+            from api.endpoints.analysis import get_latest_feeds
+
+            latest_feeds = get_latest_feeds().get(session_id, {})
+            cached_path = latest_feeds.get(type)
+            if cached_path:
+                candidate_path = os.path.join(target_dir, os.path.basename(cached_path))
+                if os.path.exists(candidate_path):
+                    return FileResponse(candidate_path, media_type="image/jpeg")
+        except Exception as cache_error:
+            print(f"[Uploads] Latest-feed cache lookup failed: {cache_error}")
+
+        latest_file = None
+        if os.path.exists(target_dir):
+            # Find all files for this session
+            session_files = []
+            for filename in os.listdir(target_dir):
+                if session_id in filename:
+                    file_path = os.path.join(target_dir, filename)
+                    session_files.append((file_path, os.path.getmtime(file_path)))
+
+            if session_files:
+                # Sort by modification time (newest first)
+                session_files.sort(key=lambda x: x[1], reverse=True)
+                latest_file = session_files[0][0]
+
+        if not latest_file:
             raise HTTPException(status_code=404, detail="No uploads recorded for this session yet")
-            
-        # Sort by modification time (newest first)
-        session_files.sort(key=lambda x: x[1], reverse=True)
-        latest_file = session_files[0][0]
-        
+
         return FileResponse(latest_file, media_type="image/jpeg")
     except HTTPException:
         raise

@@ -12,6 +12,8 @@ class ExamCapture {
         this.isCapturing = false;
         this.captureCount = { screen: 0, webcam: 0 };
         this.errorCount = { screen: 0, webcam: 0 };
+        this.pendingIceCandidates = [];
+        this.remoteDescriptionSet = false;
 
         // Adaptive configuration
         this.config = {
@@ -121,6 +123,10 @@ class ExamCapture {
             this.screenStream = null;
         }
 
+        if (this._screenCaptureVideo) {
+            this._screenCaptureVideo.srcObject = null;
+        }
+
         console.log('📸 Screen capture stopped');
     }
 
@@ -170,6 +176,44 @@ class ExamCapture {
         }
     }
 
+    /**
+     * Capture a single frame from the active screen stream
+     * @returns {string|null} Base64 JPEG data URL
+     */
+    captureScreenFrame() {
+        if (!this.screenStream || !this.screenStream.active) return null;
+
+        try {
+            if (!this._screenCaptureVideo) {
+                this._screenCaptureVideo = document.createElement('video');
+                this._screenCaptureVideo.srcObject = this.screenStream;
+                this._screenCaptureVideo.muted = true;
+                this._screenCaptureVideo.playsInline = true;
+                this._screenCaptureVideo.play();
+            }
+
+            const video = this._screenCaptureVideo;
+            if (!video.videoWidth || !video.videoHeight) {
+                return null;
+            }
+            const width = video.videoWidth || this.config.maxWidth;
+            const height = video.videoHeight || this.config.maxHeight;
+
+            const canvas = document.createElement('canvas');
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            if (!ctx) return null;
+
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+            return canvas.toDataURL('image/jpeg', 0.6);
+        } catch (error) {
+            console.warn('Screen frame capture failed:', error);
+            return null;
+        }
+    }
+
     // ==================== UNIFIED CONTROLS ====================
 
     async startAll() {
@@ -177,17 +221,12 @@ class ExamCapture {
         this.captureCount = { screen: 0, webcam: 0 };
         this.errorCount = { screen: 0, webcam: 0 };
 
-        const [screenResult, webcamResult] = await Promise.allSettled([
-            this.startScreenCapture(),
-            this.startWebcamCapture(),
-        ]);
-
-        // Kick off WebRTC P2P signaling using the gathered streams
-        this.initWebRTC();
+        const screenResult = await this.startScreenCapture();
+        const webcamResult = await this.startWebcamCapture();
 
         return {
-            screen: screenResult.status === 'fulfilled' ? screenResult.value : { success: false, error: screenResult.reason },
-            webcam: webcamResult.status === 'fulfilled' ? webcamResult.value : { success: false, error: webcamResult.reason },
+            screen: screenResult,
+            webcam: webcamResult,
         };
     }
 
@@ -197,9 +236,12 @@ class ExamCapture {
             this.pc.close();
             this.pc = null;
         }
+        this.pendingIceCandidates = [];
+        this.remoteDescriptionSet = false;
         this.stopMediaRecorder();
         this.stopScreenCapture();
         this.stopWebcamCapture();
+        this._screenCaptureVideo = null;
     }
 
     // ==================== LIVE STREAMING (MEDIA RECORDER) ====================
@@ -279,79 +321,21 @@ class ExamCapture {
 
     // ==================== WEBRTC INJECTION ====================
     initWebRTC() {
-        if (this.pc) {
-            this.pc.close();
-        }
-
-        this.pc = new RTCPeerConnection({
-            iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
-        });
-
-        // Add 2 generic video tracks: first webcam, second screen
-        if (this.webcamStream && this.webcamStream.getVideoTracks()[0]) {
-            this.webcamStream.getVideoTracks()[0].enabled = true;
-            this.pc.addTrack(this.webcamStream.getVideoTracks()[0], this.webcamStream);
-        }
-        if (this.screenStream && this.screenStream.getVideoTracks()[0]) {
-            this.screenStream.getVideoTracks()[0].enabled = true;
-            this.pc.addTrack(this.screenStream.getVideoTracks()[0], this.screenStream);
-        }
-
-        this.pc.onicecandidate = (event) => {
-             if (event.candidate) {
-                 chrome.runtime.sendMessage({
-                     type: 'WEBRTC_SIGNAL_OUT',
-                     payload: { candidate: event.candidate }
-                 });
-             }
-        };
-
-        // Student is the offerer. They open P2P with their ready streams
-        this.pc.createOffer().then(offer => {
-            return this.pc.setLocalDescription(offer);
-        }).then(() => {
-            chrome.runtime.sendMessage({
-                type: 'WEBRTC_SIGNAL_OUT',
-                payload: { sdp: this.pc.localDescription }
-            });
-        }).catch(err => console.error("WebRTC Offer Error:", err));
+        console.warn('[WebRTC] Disabled in webcam-only capture flow');
+        return;
     }
 
     async handleWebRTCSignal(payload) {
-        console.log('[WebRTC] Received signal:', payload);
-        if (!this.pc) {
-            console.error('[WebRTC] No peer connection available');
-            return;
-        }
-        try {
-            if (payload.sdp) {
-                console.log('[WebRTC] Setting remote description:', payload.sdp.type);
-                await this.pc.setRemoteDescription(new RTCSessionDescription(payload.sdp));
-                console.log('[WebRTC] Remote description set successfully');
-            } else if (payload.candidate) {
-                console.log('[WebRTC] Adding ICE candidate');
-                await this.pc.addIceCandidate(new RTCIceCandidate(payload.candidate));
-            } else {
-                console.log('[WebRTC] Unknown signal type:', payload);
-            }
-        } catch (e) {
-            console.error("[WebRTC] Signaling Error", e);
-        }
+        console.warn('[WebRTC] Ignored signal in webcam-only capture flow', payload);
+        return;
     }
 }
 
-// Global Message Listener for WebRTC from Background
+// WebRTC messages are ignored in the webcam-only flow.
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-    if (message.type === 'WEBRTC_SIGNAL_IN' && window.ExamCaptureInstance) {
-        window.ExamCaptureInstance.handleWebRTCSignal(message.payload);
-        sendResponse({ success: true });
-        return true;
-    }
-    
-    if (message.type === 'REQUEST_WEBRTC_OFFER' && window.ExamCaptureInstance) {
-        console.log("📡 Dashboard requested WEBRTC offer, re-initializing...");
-        window.ExamCaptureInstance.initWebRTC();
-        sendResponse({ success: true });
+    if ((message.type === 'WEBRTC_SIGNAL_IN' || message.type === 'REQUEST_WEBRTC_OFFER') && window.ExamCaptureInstance) {
+        console.warn('[WebRTC] Message ignored in webcam-only capture flow:', message.type);
+        sendResponse({ success: true, skipped: true });
         return true;
     }
 });

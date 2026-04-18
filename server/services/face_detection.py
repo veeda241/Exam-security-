@@ -1,8 +1,10 @@
+import asyncio
 import cv2
 import numpy as np
 import time
 import os
 import urllib.request
+from typing import Any, Dict
 
 # ---- Face Detection Backend Detection (Modern Tasks API) ----
 FACE_BACKEND = 'haar'
@@ -61,17 +63,42 @@ class SecureVision:
         self._last_face_time = time.time()
         self.FACE_ABSENT_THRESHOLD_SEC = 3.0
 
-    def analyze_frame(self, frame):
+    def _finalize_results(self, results: Dict[str, Any], face_detected: bool | None = None) -> Dict[str, Any]:
+        normalized = dict(results)
+        violations = normalized.get("violations", [])
+        if not isinstance(violations, list):
+            violations = [str(violations)] if violations else []
+
+        normalized["violations"] = violations
+
+        if face_detected is None:
+            face_detected = not any(
+                violation in {"FACE_NOT_FOUND", "FACE_ABSENT_VIOLATION"}
+                for violation in violations
+            )
+
+        normalized["face_detected"] = face_detected
+        normalized["confidence"] = 0.0 if not face_detected else (
+            0.5 if any(
+                violation in {"MULTIPLE_FACES_DETECTED", "MULTIPLE_FACES"}
+                for violation in violations
+            ) else 0.9
+        )
+        normalized["risk_score"] = normalized.get("integrity_score_impact", 0)
+        return normalized
+
+    def analyze_frame(self, frame, student_id: str | None = None, **_: Any):
         results = {'violations': [], 'integrity_score_impact': 0, 'detections': [], 'pose': None}
-        if frame is None: return results
+        if frame is None:
+            return self._finalize_results(results, face_detected=False)
 
         if self.landmarker:
-            return self._analyze_tasks(frame, results)
+            return self._finalize_results(self._analyze_tasks(frame, results))
         elif self.haar_cascade is not None:
-            return self._analyze_haar(frame, results)
+            return self._finalize_results(self._analyze_haar(frame, results))
         else:
             # No face detection available - return empty results
-            return results
+            return self._finalize_results(results, face_detected=False)
 
     def _analyze_tasks(self, frame, results):
         mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
@@ -101,6 +128,14 @@ class SecureVision:
                 results['integrity_score_impact'] += 20
         
         return results
+
+
+_VISION_ENGINE = SecureVision()
+
+
+async def detect_face(file_path: str) -> Dict[str, Any]:
+    frame = await asyncio.to_thread(cv2.imread, file_path)
+    return await asyncio.to_thread(_VISION_ENGINE.analyze_frame, frame)
 
     def _analyze_haar(self, frame, results):
         gray = cv2.equalizeHist(cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY))

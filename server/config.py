@@ -54,6 +54,10 @@ WEBCAM_INTERVAL_SECONDS = 5
 IMAGE_QUALITY = 0.7
 MAX_IMAGE_WIDTH = 1280
 MAX_IMAGE_HEIGHT = 720
+ENABLE_OBJECT_DETECTION = os.getenv(
+    "ENABLE_OBJECT_DETECTION",
+    "1" if os.name != "nt" else "0"
+).strip().lower() in {"1", "true", "yes", "on"}
 
 # Forbidden keywords for OCR detection
 FORBIDDEN_KEYWORDS = [

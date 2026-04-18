@@ -12,26 +12,25 @@
 <body>
     <div class="container">
         <h1>🛡️ Permission Setup</h1>
-        <p>ExamGuard Pro needs your permission to monitor the session. Please enable both Screen Sharing and Webcam
-            access to proceed.</p>
+        <p>ExamGuard Pro needs your webcam and screen sharing permissions to monitor the session. Please enable both to proceed.</p>
 
         <div class="permissions">
-            <button class="permission-card" id="screen-card">
-                <span class="permission-icon">🖥️</span>
-                <div class="permission-info">
-                    <h3>Screen Monitoring</h3>
-                    <span>Required to detect plagiarism and tab switching</span>
-                </div>
-                <span class="permission-status" id="screen-status-icon">⬜</span>
-            </button>
-
             <button class="permission-card" id="webcam-card">
                 <span class="permission-icon">📹</span>
                 <div class="permission-info">
                     <h3>Identity Verification</h3>
-                    <span>Required for face detection and gaze tracking</span>
+                    <span>Required for face detection snapshots</span>
                 </div>
                 <span class="permission-status" id="webcam-status-icon">⬜</span>
+            </button>
+
+            <button class="permission-card" id="screen-card">
+                <span class="permission-icon">🖥️</span>
+                <div class="permission-info">
+                    <h3>Screen Sharing</h3>
+                    <span>Required to show the student's screen in real time</span>
+                </div>
+                <span class="permission-status" id="screen-status-icon">⬜</span>
             </button>
         </div>
 

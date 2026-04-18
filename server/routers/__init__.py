@@ -3,6 +3,6 @@ ExamGuard Pro - Routers Package
 API route handlers
 """
 
-from . import students, events_log, uploads, reports, analysis, research, sessions
+from . import analysis, events_log, reports, research, sessions, students, uploads
 
-__all__ = ["students", "events_log", "uploads", "reports", "analysis", "research", "sessions"]
+__all__ = ["analysis", "events_log", "reports", "research", "sessions", "students", "uploads"]
