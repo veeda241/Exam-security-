@@ -12,8 +12,8 @@ export function Header() {
   const { messages: liveAlerts } = useWebSocket('/dashboard');
 
   // Filter to only real alerts
-  const alerts = liveAlerts.filter(m => {
-    const t = m.event_type || m.type;
+  const alerts = liveAlerts.filter((m) => {
+    const t = String(m.event_type || m.type || '');
     const ignore = ['connection', 'heartbeat', 'risk_score_update', 'session_started', 'session_ended', 'student_joined', 'student_left'];
     return t && !ignore.includes(t);
   });
@@ -119,19 +119,19 @@ export function Header() {
                         }}
                         className="flex items-start gap-3 px-4 py-3 hover:bg-slate-50 transition-colors cursor-pointer border-b border-slate-50 last:border-b-0"
                       >
-                        <div className={`mt-0.5 p-1.5 rounded-lg ${getAlertColor(alert.alert_level)}`}>
+                        <div className={`mt-0.5 p-1.5 rounded-lg ${getAlertColor(String(alert.alert_level || ''))}`}>
                           <AlertTriangle className="w-3.5 h-3.5" />
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium text-slate-900 truncate">
-                            {(alert.event_type || '').replace(/_/g, ' ')}
+                            {String(alert.event_type || alert.type || '').replace(/_/g, ' ')}
                           </p>
                           <p className="text-xs text-slate-500 truncate mt-0.5">
                             {alert.data?.message || alert.student_id || 'System alert'}
                           </p>
                         </div>
                         <span className="text-[10px] text-slate-400 whitespace-nowrap mt-0.5">
-                          {formatTime(alert.timestamp)}
+                          {formatTime(String(alert.timestamp || ''))}
                         </span>
                       </div>
                     ))

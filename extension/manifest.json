@@ -1,73 +1,42 @@
 {
   "manifest_version": 3,
   "name": "ExamGuard Pro",
-  "version": "2.0.0",
-  "description": "AI-powered secure exam proctoring with real-time behavioral monitoring and identity verification.",
+  "version": "3.0.0",
+  "description": "AI-powered exam proctoring system",
   "permissions": [
+    "storage",
     "tabs",
     "activeTab",
-    "storage",
-    "unlimitedStorage",
     "notifications",
-    "clipboardRead",
-    "alarms",
     "scripting",
     "windows",
     "system.display"
   ],
   "host_permissions": [
-    "http://localhost:8000/*",
-    "https://exam-security.onrender.com/*",
-    "https://*/*",
-    "http://*/*",
     "<all_urls>"
-  ],
-  "background": {
-    "service_worker": "background.js",
-    "type": "module"
-  },
-  "content_scripts": [
-    {
-      "matches": [
-        "http://*/*",
-        "https://*/*"
-      ],
-      "js": [
-        "html2canvas.min.js",
-        "utils.js",
-        "eventLogger.js",
-        "content.js"
-      ],
-      "run_at": "document_start",
-      "all_frames": true
-    }
   ],
   "action": {
     "default_popup": "popup/popup.html",
     "default_icon": {
-      "16": "icons/icon16.png",
-      "48": "icons/icon48.png",
-      "128": "icons/icon128.png"
-    },
-    "default_title": "ExamGuard Pro Session Control"
+      "16": "icons/icon16.svg",
+      "48": "icons/icon48.svg",
+      "128": "icons/icon128.svg"
+    }
   },
-  "icons": {
-    "16": "icons/icon16.png",
-    "48": "icons/icon48.png",
-    "128": "icons/icon128.png"
+  "background": {
+    "service_worker": "background.js"
   },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js", "content_agent_patch.js"],
+      "run_at": "document_idle"
+    }
+  ],
   "web_accessible_resources": [
     {
-      "resources": [
-        "webcam.js",
-        "capture.js",
-        "capture-page.html",
-        "capture-page.css",
-        "utils.js"
-      ],
-      "matches": [
-        "<all_urls>"
-      ]
+      "resources": ["icons/*", "capture-page.html", "capture-page.js", "capture-page.css", "webcam.js", "capture.js"],
+      "matches": ["<all_urls>"]
     }
   ]
 }

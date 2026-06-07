@@ -9,6 +9,7 @@ interface SessionData {
   student_name: string;
   student_id: string;
   exam_id: string;
+  proctor_session_id?: string | null;
   status: string;
   risk_level: string;
   risk_score: number;
@@ -54,10 +55,10 @@ export function Sessions() {
     const groups: Record<string, ExamGroup> = {};
 
     for (const s of sessions) {
-      const examId = s.exam_id;
-      if (!groups[examId]) {
-        groups[examId] = {
-          exam_id: examId,
+      const groupKey = s.proctor_session_id || s.exam_id;
+      if (!groups[groupKey]) {
+        groups[groupKey] = {
+          exam_id: s.exam_id,
           proctor_session_id: '',
           status: 'active',
           started_at: s.started_at,
@@ -68,11 +69,11 @@ export function Sessions() {
       }
 
       if (s.student_id?.startsWith('PROCTOR-')) {
-        groups[examId].proctor_session_id = s.id;
-        groups[examId].status = s.status;
-        groups[examId].started_at = s.started_at;
+        groups[groupKey].proctor_session_id = s.id;
+        groups[groupKey].status = s.status;
+        groups[groupKey].started_at = s.started_at;
       } else {
-        groups[examId].students.push(s);
+        groups[groupKey].students.push(s);
       }
     }
 
@@ -163,18 +164,19 @@ export function Sessions() {
           <div className="divide-y divide-slate-100">
             {examGroups.map((group, idx) => {
               const isActive = group.status === 'active';
+              const canOpenExamSession = Boolean(group.proctor_session_id);
               return (
                 <motion.div
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: idx * 0.05 }}
-                  key={group.exam_id}
+                  key={group.proctor_session_id || group.exam_id}
                   onClick={() => {
-                    // Navigate to the proctor session detail, or first student session
-                    const targetId = group.proctor_session_id || group.students[0]?.id;
-                    if (targetId) navigate(`/sessions/${targetId}`);
+                    if (canOpenExamSession) {
+                      navigate(`/sessions/${group.proctor_session_id}`);
+                    }
                   }}
-                  className="p-5 hover:bg-slate-50/80 transition-colors cursor-pointer group"
+                  className={`p-5 transition-colors group ${canOpenExamSession ? 'hover:bg-slate-50/80 cursor-pointer' : 'cursor-default'}`}
                 >
                   <div className="flex items-center justify-between">
                     {/* Left side: Exam info */}
@@ -256,7 +258,11 @@ export function Sessions() {
                         </div>
                       )}
 
-                      <ChevronRight className="w-5 h-5 text-slate-300 group-hover:text-indigo-500 transition-colors" />
+                      {canOpenExamSession ? (
+                        <ChevronRight className="w-5 h-5 text-slate-300 group-hover:text-indigo-500 transition-colors" />
+                      ) : (
+                        <span className="text-xs font-medium text-slate-400">Waiting for proctor</span>
+                      )}
                     </div>
                   </div>
                 </motion.div>

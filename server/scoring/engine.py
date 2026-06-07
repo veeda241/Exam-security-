@@ -53,7 +53,8 @@ class _Relevance:
 
 class _Effort:
     NEUTRAL_BASE          = 60.0   # used when no browsing data available
-    OTHER_SITE_CREDIT     = 0.10   # 10 % credit for "other" sites
+    OTHER_SITE_CREDIT     = 0.0    # "other" sites must not boost effort
+    OTHER_SITE_PENALTY    = 0.22   # penalty for unclassified browsing time
     PRODUCTIVE_BONUS_TIME = 30.0   # 1 % per N seconds of productive time
     PRODUCTIVE_RATIO_BONUS = 20.0  # bonus when productive ratio > 50 %
     PRODUCTIVE_RATIO_THRESHOLD = 0.5
@@ -260,13 +261,15 @@ def _calc_effort(
     E = _Effort
 
     exam_ms        = browsing.category_ms("exam")
+    quiz_ms        = browsing.category_ms("quiz")
+    education_ms   = browsing.category_ms("education")
     learning_ms    = browsing.category_ms("learning")
     ai_ms          = browsing.category_ms("ai")
     cheating_ms    = browsing.category_ms("cheating")
     entertainment_ms = browsing.category_ms("entertainment")
     other_ms       = browsing.category_ms("other")
 
-    productive_ms  = exam_ms + learning_ms
+    productive_ms  = exam_ms + quiz_ms + education_ms + learning_ms
     total_ms       = productive_ms + ai_ms + cheating_ms + entertainment_ms + other_ms
 
     if total_ms > E.BROWSE_MIN_MS:
@@ -274,7 +277,13 @@ def _calc_effort(
         other_ratio      = other_ms / total_ms
 
         score  = productive_ratio * 100
-        score += other_ratio * (E.OTHER_SITE_CREDIT * 100)
+        score -= other_ratio * (E.OTHER_SITE_PENALTY * 100)
+
+        # Weight productive categories — quiz/LMS/exam search count as effort
+        score += (exam_ms / max(total_ms, 1)) * 12
+        score += (quiz_ms / max(total_ms, 1)) * 10
+        score += (education_ms / max(total_ms, 1)) * 10
+        score += (learning_ms / max(total_ms, 1)) * 8
 
         # Bonus for raw productive time
         score += (productive_ms / 1000.0) / E.PRODUCTIVE_BONUS_TIME

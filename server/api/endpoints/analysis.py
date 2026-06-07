@@ -52,6 +52,49 @@ def get_latest_feeds():
     """Get the global feeds cache — used by uploads endpoint."""
     return _latest_feeds
 
+
+def set_latest_feed(session_id: str, frame_type: str, relative_path: str) -> None:
+    if session_id not in _latest_feeds:
+        _latest_feeds[session_id] = {}
+    _latest_feeds[session_id][frame_type] = relative_path
+
+
+def _get_local_session(session_id: str) -> dict[str, Any] | None:
+    from api.endpoints import sessions as session_store
+
+    with session_store._LOCAL_STORE_LOCK:
+        session = session_store._LOCAL_SESSIONS.get(session_id)
+        return dict(session) if session else None
+
+
+def _resolve_session(session_id: str) -> dict[str, Any] | None:
+    """Load a session from Supabase, falling back to the in-memory dev store."""
+    if supabase is not None:
+        try:
+            session_res = supabase.table("exam_sessions").select("*").eq("id", session_id).execute()
+            session_row = _first_record(session_res.data)
+            if session_row:
+                return session_row
+        except Exception as e:
+            print(f"[Analysis] Supabase session lookup failed, using local fallback: {e}")
+
+    return _get_local_session(session_id)
+
+
+def _update_local_session(session_id: str, updates: dict[str, Any]) -> None:
+    from api.endpoints import sessions as session_store
+
+    with session_store._LOCAL_STORE_LOCK:
+        session = session_store._LOCAL_SESSIONS.get(session_id)
+        if not session:
+            return
+        session.update(updates)
+
+
+def _broadcast_room_for_session(session_row: dict[str, Any], session_id: str) -> str:
+    """Proctors subscribe by exam_id, not the per-student session UUID."""
+    return _as_str(session_row.get("exam_id"), session_id)
+
 def decode_image(base64_string):
     """Decode base64 image string to OpenCV image"""
     if not base64_string:
@@ -70,6 +113,7 @@ def decode_image(base64_string):
 
 def save_image(img, folder, prefix, session_id=None):
     """Save image to disk and return filename and path"""
+    os.makedirs(folder, exist_ok=True)
     session_part = f"_{session_id}" if session_id else ""
     filename = f"{prefix}{session_part}_{uuid.uuid4().hex}.jpg"
     path = os.path.join(folder, filename)
@@ -77,7 +121,13 @@ def save_image(img, folder, prefix, session_id=None):
     return filename, path
 
 
-async def broadcast_live_frame(room_id: str, student_id: str, frame_type: str, image_data: str):
+async def broadcast_live_frame(
+    room_id: str,
+    session_id: str,
+    student_id: str,
+    frame_type: str,
+    image_data: str,
+):
     """Broadcast a captured frame immediately so the UI stays close to real time."""
     if not image_data:
         return
@@ -92,9 +142,10 @@ async def broadcast_live_frame(room_id: str, student_id: str, frame_type: str, i
 
         await mgr.broadcast_to_session(room_id, {
             "type": "live_frame",
+            "session_id": session_id,
             "student_id": student_id,
             "frame_type": frame_type,
-            "data": f"data:image/jpeg;base64,{clean_b64}"
+            "data": f"data:image/jpeg;base64,{clean_b64}",
         })
     except Exception as ws_err:
         print(f"[WS] Live frame broadcast error: {ws_err}")
@@ -112,13 +163,13 @@ async def process_analysis_data(
         # Access vision engine from app state
         vision_engine = getattr(request.app.state, "vision_engine", None)
         
-        # 1. Verify session in Supabase
-        session_res = supabase.table("exam_sessions").select("*").eq("id", analysis_request.session_id).execute()
-        session_row = _first_record(session_res.data)
+        # 1. Verify session (Supabase or local dev store)
+        session_row = _resolve_session(analysis_request.session_id)
         if not session_row:
             raise HTTPException(status_code=404, detail="Session not found")
         session_id = _as_str(session_row.get("id"), analysis_request.session_id)
         student_id = _as_str(session_row.get("student_id"))
+        broadcast_room = _broadcast_room_for_session(session_row, session_id)
         
         # Prepare analysis record with all optional fields initialized to prevent Supabase schema errors
         from typing import Dict, Any
@@ -159,7 +210,13 @@ async def process_analysis_data(
                 _latest_feeds[session_id]["webcam"] = f"/uploads/webcam/{fname}"
 
                 # Broadcast immediately so the dashboard does not wait for analysis work.
-                await broadcast_live_frame(session_id, student_id, "webcam", analysis_request.webcam_image)
+                await broadcast_live_frame(
+                    broadcast_room,
+                    session_id,
+                    student_id,
+                    "webcam",
+                    analysis_request.webcam_image,
+                )
                 
                 if vision_engine:
                     try:
@@ -226,7 +283,13 @@ async def process_analysis_data(
                 _latest_feeds[session_id]["screenshot"] = f"/uploads/screenshots/{fname}"
 
                 # Broadcast immediately so the dashboard stays responsive.
-                await broadcast_live_frame(session_id, student_id, "screenshot", analysis_request.screen_image)
+                await broadcast_live_frame(
+                    broadcast_room,
+                    session_id,
+                    student_id,
+                    "screenshot",
+                    analysis_request.screen_image,
+                )
                 ocr_result = await analyze_screenshot_ocr(fpath)
                 
                 analysis_data["detected_text"] = ocr_result.get("text", "")
@@ -261,10 +324,11 @@ async def process_analysis_data(
                 print(f"[Analysis] LLM Analysis Error: {le}")
 
         # Save Analysis Result to Supabase (non-blocking - don't crash if schema mismatch)
-        try:
-            supabase.table("analysis_results").insert(analysis_data).execute()
-        except Exception as db_err:
-            print(f"[Analysis] analysis_results insert failed (non-fatal): {db_err}")
+        if supabase is not None:
+            try:
+                supabase.table("analysis_results").insert(analysis_data).execute()
+            except Exception as db_err:
+                print(f"[Analysis] analysis_results insert failed (non-fatal): {db_err}")
         
         # Update Session Risk
         current_risk = _as_int(session_row.get("risk_score"), 0)
@@ -280,10 +344,12 @@ async def process_analysis_data(
             
         # Update session in Supabase (critical for live feeds - always try)
         if session_updates:
-            try:
-                supabase.table("exam_sessions").update(session_updates).eq("id", session_id).execute()
-            except Exception as upd_err:
-                print(f"[Analysis] session update failed (non-fatal): {upd_err}")
+            if supabase is not None:
+                try:
+                    supabase.table("exam_sessions").update(session_updates).eq("id", session_id).execute()
+                except Exception as upd_err:
+                    print(f"[Analysis] session update failed (non-fatal): {upd_err}")
+            _update_local_session(session_id, session_updates)
         
         # Safely determine if forbidden keywords were found
         forbidden_keywords = analysis_data.get("forbidden_keywords_found")

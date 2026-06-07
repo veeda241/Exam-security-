@@ -34,12 +34,30 @@ def _local_student_name(student_id: str) -> str:
     return student.get("name") or "Unknown"
 
 
-def _build_local_summary(session: Dict[str, Any]) -> SessionSummary:
+def _build_proctor_lookup(sessions: List[Dict[str, Any]]) -> Dict[str, str]:
+    lookup: Dict[str, str] = {}
+    for session in sessions:
+        student_id = str(session.get("student_id") or "")
+        exam_id = session.get("exam_id")
+        if student_id.startswith("PROCTOR-") and exam_id and exam_id not in lookup:
+            lookup[exam_id] = session.get("id")
+    return lookup
+
+
+def _resolve_proctor_session_id(session: Dict[str, Any], proctor_lookup: Dict[str, str]) -> str | None:
+    student_id = str(session.get("student_id") or "")
+    if student_id.startswith("PROCTOR-"):
+        return session.get("id")
+    return proctor_lookup.get(session.get("exam_id"))
+
+
+def _build_local_summary(session: Dict[str, Any], proctor_session_id: str | None = None) -> SessionSummary:
     return SessionSummary(
         id=session["id"],
         student_name=_local_student_name(session["student_id"]),
         student_id=session["student_id"],
         exam_id=session["exam_id"],
+        proctor_session_id=proctor_session_id,
         started_at=session["started_at"],
         ended_at=session.get("ended_at"),
         risk_score=session.get("risk_score", 0.0),
@@ -49,7 +67,54 @@ def _build_local_summary(session: Dict[str, Any]) -> SessionSummary:
         effort_alignment=session.get("effort_alignment", 100.0),
         status="active" if session.get("is_active", True) else "ended",
         stats=_session_stats(session),
+        browsing=session.get("browsing") or _latest_browsing_summary(session.get("id", "")),
     )
+
+
+def _latest_browsing_summary(session_id: str) -> Dict[str, Any] | None:
+    try:
+        res = (
+            supabase.table("events")
+            .select("data, timestamp")
+            .eq("session_id", session_id)
+            .eq("event_type", "BROWSING_SUMMARY")
+            .order("timestamp", desc=True)
+            .limit(1)
+            .execute()
+        )
+
+        if not getattr(res, "data", None):
+            return None
+
+        payload = res.data[0].get("data") or {}
+        if not isinstance(payload, dict):
+            return None
+
+        active_site = payload.get("activeSite") or payload.get("active_site") or None
+        if isinstance(active_site, dict):
+            active_site = {
+                "url": active_site.get("url") or "",
+                "category": active_site.get("category") or active_site.get("siteCategory") or "other",
+                "riskLevel": active_site.get("riskLevel") or active_site.get("risk_level") or "none",
+                "title": active_site.get("title") or "",
+            }
+
+        return {
+            "activeSite": active_site,
+            "timeByCategory": payload.get("timeByCategory") or {},
+            "totalTime": payload.get("totalTime", 0),
+            "browsingRiskScore": payload.get("browsingRiskScore", 0),
+            "effortScore": payload.get("effortScore", 100),
+            "uniqueSitesVisited": payload.get("uniqueSitesVisited", payload.get("totalSitesVisited", 0)),
+            "flaggedSitesCount": payload.get("flaggedSitesCount", 0),
+            "openTabsCount": payload.get("openTabsCount", 0),
+            "flaggedOpenTabs": payload.get("flaggedOpenTabs", 0),
+            "currentCategory": payload.get("currentCategory") or (active_site or {}).get("category") if isinstance(active_site, dict) else payload.get("currentCategory", "none"),
+            "topFlaggedSites": payload.get("topFlaggedSites") or [],
+        }
+    except Exception as e:
+        print(f"[Session] Failed to load latest browsing summary for {session_id}: {e}")
+        return None
 
 
 def _store_local_student(student_id: str, student_name: str, email: str | None = None) -> None:
@@ -90,6 +155,20 @@ def _create_local_session(session_data: SessionCreate) -> SessionResponse:
         session_data.student_name,
         session_data.student_email or f"{session_data.student_id}@examguard.internal",
     )
+
+    # End any stale active sessions for the same student/exam to avoid duplicate feeds.
+    if not creating_proctor:
+        ended_at = datetime.utcnow().isoformat()
+        with _LOCAL_STORE_LOCK:
+            for existing in _LOCAL_SESSIONS.values():
+                if (
+                    existing.get("is_active", True)
+                    and existing.get("student_id") == session_data.student_id
+                    and existing.get("exam_id") == session_data.exam_id
+                ):
+                    existing["is_active"] = False
+                    existing["ended_at"] = ended_at
+                    existing["status"] = "ended"
 
     session_id = str(uuid.uuid4())
     started_at = datetime.utcnow().isoformat()
@@ -185,12 +264,16 @@ def _end_local_session(session_id: str) -> Dict[str, Any]:
 def _local_list_sessions(active_only: bool = False, limit: int = 100) -> List[SessionSummary]:
     with _LOCAL_STORE_LOCK:
         sessions = list(_LOCAL_SESSIONS.values())
+    proctor_lookup = _build_proctor_lookup(sessions)
 
     if active_only:
         sessions = [session for session in sessions if session.get("is_active", True)]
 
     sessions = sorted(sessions, key=lambda session: session.get("started_at", ""), reverse=True)
-    return [_build_local_summary(session) for session in sessions[:limit]]
+    return [
+        _build_local_summary(session, _resolve_proctor_session_id(session, proctor_lookup))
+        for session in sessions[:limit]
+    ]
 
 @router.post("/create", response_model=SessionResponse)
 async def create_session(session_data: SessionCreate):
@@ -429,6 +512,7 @@ async def list_sessions(active_only: bool = False, limit: int = 100):
             
         res = query.execute()
         sessions = res.data
+        proctor_lookup = _build_proctor_lookup(sessions)
         
         summaries = []
         for s in sessions:
@@ -440,6 +524,7 @@ async def list_sessions(active_only: bool = False, limit: int = 100):
                 student_name=student_name,
                 student_id=s["student_id"],
                 exam_id=s["exam_id"],
+                proctor_session_id=_resolve_proctor_session_id(s, proctor_lookup),
                 started_at=s["started_at"],
                 ended_at=s.get("ended_at"),
                 risk_score=s["risk_score"],
@@ -454,12 +539,64 @@ async def list_sessions(active_only: bool = False, limit: int = 100):
                     "face_absences": s.get("face_absence_count", 0),
                     "forbidden_sites": s.get("forbidden_site_count", 0),
                     "total": s.get("total_events", 0)
-                }
+                },
             ))
         return summaries
     except Exception as e:
         print(f"[Session] Supabase list failed, using local fallback: {e}")
         return _local_list_sessions(active_only=active_only, limit=limit)
+
+
+@router.post("/{session_id}/scores")
+async def update_session_scores(session_id: str, payload: dict):
+    """Apply browsing-derived risk/effort scores from the extension."""
+    from api.endpoints.events import _apply_browsing_scores, _resolve_session, _update_local_session
+
+    session = _resolve_session(session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    updates: Dict[str, Any] = {
+        "total_events": (session.get("total_events") or 0) + 1,
+    }
+    _apply_browsing_scores(updates, payload or {})
+
+    if supabase is not None:
+        try:
+            supabase.table("exam_sessions").update(updates).eq("id", session_id).execute()
+        except Exception as db_err:
+            print(f"[Session] Supabase score update failed, using local fallback: {db_err}")
+            _update_local_session(session_id, updates)
+    else:
+        _update_local_session(session_id, updates)
+
+    try:
+        from services.realtime import get_realtime_manager
+
+        mgr = get_realtime_manager()
+        await mgr.broadcast_to_session(
+            session.get("exam_id") or session_id,
+            {
+                "type": "risk_score_update",
+                "session_id": session_id,
+                "student_id": session.get("student_id"),
+                "risk_score": updates.get("risk_score"),
+                "engagement_score": updates.get("engagement_score"),
+                "effort_score": updates.get("engagement_score"),
+                "risk_level": updates.get("risk_level"),
+                "browsing": updates.get("browsing"),
+            },
+        )
+    except Exception as ws_err:
+        print(f"[Session] Score broadcast failed: {ws_err}")
+
+    return {
+        "success": True,
+        "risk_score": updates.get("risk_score"),
+        "engagement_score": updates.get("engagement_score"),
+        "effort_alignment": updates.get("effort_alignment"),
+        "risk_level": updates.get("risk_level"),
+    }
 
 
 @router.get("/{session_id}", response_model=SessionSummary)
@@ -474,19 +611,24 @@ async def get_session(session_id: str):
             if not local_session:
                 raise HTTPException(status_code=404, detail="Session not found")
 
-            return _build_local_summary(local_session)
+            with _LOCAL_STORE_LOCK:
+                proctor_lookup = _build_proctor_lookup(list(_LOCAL_SESSIONS.values()))
+            return _build_local_summary(local_session, _resolve_proctor_session_id(local_session, proctor_lookup))
         
         s = res.data[0]
         
         # Get student name
         st_res = supabase.table("students").select("name").eq("id", s["student_id"]).execute()
         student_name = st_res.data[0]["name"] if st_res.data else "Unknown"
+        proctor_res = supabase.table("exam_sessions").select("id").eq("exam_id", s["exam_id"]).ilike("student_id", "PROCTOR-%").limit(1).execute()
+        proctor_session_id = s["id"] if str(s["student_id"]).startswith("PROCTOR-") else (proctor_res.data[0]["id"] if proctor_res.data else None)
         
         return SessionSummary(
             id=s["id"],
             student_name=student_name,
             student_id=s["student_id"],
             exam_id=s["exam_id"],
+            proctor_session_id=proctor_session_id,
             started_at=s["started_at"],
             ended_at=s.get("ended_at"),
             risk_score=s["risk_score"],
@@ -501,7 +643,8 @@ async def get_session(session_id: str):
                 "face_absences": s.get("face_absence_count", 0),
                 "forbidden_sites": s.get("forbidden_site_count", 0),
                 "total": s.get("total_events", 0)
-            }
+            },
+            browsing=s.get("browsing") or _latest_browsing_summary(session_id),
         )
     except Exception as e:
         if isinstance(e, HTTPException):
@@ -511,4 +654,6 @@ async def get_session(session_id: str):
             local_session = _LOCAL_SESSIONS.get(session_id)
         if not local_session:
             raise HTTPException(status_code=404, detail="Session not found")
-        return _build_local_summary(local_session)
+        with _LOCAL_STORE_LOCK:
+            proctor_lookup = _build_proctor_lookup(list(_LOCAL_SESSIONS.values()))
+        return _build_local_summary(local_session, _resolve_proctor_session_id(local_session, proctor_lookup))

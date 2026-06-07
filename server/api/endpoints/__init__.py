@@ -11,6 +11,8 @@ from .uploads import router as uploads_router
 from .reports import router as reports_router
 from .research import router as research_router
 from .transformer import router as transformer_router
+from .classify import router as classify_router
+from ..agent_scoring_router import router as agent_scoring_router
 
 __all__ = [
     "students_router",
@@ -20,7 +22,9 @@ __all__ = [
     "uploads_router",
     "reports_router",
     "research_router",
-    "transformer_router"
+    "transformer_router",
+    "classify_router",
+    "agent_scoring_router",
 ]
 
 # Router configurations for easy registration
@@ -33,4 +37,6 @@ ROUTERS = [
     {"router": reports_router, "prefix": "/api/reports", "tags": ["Reports"]},
     {"router": research_router, "prefix": "/api/research", "tags": ["Research"]},
     {"router": transformer_router, "prefix": "/api/transformer", "tags": ["Transformer"]},
+    {"router": classify_router, "prefix": "/api/classify", "tags": ["Classification"]},
+    {"router": agent_scoring_router, "prefix": "/api/v2", "tags": ["Agent Scoring"]},
 ]

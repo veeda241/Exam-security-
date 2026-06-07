@@ -12,7 +12,7 @@ const BACKEND_URL = 'http://127.0.0.1:8000';
 const CONFIG = {
   API_BASE: `${BACKEND_URL}/api`,
   WS_URL: `${BACKEND_URL.replace('http://', 'ws://').replace('https://', 'wss://')}/ws/student`,
-  SYNC_INTERVAL: 5000,          // Sync events every 5s
+  SYNC_INTERVAL: 3000,          // Sync scores/events every 3s
   TRANSFORMER_INTERVAL: 15000,  // Run transformer analysis every 15s
   MAX_RETRY_ATTEMPTS: 3,
   RETRY_DELAY: 2000,
@@ -22,6 +22,9 @@ const CONFIG = {
 let examSession = {
   active: false,
   sessionId: null,
+  studentId: '',
+  studentName: '',
+  examId: '',
   startTime: null,
   events: [],
   tabSwitchCount: 0,
@@ -43,11 +46,17 @@ let syncIntervalId = null;
 let transformerIntervalId = null;
 let wsConnection = null;
 let wsReconnectTimer = null;
+let wsConnecting = false;
+let wsReconnectDelayMs = 3000;
 let clipboardTexts = [];     // Buffer for transformer analysis
 let pendingAnalysis = [];    // Buffer for pending text analysis
 let domCaptureIntervalId = null;
-let webcamCaptureIntervalId = null; 
+let webcamCaptureIntervalId = null;
+let webcamAnalysisIntervalId = null;
 let webcamUploadInFlight = false;
+
+const LIVE_CAPTURE_INTERVAL_MS = 900;
+const AI_ANALYSIS_INTERVAL_MS = 5000;
 
 // ==================== MESSAGE HANDLING (REGISTER EARLY) ====================
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -71,7 +80,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       sendResponse({ success: true });
       return true;
 
-    case 'GET_STATUS':
+    case 'GET_STATUS': {
+      const browsingStats = examSession.active ? browsingTracker.getStats() : null;
       sendResponse({
         active: examSession.active,
         sessionId: examSession.sessionId,
@@ -86,11 +96,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         lastScreenCapture: examSession.lastScreenCapture,
         lastWebcamCapture: examSession.lastWebcamCapture,
         lastSync: examSession.lastSync,
-        globalRiskScore: examSession.globalRiskScore || 0,
-        globalEffortScore: examSession.globalEffortScore || 100,
-        browsing: examSession.active ? browsingTracker.getStats() : null,
+        globalRiskScore: browsingStats?.browsingRiskScore ?? examSession.globalRiskScore ?? 0,
+        globalEffortScore: browsingStats?.effortScore ?? examSession.globalEffortScore ?? 100,
+        browsing: browsingStats,
       });
       return true;
+    }
 
 
     case 'CLIPBOARD_TEXT':
@@ -109,6 +120,15 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     case 'DOM_CONTENT_CAPTURE':
       if (examSession.active && message.data?.image) {
         uploadDOMSnapshot(message.data).catch(console.warn);
+        sendResponse({ success: true, queued: true });
+      } else {
+        sendResponse({ success: false });
+      }
+      return true;
+
+    case 'PAGE_CONTEXT':
+      if (examSession.active && (message.data?.url || message.data?.title)) {
+        analyzePageContext(message.data).catch(console.warn);
         sendResponse({ success: true, queued: true });
       } else {
         sendResponse({ success: false });
@@ -155,17 +175,36 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
  *  - All open tabs (periodic audit via chrome.tabs.query)
  *  - Real-time risk & effort scores based on browsing behavior
  */
+function isProductiveCategory(category) {
+  return ['exam', 'quiz', 'education', 'learning'].includes(String(category || '').toLowerCase());
+}
+
+function isHighRiskLevel(riskLevel) {
+  return ['high', 'critical', 'medium'].includes(String(riskLevel || '').toLowerCase());
+}
+
+function syncExamSessionScoresFromBrowsing() {
+  if (!examSession.active) return;
+  examSession.globalRiskScore = Math.max(
+    examSession.globalRiskScore || 0,
+    browsingTracker.browsingRiskScore || 0
+  );
+  examSession.globalEffortScore = browsingTracker.effortScore ?? examSession.globalEffortScore ?? 100;
+}
+
 const browsingTracker = {
-  // Current active site tracking
   activeSite: null,            // { url, title, tabId, category, startTime }
   
   // Time spent per category (milliseconds)
   timeByCategory: {
     exam: 0,
+    quiz: 0,
+    education: 0,
     learning: 0,
     ai: 0,
     cheating: 0,
     entertainment: 0,
+    social: 0,
     other: 0,
   },
   
@@ -181,20 +220,81 @@ const browsingTracker = {
   
   // Audit interval
   auditIntervalId: null,
-  
+  timeFlushIntervalId: null,
+
+  getProductiveTimeMs() {
+    return (
+      (this.timeByCategory.exam || 0) +
+      (this.timeByCategory.quiz || 0) +
+      (this.timeByCategory.education || 0) +
+      (this.timeByCategory.learning || 0)
+    );
+  },
+
+  getExamFocusPercent() {
+    this.flushActiveSite();
+    const totalTime = Object.values(this.timeByCategory).reduce((a, b) => a + b, 0);
+    const productiveTime = this.getProductiveTimeMs();
+
+    if (totalTime <= 0) {
+      if (this.activeSite && isProductiveCategory(this.activeSite.category)) {
+        return 100;
+      }
+      return 0;
+    }
+
+    return Math.min(100, Math.round((productiveTime / totalTime) * 100));
+  },
+
+  /** Track the currently focused exam tab when session starts */
+  async syncActiveTab() {
+    if (!examSession.active) return;
+
+    try {
+      const tabs = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+      const tab = tabs.find(
+        (t) =>
+          t?.url &&
+          !t.url.startsWith('chrome://') &&
+          !t.url.startsWith('chrome-extension://') &&
+          !isInternalCaptureUrl(t.url)
+      );
+
+      if (!tab) return;
+
+      const cleanUrl = sanitizeUrl(tab.url);
+      if (this.activeSite?.url === cleanUrl && this.activeSite?.tabId === tab.id) {
+        return;
+      }
+
+      this.trackSiteChange(tab.id, tab.url, tab.title);
+    } catch (error) {
+      console.warn('Active tab sync failed:', error.message);
+    }
+  },
+
   /** Start tracking when exam begins */
   start() {
     this.reset();
-    // Run an initial tab audit
+    this.syncActiveTab();
     this.auditOpenTabs();
-    // Audit open tabs every 10 seconds
     this.auditIntervalId = setInterval(() => this.auditOpenTabs(), 10000);
+    // Accrue time every 2s even without tab switches or popup open
+    this.timeFlushIntervalId = setInterval(() => {
+      if (!examSession.active) return;
+      this.flushActiveSite();
+      this.calculateScores();
+      syncExamSessionScoresFromBrowsing();
+    }, 2000);
   },
-  
+
   /** Stop tracking when exam ends */
   stop() {
-    // Flush the active site time
     this.flushActiveSite();
+    if (this.timeFlushIntervalId) {
+      clearInterval(this.timeFlushIntervalId);
+      this.timeFlushIntervalId = null;
+    }
     if (this.auditIntervalId) {
       clearInterval(this.auditIntervalId);
       this.auditIntervalId = null;
@@ -204,29 +304,75 @@ const browsingTracker = {
   /** Reset all tracking data */
   reset() {
     this.activeSite = null;
-    this.timeByCategory = { exam: 0, learning: 0, ai: 0, cheating: 0, entertainment: 0, other: 0 };
+    this.timeByCategory = {
+      exam: 0, quiz: 0, education: 0, learning: 0,
+      ai: 0, cheating: 0, entertainment: 0, social: 0, other: 0,
+    };
     this.visitedSites = [];
     this.openTabs = [];
     this.browsingRiskScore = 0;
     this.effortScore = 100;
   },
   
+  /** Apply server/model classification to active site and scores */
+  applyModelClassification(url, classification) {
+    if (!classification || !url) return;
+    const cleanUrl = sanitizeUrl(url);
+    const trackerCategory = (
+      classification.trackerCategory ||
+      classification.tracker_category ||
+      classification.category ||
+      'other'
+    ).toLowerCase();
+    const riskLevel = classification.riskLevel || classification.risk_level || 'none';
+
+    if (this.activeSite && this.activeSite.url === cleanUrl) {
+      if (this.activeSite.category !== trackerCategory) {
+        this.flushActiveSite();
+      }
+      this.activeSite.category = trackerCategory;
+      this.activeSite.riskLevel = riskLevel;
+      if (!this.activeSite.startTime) {
+        this.activeSite.startTime = Date.now();
+      }
+    }
+
+    const entry = this.visitedSites.find((s) => s.url === cleanUrl);
+    if (entry) {
+      entry.category = trackerCategory;
+      entry.riskLevel = riskLevel;
+    }
+
+    const tabEntry = this.openTabs.find((t) => t.url === cleanUrl);
+    if (tabEntry) {
+      tabEntry.category = trackerCategory;
+      tabEntry.riskLevel = riskLevel;
+    }
+
+    this.calculateScores();
+    pushSessionScores();
+  },
+
   /** Called when user switches to a new tab or navigates to a new URL */
   trackSiteChange(tabId, url, title) {
     // Flush time for the previous active site
     this.flushActiveSite();
-    
-    // Classify the new URL
-    const classification = classifyUrl(url);
+
+    // Initial classification (cache / title heuristic / local exam only)
+    const classification = classifyUrl(url, title);
     let category = 'other';
     let riskLevel = 'none';
     if (classification) {
-      category = classification.category.toLowerCase(); // ai, cheating, entertainment
-      riskLevel = classification.riskLevel;
-    } else if (this.isExamRelated(url)) {
+      category = (
+        classification.trackerCategory ||
+        classification.category ||
+        'other'
+      ).toLowerCase();
+      riskLevel = classification.riskLevel || 'none';
+    } else if (isLocalExamPlatform(url)) {
       category = 'exam';
     }
-    
+
     // Set new active site
     this.activeSite = {
       url: sanitizeUrl(url),
@@ -236,15 +382,25 @@ const browsingTracker = {
       riskLevel,
       startTime: Date.now(),
     };
-    
+
     // Layer 1 Cross-check: Exam Question Leak detection
     this.checkForQuestionLeads(url, category);
-    
+
     // Update visited sites list
     this.recordVisit(url, title, category, riskLevel);
-    
+
     // Recalculate scores
     this.calculateScores();
+    pushSessionScores();
+
+    // Refine with content/JS model (no domain lists)
+    classifyPageWithModel({ url, title })
+      .then((refined) => {
+        if (!refined || !this.activeSite) return;
+        if (this.activeSite.url !== sanitizeUrl(url)) return;
+        this.applyModelClassification(url, refined);
+      })
+      .catch(() => {});
   },
 
   /** Track visual presence (from html2canvas) */
@@ -253,14 +409,17 @@ const browsingTracker = {
     
     // Check if what was captured is actually the exam page
     const isActuallyExam = this.isExamRelated(data.url);
-    if (isActuallyExam) {
-        // Boost effort if student is visually focused on the exam
-        this.effortScore = Math.min(100, this.effortScore + 5);
-        console.log('📈 Visual focus on exam page confirmed');
+    if (isActuallyExam || isProductiveCategory(this.activeSite?.category)) {
+        this.effortScore = Math.min(100, this.effortScore + 8);
+        syncExamSessionScoresFromBrowsing();
+        console.log('📈 Visual focus on productive page confirmed');
+    } else if (this.activeSite?.category === 'other') {
+        this.browsingRiskScore = Math.min(100, this.browsingRiskScore + 8);
+        syncExamSessionScoresFromBrowsing();
+        console.log('📉 Visual activity on unclassified site');
     } else {
-        // Flag non-exam visual content
         const classification = classifyUrl(data.url);
-        if (classification && classification.riskLevel !== 'none') {
+        if (classification && isHighRiskLevel(classification.riskLevel)) {
             this.browsingRiskScore = Math.min(100, this.browsingRiskScore + 10);
             console.log(`📉 Visual risk on forbidden site: ${classification.category}`);
         }
@@ -343,31 +502,9 @@ const browsingTracker = {
     }
   },
   
-  /** Check if a URL is productive (exam platform itself, LMS, or learning research) */
+  /** Check if URL is the local exam dashboard (instant detect only — no domain lists) */
   isExamRelated(url) {
-    if (!url) return false;
-    try {
-      const hostname = new URL(url).hostname.toLowerCase();
-      // Common LMS / exam platforms
-      const examPlatforms = [
-        'localhost', '127.0.0.1',             // Local exam platform
-        'onrender.com',                       // Cloud backend
-        'canvas.', 'blackboard.', 'moodle.',  // LMS platforms
-        'forms.google.com', 'docs.google.com',
-        'exam.', 'test.', 'quiz.', 'assessment.',
-        'gradescope.com', 'proctorio.com',
-      ];
-      if (examPlatforms.some(p => hostname.includes(p))) return true;
-      
-      const fullUrl = url.toLowerCase();
-      // Also count learning/research as productive time (increases effort score)
-      if (typeof LEARNING_SITES !== 'undefined' && LEARNING_SITES.some(p => hostname.includes(p) || fullUrl.includes(p))) {
-        return true;
-      }
-      return false;
-    } catch {
-      return false;
-    }
+    return isLocalExamPlatform(url);
   },
   
   /** Audit all currently open tabs using chrome.tabs.query */
@@ -384,19 +521,35 @@ const browsingTracker = {
           continue;
         }
         
-        const classification = classifyUrl(tab.url);
+        const classification = classifyUrl(tab.url, tab.title);
         const entry = {
           tabId: tab.id,
           url: sanitizeUrl(tab.url),
           title: tab.title || 'Unknown',
-          category: classification ? classification.category : (this.isExamRelated(tab.url) ? 'EXAM' : 'OTHER'),
+          category: classification
+            ? (classification.trackerCategory || classification.category || 'other').toLowerCase()
+            : (isLocalExamPlatform(tab.url) ? 'exam' : 'other'),
           riskLevel: classification ? classification.riskLevel : 'none',
           active: tab.active,
           pinned: tab.pinned,
         };
-        
+
         auditResults.push(entry);
-        if (classification) flaggedCount++;
+        if (classification && isHighRiskLevel(classification.riskLevel)) flaggedCount++;
+
+        classifyPageWithModel({ url: tab.url, title: tab.title })
+          .then((refined) => {
+            if (!refined) return;
+            const idx = this.openTabs.findIndex((t) => t.tabId === tab.id);
+            if (idx === -1) return;
+            this.openTabs[idx].category = (
+              refined.trackerCategory || refined.category || 'other'
+            ).toLowerCase();
+            this.openTabs[idx].riskLevel = refined.riskLevel || 'none';
+            this.calculateScores();
+            pushSessionScores();
+          })
+          .catch(() => {});
         
         // Record visit if not already tracked
         this.recordVisit(tab.url, tab.title, entry.category.toLowerCase(), entry.riskLevel);
@@ -421,6 +574,7 @@ const browsingTracker = {
       }
       
       this.calculateScores();
+      pushSessionScores();
     } catch (error) {
       console.warn('Tab audit error:', error.message);
     }
@@ -441,42 +595,60 @@ const browsingTracker = {
     const aiTimeRatio = this.timeByCategory.ai / totalTime;
     const cheatingTimeRatio = this.timeByCategory.cheating / totalTime;
     const entertainmentTimeRatio = this.timeByCategory.entertainment / totalTime;
+    const socialTimeRatio = this.timeByCategory.social / totalTime;
     const otherTimeRatio = this.timeByCategory.other / totalTime;
     
-    risk += aiTimeRatio * 50;              // AI usage: up to 50 risk (Semi-risk)
-    risk += cheatingTimeRatio * 100;       // Cheating: up to 100 risk
-    risk += entertainmentTimeRatio * 100;  // Entertainment: up to 100 risk (Max Risk)
-    risk += otherTimeRatio * 40;           // Unclassified sites: up to 40 risk (Distraction)
+    risk += aiTimeRatio * 50;
+    risk += cheatingTimeRatio * 100;
+    risk += entertainmentTimeRatio * 100;
+    risk += socialTimeRatio * 70;
+    // Unclassified "other" sites raise risk — unknown browsing is suspicious
+    risk += otherTimeRatio * 70;
+
+    const flaggedCategories = ['ai', 'cheating', 'entertainment', 'social'];
+    const flaggedSites = this.visitedSites.filter(s => flaggedCategories.includes(s.category));
+    risk += Math.min(flaggedSites.length * 15, 60);
+
+    const otherSites = this.visitedSites.filter((s) => s.category === 'other');
+    risk += Math.min(otherSites.length * 12, 45);
     
-    // Count-based risk (unique flagged sites)
-    const flaggedSites = this.visitedSites.filter(s => ['ai', 'cheating', 'entertainment'].includes(s.category));
-    risk += Math.min(flaggedSites.length * 15, 60); 
-    
-    // Open tabs risk bonus
-    const flaggedOpenTabs = this.openTabs.filter(t => t.riskLevel !== 'none').length;
+    // Open tabs risk bonus (only meaningful risk levels)
+    const flaggedOpenTabs = this.openTabs.filter((t) => isHighRiskLevel(t.riskLevel)).length;
     risk += Math.min(flaggedOpenTabs * 10, 40);
-    
+
+    // Immediate risk when active tab is high-risk or unclassified
+    if (this.activeSite && isHighRiskLevel(this.activeSite.riskLevel)) {
+      risk += 25;
+    }
+    if (this.activeSite?.category === 'other') {
+      risk += 25;
+    }
+
     this.browsingRiskScore = Math.min(Math.round(risk), 100);
     
     // --- Effort Score (0-100) ---
-    // If student spends 100% on exam + learning => effort 100. If 0% => effort 0.
-    const productiveTime = this.timeByCategory.exam + (this.timeByCategory.learning || 0);
+    // Effort rises on exam, quiz, LMS, and exam-related search; "other" does not help
+    const productiveTime = this.getProductiveTimeMs();
     const productiveRatio = productiveTime / totalTime;
-    const distractionTime = this.timeByCategory.ai + this.timeByCategory.cheating + this.timeByCategory.entertainment + this.timeByCategory.other;
-    const distractionRatio = distractionTime / totalTime;
-    
-    // Base effort: strictly productive time (exam + learning) drives it up
-    let effort = productiveRatio * 100;
-    
-    // Unclassified sites (other) do NOT give effort anymore, they act as distractions
-    // Ratio Bonus: only if productive ratio is dominant (>70%)
-    if (productiveRatio > 0.7) {
-        effort += 20; 
-    } else if (productiveRatio < 0.3) {
-        effort -= 20; // Massive penalty for lack of focus
+
+    let effort = 15;
+    effort += (this.timeByCategory.exam / totalTime) * 45;
+    effort += (this.timeByCategory.quiz / totalTime) * 42;
+    effort += (this.timeByCategory.education / totalTime) * 42;
+    effort += (this.timeByCategory.learning / totalTime) * 38;
+
+    if (this.activeSite && isProductiveCategory(this.activeSite.category)) {
+      effort += 15;
     }
-    
+
+    if (productiveRatio > 0.45) effort += 8;
+    if (productiveRatio > 0.7) effort += 12;
+
+    // Penalize time on unknown/unclassified sites
+    effort -= otherTimeRatio * 30;
+
     this.effortScore = Math.min(Math.max(Math.round(effort), 0), 100);
+    syncExamSessionScoresFromBrowsing();
   },
   
   /** Generate a browsing summary event for syncing to server */
@@ -485,19 +657,27 @@ const browsingTracker = {
     this.calculateScores();
     
     const totalTime = Object.values(this.timeByCategory).reduce((a, b) => a + b, 0);
+    const productiveTime = this.getProductiveTimeMs();
+    const examFocusPercent = this.getExamFocusPercent();
     
     return {
       type: 'BROWSING_SUMMARY',
       timestamp: Date.now(),
       data: {
+        activeSite: this.activeSite ? {
+          url: this.activeSite.url,
+          title: this.activeSite.title,
+          category: this.activeSite.category,
+          riskLevel: this.activeSite.riskLevel,
+        } : null,
         timeByCategory: { ...this.timeByCategory },
         totalTime,
         browsingRiskScore: this.browsingRiskScore,
         effortScore: this.effortScore,
         uniqueSitesVisited: this.visitedSites.length,
-        flaggedSitesCount: this.visitedSites.filter(s => ['ai', 'cheating', 'entertainment'].includes(s.category)).length,
+        flaggedSitesCount: this.visitedSites.filter(s => ['ai', 'cheating', 'entertainment', 'social'].includes(s.category)).length,
         openTabsCount: this.openTabs.length,
-        flaggedOpenTabs: this.openTabs.filter(t => t.riskLevel !== 'none').length,
+        flaggedOpenTabs: this.openTabs.filter((t) => isHighRiskLevel(t.riskLevel)).length,
         topFlaggedSites: this.visitedSites
           .filter(s => ['ai', 'cheating', 'entertainment'].includes(s.category))
           .sort((a, b) => b.totalTime - a.totalTime)
@@ -509,9 +689,12 @@ const browsingTracker = {
             totalTime: s.totalTime,
             visitCount: s.visitCount,
           })),
-        examTimePercent: totalTime > 0 ? Math.round(((this.timeByCategory.exam + (this.timeByCategory.learning || 0)) / totalTime) * 100) : 0,
+        examTimePercent: examFocusPercent,
+        examFocusPercent,
         distractionTimePercent: totalTime > 0 ? Math.round(
-          ((this.timeByCategory.ai + this.timeByCategory.cheating + this.timeByCategory.entertainment) / totalTime) * 100
+          ((this.timeByCategory.ai + this.timeByCategory.cheating +
+            this.timeByCategory.entertainment + this.timeByCategory.social +
+            this.timeByCategory.other) / totalTime) * 100
         ) : 0,
       },
     };
@@ -521,8 +704,10 @@ const browsingTracker = {
   getStats() {
     this.flushActiveSite();
     this.calculateScores();
-    
+
     const totalTime = Object.values(this.timeByCategory).reduce((a, b) => a + b, 0);
+    const examFocusPercent = this.getExamFocusPercent();
+
     return {
       activeSite: this.activeSite ? {
         url: this.activeSite.url,
@@ -531,108 +716,188 @@ const browsingTracker = {
       } : null,
       timeByCategory: { ...this.timeByCategory },
       totalTime,
+      examFocusPercent,
+      examTimePercent: examFocusPercent,
       browsingRiskScore: this.browsingRiskScore,
       effortScore: this.effortScore,
-      flaggedSitesCount: this.visitedSites.filter(s => ['ai', 'cheating', 'entertainment'].includes(s.category)).length,
+      flaggedSitesCount: this.visitedSites.filter(s => ['ai', 'cheating', 'entertainment', 'social'].includes(s.category)).length,
       totalSitesVisited: this.visitedSites.length,
       openTabsCount: this.openTabs.length,
-      flaggedOpenTabs: this.openTabs.filter(t => t.riskLevel !== 'none').length,
+      flaggedOpenTabs: this.openTabs.filter((t) => isHighRiskLevel(t.riskLevel)).length,
       currentCategory: this.activeSite?.category || 'none',
     };
   },
 };
 
-// ==================== URL CLASSIFICATION ====================
-// AI / LLM Sites - semi-effort, semi-risk
-const AI_SITES = [
-  'chat.openai.com', 'chatgpt.com', 'openai.com',
-  'gemini.google.com', 'bard.google.com',
-  'claude.ai', 'anthropic.com',
-  'perplexity.ai', 'copilot.microsoft.com', 'bing.com/chat',
-  'poe.com', 'character.ai', 'huggingface.co/chat', 'deepseek.com',
-  'you.com', 'phind.com', 'writesonic.com', 'jasper.ai',
-  'wolframalpha.com', 'symbolab.com', 'photomath.com', 'mathway.com',
-];
+// ==================== PAGE CLASSIFICATION (content/JS model — no domain lists) ====================
+const pageClassificationCache = new Map();
+const PAGE_CLASSIFY_CACHE_TTL_MS = 120000;
 
-// Entertainment / Distraction Sites - maximum risk (Critical)
-const ENTERTAINMENT_SITES = [
-  'youtube.com', 'netflix.com', 'hulu.com',
-  'disneyplus.com', 'primevideo.com', 'amazon.com/gp/video',
-  'twitch.tv', 'kick.com',
-  'tiktok.com', 'instagram.com', 'facebook.com', 'twitter.com', 'x.com',
-  'reddit.com', 'tumblr.com', 'pinterest.com',
-  'snapchat.com', 'discord.com',
-  'spotify.com', 'music.youtube.com', 'soundcloud.com',
-  'store.steampowered.com', 'epicgames.com',
-  'crunchyroll.com', 'funimation.com',
-  'roblox.com', 'miniclip.com',
-  // Streaming / movie sites
-  'movhub.ws', 'movhub.to', 'fmovies.to', 'fmovies.wtf',
-  'soap2day.to', 'soap2day.ac', 'putlocker.', 'gomovies.',
-  'solarmovie.', '123movies.', 'yesmovies.', 'flixhq.to',
-  'bflixz.to', 'myflixer.', 'cineb.net', 'hdtoday.',
-  'tinyzone.', 'zoechip.', 'primewire.', 'movieorca.',
-  'imdb.com', 'rottentomatoes.com', 'letterboxd.com',
-  'vimeo.com', 'dailymotion.com',
-  // Gaming
-  'twitch.tv', 'poki.com', 'crazygames.com', 'kongregate.com',
-  'itch.io', 'armor games.com', 'addictinggames.com',
-  // Social / news / forums
-  'threads.net', 'mastodon.social', 'linkedin.com',
-  'buzzfeed.com', '9gag.com', 'imgur.com',
-  'whatsapp.com', 'web.telegram.org', 'messenger.com',
-  'cinehd.cc', 'cinehd.to', 'cinehd.ws'
-];
-
-// Cheating / Academic dishonesty sites - Critical risk
-const CHEATING_SITES = [
-  'chegg.com', 'coursehero.com', 'studocu.com',
-  'quizlet.com', 'brainly.com', 'bartleby.com',
-  'numerade.com', 'slader.com', 'litanswers.org',
-  'pastebin.com',
-];
-
-// Learning / Project / Course sites - Max Effort
-const LEARNING_SITES = [
-  'udemy.com', 'coursera.org', 'edx.org', 'pluralsight.com', 'codecademy.com',
-  'freecodecamp.org', 'khanacademy.org', 'udacity.com', 'skillshare.com',
-  'datacamp.com', 'linkedin.com/learning',
-  'stackoverflow.com', 'stackexchange.com', 'github.com', 'gitlab.com',
-  'developer.', 'docs.', 'w3schools.com', 'mdn.io', 'geeksforgeeks.org',
-  'google.com/search', 'google.co.in/search', 'bing.com/search', 'duckduckgo.com'
-];
-
-/** Classify a URL into a risk category */
-function classifyUrl(url) {
-  if (!url) return null;
+function isLocalExamPlatform(url) {
+  if (!url) return false;
   try {
-    const hostname = new URL(url).hostname.replace(/^www\./, '');
-    const fullUrl = url.toLowerCase();
-
-    for (const site of LEARNING_SITES) {
-      if (hostname.includes(site) || fullUrl.includes(site)) {
-        return { category: 'LEARNING', site, riskLevel: 'none' };
-      }
-    }
-    // Check AI after learning so that Claude/GPT count as LEARNING instead of AI if specified
-    for (const site of AI_SITES) {
-      if (hostname.includes(site) || fullUrl.includes(site)) {
-        return { category: 'AI', site, riskLevel: 'medium' };
-      }
-    }
-    for (const site of CHEATING_SITES) {
-      if (hostname.includes(site) || fullUrl.includes(site)) {
-        return { category: 'CHEATING', site, riskLevel: 'critical' };
-      }
-    }
-    for (const site of ENTERTAINMENT_SITES) {
-      if (hostname.includes(site) || fullUrl.includes(site)) {
-        return { category: 'ENTERTAINMENT', site, riskLevel: 'critical' };
-      }
-    }
-    return null;
+    const host = new URL(url).hostname.replace(/^www\./, '').toLowerCase();
+    return host === 'localhost' || host === '127.0.0.1' || host.includes('examguard');
   } catch {
-    return null;
+    return false;
+  }
+}
+
+function pageClassifyCacheKey(url, title) {
+  return `${sanitizeUrl(url)}|${String(title || '').slice(0, 80).toLowerCase()}`;
+}
+
+/** Detect academic/exam-related web search (Google, Bing, etc.) */
+function isExamRelatedSearch(url, title = '') {
+  const combined = `${url} ${title}`.toLowerCase();
+  if (!/(\/search|[?&]q=|google\.[^/]+\/search|bing\.com\/search|duckduckgo\.com)/.test(combined)) {
+    return false;
+  }
+
+  const studyPattern = /\b(exam|quiz|assignment|syllabus|lecture|homework|study|course|practice|textbook|notes|tutorial|problem set|lab report)\b/;
+
+  try {
+    const parsed = new URL(url);
+    const query = decodeURIComponent(parsed.searchParams.get('q') || parsed.searchParams.get('query') || '');
+    return studyPattern.test(`${query} ${title}`.toLowerCase());
+  } catch {
+    return studyPattern.test(combined);
+  }
+}
+
+/** Lightweight title/URL text heuristic until full page content arrives */
+function titleHeuristicClassification(url, title = '') {
+  const combined = `${url} ${title}`.toLowerCase();
+
+  if (isLocalExamPlatform(url)) {
+    return {
+      category: 'EXAM',
+      trackerCategory: 'exam',
+      site: 'local exam platform',
+      riskLevel: 'none',
+      method: 'local',
+    };
+  }
+
+  if (isExamRelatedSearch(url, title)) {
+    return {
+      category: 'LEARNING',
+      trackerCategory: 'learning',
+      site: 'exam search',
+      riskLevel: 'none',
+      method: 'exam_search',
+    };
+  }
+
+  const patterns = [
+    { re: /\b(kahoot|quizizz|quizlet live|socrative|nearpod|start quiz|submit quiz|question \d+ of)\b/, category: 'QUIZ', trackerCategory: 'quiz', riskLevel: 'none' },
+    { re: /\b(my courses|course dashboard|google classroom|canvas|moodle|blackboard|coursera|udemy|khan academy|edx|codecademy)\b/, category: 'EDUCATION', trackerCategory: 'education', riskLevel: 'none' },
+    { re: /\b(chatgpt|openai|claude|gemini|copilot|perplexity|deepseek|llm|ai chat)\b/, category: 'AI', trackerCategory: 'ai', riskLevel: 'high' },
+    { re: /\b(chegg|course hero|studocu|answer key|homework help|essay writer|solution manual)\b/, category: 'CHEATING', trackerCategory: 'cheating', riskLevel: 'critical' },
+    { re: /\b(youtube|netflix|twitch|tiktok|watch now|episode|gaming|stream live)\b/, category: 'ENTERTAINMENT', trackerCategory: 'entertainment', riskLevel: 'critical' },
+    { re: /\b(facebook|instagram|reddit|discord|twitter|timeline|news feed)\b/, category: 'SOCIAL', trackerCategory: 'social', riskLevel: 'medium' },
+    { re: /\b(tutorial|documentation|stackoverflow|leetcode|wikipedia|course module|lecture)\b/, category: 'LEARNING', trackerCategory: 'learning', riskLevel: 'none' },
+    { re: /\b(proctor|lockdown|submit exam|quiz attempt|assessment portal|gradescope)\b/, category: 'EXAM', trackerCategory: 'exam', riskLevel: 'none' },
+  ];
+
+  for (const pattern of patterns) {
+    if (pattern.re.test(combined)) {
+      return {
+        category: pattern.category,
+        trackerCategory: pattern.trackerCategory,
+        site: (title || url).slice(0, 60),
+        riskLevel: pattern.riskLevel,
+        method: 'title_heuristic',
+      };
+    }
+  }
+
+  return null;
+}
+
+/** Classify page via server content/JS model */
+async function classifyPageWithModel({ url, title = '', content = '', signals = {} }) {
+  if (!url) return null;
+
+  const key = pageClassifyCacheKey(url, title);
+  const cached = pageClassificationCache.get(key);
+  if (cached && Date.now() - cached.at < PAGE_CLASSIFY_CACHE_TTL_MS) {
+    return cached.result;
+  }
+
+  const quick = titleHeuristicClassification(url, title);
+  if (quick && quick.method === 'local') {
+    pageClassificationCache.set(key, { at: Date.now(), result: quick });
+    return quick;
+  }
+
+  try {
+    const response = await fetch(`${CONFIG.API_BASE}/classify/page`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url, title, content, signals }),
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      const result = {
+        category: data.category,
+        trackerCategory: data.tracker_category || data.trackerCategory || 'other',
+        site: data.site || (title || url).slice(0, 60),
+        riskLevel: data.risk_level || data.riskLevel || 'low',
+        riskScore: data.risk_score,
+        effortScore: data.effort_score,
+        confidence: data.confidence,
+        method: data.method,
+        reason: data.reason,
+      };
+      pageClassificationCache.set(key, { at: Date.now(), result });
+      return result;
+    }
+  } catch (error) {
+    console.warn('Page classify API failed:', error.message);
+  }
+
+  if (quick) {
+    pageClassificationCache.set(key, { at: Date.now(), result: quick });
+    return quick;
+  }
+
+  return {
+    category: 'OTHER',
+    trackerCategory: 'other',
+    site: (title || url).slice(0, 60),
+    riskLevel: 'low',
+    method: 'fallback',
+  };
+}
+
+/** Sync classify — uses cache or title heuristic only (tab switch hot path) */
+function classifyUrl(url, title = '') {
+  if (!url) return null;
+  const key = pageClassifyCacheKey(url, title);
+  const cached = pageClassificationCache.get(key);
+  if (cached) return cached.result;
+  return titleHeuristicClassification(url, title);
+}
+
+let lastScorePushAt = 0;
+async function pushSessionScores(force = false) {
+  if (!examSession.active || !examSession.sessionId) return;
+
+  const now = Date.now();
+  if (!force && now - lastScorePushAt < 2000) return;
+  lastScorePushAt = now;
+
+  const summary = browsingTracker.generateSummaryEvent();
+  try {
+    await fetch(`${CONFIG.API_BASE}/sessions/${examSession.sessionId}/scores`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(summary.data),
+    });
+  } catch (error) {
+    console.warn('Score sync failed:', error.message);
   }
 }
 
@@ -655,6 +920,7 @@ chrome.storage.local.get(['examSession'], (result) => {
     }
 
     console.log('📂 Restored exam session:', examSession.sessionId);
+    browsingTracker.start();
     startPeriodicSync();
   }
 });
@@ -699,9 +965,9 @@ async function onCaptureReady(captureData, sendResponse) {
   const result = await startExamSession(pendingStartData);
 
   if (result.success) {
-    // Minimize capture window to keep streams alive
+    // Keep the capture window alive without minimizing (minimized windows throttle video frames).
     if (captureWindowId) {
-      chrome.windows.update(captureWindowId, { state: 'minimized' }).catch(() => { });
+      chrome.windows.update(captureWindowId, { focused: false, drawAttention: false }).catch(() => { });
     }
 
     // Send success notification
@@ -781,6 +1047,9 @@ async function startExamSession(data) {
     examSession = {
       active: true,
       sessionId: sessionId,
+      studentId: data.studentId || '',
+      studentName: data.studentName || '',
+      examId: data.examId || '',
       startTime: Date.now(),
       events: [],
       tabSwitchCount: 0,
@@ -802,6 +1071,7 @@ async function startExamSession(data) {
     notifyAllTabs('EXAM_STARTED');
 
     // Start periodic sync
+    browsingTracker.start();
     startPeriodicSync();
 
     if (webcamCaptureIntervalId) {
@@ -812,11 +1082,17 @@ async function startExamSession(data) {
       clearInterval(domCaptureIntervalId);
       domCaptureIntervalId = null;
     }
+    if (webcamAnalysisIntervalId) {
+      clearInterval(webcamAnalysisIntervalId);
+      webcamAnalysisIntervalId = null;
+    }
     webcamUploadInFlight = false;
     triggerNativeDOMCapture();
-    domCaptureIntervalId = setInterval(triggerNativeDOMCapture, 2500);
     triggerWebcamCapture();
-    webcamCaptureIntervalId = setInterval(triggerWebcamCapture, 2500);
+    domCaptureIntervalId = setInterval(triggerNativeDOMCapture, LIVE_CAPTURE_INTERVAL_MS);
+    webcamCaptureIntervalId = setInterval(triggerWebcamCapture, LIVE_CAPTURE_INTERVAL_MS);
+    webcamAnalysisIntervalId = setInterval(triggerWebcamAnalysis, AI_ANALYSIS_INTERVAL_MS);
+    triggerWebcamAnalysis();
 
     // Kiosk Mode: Enforce Lockdown
     await enforceLockdown();
@@ -895,6 +1171,10 @@ async function stopExamSession() {
       clearInterval(webcamCaptureIntervalId);
       webcamCaptureIntervalId = null;
     }
+    if (webcamAnalysisIntervalId) {
+      clearInterval(webcamAnalysisIntervalId);
+      webcamAnalysisIntervalId = null;
+    }
     webcamUploadInFlight = false;
 
     // Notify all tabs
@@ -951,7 +1231,7 @@ chrome.tabs.onActivated.addListener(async (activeInfo) => {
     });
 
     // Classify the URL and log risk event if matched
-    const classification = classifyUrl(tab.url);
+    const classification = classifyUrl(tab.url, tab.title);
     if (classification) {
       logEvent({
         type: 'FORBIDDEN_SITE',
@@ -999,10 +1279,11 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
     browsingTracker.trackSiteChange(tabId, changeInfo.url, tab.title);
   } else {
     // Still record the visit even for background tabs
-    const classification = classifyUrl(changeInfo.url);
-    const category = classification ? classification.category.toLowerCase() : 
-                     (browsingTracker.isExamRelated(changeInfo.url) ? 'exam' : 'other');
-    browsingTracker.recordVisit(changeInfo.url, tab.title, category, 
+    const classification = classifyUrl(changeInfo.url, tab.title);
+    const category = classification
+      ? (classification.trackerCategory || classification.category || 'other').toLowerCase()
+      : (isLocalExamPlatform(changeInfo.url) ? 'exam' : 'other');
+    browsingTracker.recordVisit(changeInfo.url, tab.title, category,
                                 classification?.riskLevel || 'none');
   }
 
@@ -1239,6 +1520,42 @@ async function syncEvents() {
 }
 
 /**
+ * Fast live screen upload — no AI blocking, broadcasts immediately via WebSocket.
+ */
+function uploadLiveScreenFrame(image, url = 'screen-share') {
+  if (!examSession.active || !examSession.sessionId || !image) return;
+
+  fetch(`${CONFIG.API_BASE}/uploads/screenshot`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      session_id: examSession.sessionId,
+      timestamp: Date.now(),
+      image_data: image,
+    }),
+    keepalive: true,
+  }).catch(() => {});
+}
+
+/**
+ * Fast live webcam upload — no AI blocking, broadcasts immediately via WebSocket.
+ */
+function uploadLiveWebcamFrame(image) {
+  if (!examSession.active || !examSession.sessionId || !image) return;
+
+  fetch(`${CONFIG.API_BASE}/uploads/webcam`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      session_id: examSession.sessionId,
+      timestamp: Date.now(),
+      image_data: image,
+    }),
+    keepalive: true,
+  }).catch(() => {});
+}
+
+/**
  * Upload high-fidelity snapshot for content analysis (native approach)
  */
 async function uploadDOMSnapshot(data) {
@@ -1280,40 +1597,71 @@ async function uploadDOMSnapshot(data) {
     return { success: false };
 }
 
+function requestCaptureFrame(messageType) {
+  return new Promise((resolve) => {
+    getCaptureTabId()
+      .then((tabId) => {
+        chrome.tabs.sendMessage(tabId, { type: messageType }, (response) => {
+          if (chrome.runtime.lastError) {
+            resolve(null);
+            return;
+          }
+          resolve(response?.image || null);
+        });
+      })
+      .catch(() => resolve(null));
+  });
+}
+
+function isInternalCaptureUrl(url = '') {
+  return url.includes('capture-page') || url.startsWith('chrome-extension://') || url.startsWith('chrome://');
+}
+
+async function captureVisibleExamTab() {
+  const focusedWindow = await chrome.windows.getLastFocused({ populate: true }).catch(() => null);
+  const candidateTabs = [];
+
+  if (focusedWindow?.tabs) {
+    candidateTabs.push(...focusedWindow.tabs.filter((tab) => tab.active));
+    candidateTabs.push(...focusedWindow.tabs.filter((tab) => !tab.active));
+  }
+
+  const allTabs = await chrome.tabs.query({});
+  candidateTabs.push(...allTabs);
+
+  const seenTabIds = new Set();
+  for (const tab of candidateTabs) {
+    if (!tab?.id || seenTabIds.has(tab.id)) continue;
+    seenTabIds.add(tab.id);
+
+    const tabUrl = tab.url || '';
+    if (!tabUrl || isInternalCaptureUrl(tabUrl)) continue;
+
+    try {
+      const image = await chrome.tabs.captureVisibleTab(tab.windowId, { format: 'jpeg', quality: 30 });
+      if (image) {
+        return { image, url: tabUrl };
+      }
+    } catch {
+      // Try the next visible tab.
+    }
+  }
+
+  return null;
+}
+
 async function triggerNativeDOMCapture() {
   if (!examSession.active) return;
-  
-  try {
-    const tabs = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
-      if (!tabs || tabs.length === 0) return;
-      
-      const activeTab = tabs[0];
-    const windowId = activeTab.windowId;
 
-      try {
-      const dataUrl = await chrome.tabs.captureVisibleTab(windowId, { format: 'jpeg', quality: 40 });
-          if (dataUrl) {
-              await uploadDOMSnapshot({
-                  image: dataUrl,
-                  url: activeTab.url,
-              });
-              return;
-          }
-      } catch (captureError) {
-          console.warn('Visible tab capture failed:', captureError.message);
-      }
+  const screenImage = await requestCaptureFrame('CAPTURE_SCREEN_FRAME');
+  if (screenImage) {
+    uploadLiveScreenFrame(screenImage, 'screen-share');
+    return;
+  }
 
-      chrome.tabs.sendMessage(await getCaptureTabId(), { type: 'CAPTURE_SCREEN_FRAME' }, (response) => {
-        if (response && response.image) {
-          uploadDOMSnapshot({
-            image: response.image,
-            url: activeTab.url,
-          }).catch(console.warn);
-        }
-      });
-  } catch (error) {
-      // It's normal for this to fail if the browser doesn't have focus or is minimized
-    console.warn('Screen capture failed:', error.message);
+  const visibleTabCapture = await captureVisibleExamTab();
+  if (visibleTabCapture?.image) {
+    uploadLiveScreenFrame(visibleTabCapture.image, visibleTabCapture.url);
   }
 }
 
@@ -1321,19 +1669,32 @@ async function triggerNativeDOMCapture() {
  * Trigger a webcam snapshot from the capture window
  */
 async function triggerWebcamCapture() {
+  if (!examSession.active || !captureWindowId) return;
+
+  try {
+    const webcamImage = await requestCaptureFrame('CAPTURE_WEBCAM_FRAME');
+    if (webcamImage) {
+      uploadLiveWebcamFrame(webcamImage);
+    }
+  } catch (err) {
+    console.warn('Webcam capture trigger failed:', err.message);
+  }
+}
+
+/**
+ * Periodic AI analysis on webcam frames (slower, does not block live streaming).
+ */
+async function triggerWebcamAnalysis() {
   if (!examSession.active || !captureWindowId || webcamUploadInFlight) return;
 
-    try {
-        // Since background script doesn't have the media stream, 
-        // it must ask the capture window to grab a frame.
-        chrome.tabs.sendMessage(await getCaptureTabId(), { type: 'CAPTURE_WEBCAM_FRAME' }, (response) => {
-            if (response && response.image) {
-                uploadWebcamFrame(response.image);
-            }
-        });
-    } catch (err) {
-        console.warn('Webcam capture trigger failed:', err.message);
+  try {
+    const webcamImage = await requestCaptureFrame('CAPTURE_WEBCAM_FRAME');
+    if (webcamImage) {
+      await uploadWebcamFrame(webcamImage);
     }
+  } catch (err) {
+    console.warn('Webcam analysis trigger failed:', err.message);
+  }
 }
 
 /**
@@ -1405,13 +1766,11 @@ function startPeriodicSync() {
 
   // Frequent event sync to keep DB updated
   syncIntervalId = setInterval(() => {
-    if (examSession.active && examSession.events.length > 0) {
-      syncEvents();
-    }
-    // Send a browsing summary every sync cycle
     if (examSession.active) {
-      const summary = browsingTracker.generateSummaryEvent();
-      logEvent(summary);
+      pushSessionScores(true);
+      if (examSession.events.length > 0) {
+        syncEvents();
+      }
     }
   }, CONFIG.SYNC_INTERVAL);
 
@@ -1440,49 +1799,96 @@ function stopPeriodicSync() {
 
 // ==================== WEBSOCKET CONNECTION ====================
 
-function connectWebSocket() {
-  if (wsConnection) return;
-
-  const studentId = examSession.sessionId || 'unknown';
-  const wsUrl = `${CONFIG.WS_URL}/${studentId}?session_id=${examSession.sessionId}`;
-
+async function isBackendReachable() {
   try {
-    wsConnection = new WebSocket(wsUrl);
-
-    wsConnection.onopen = () => {
-      console.log('🔌 WebSocket connected to backend');
-      // Send initial session info
-      wsConnection.send(JSON.stringify({
-        type: 'session_info',
-        session_id: examSession.sessionId,
-        student_id: studentId,
-      }));
-    };
-
-    wsConnection.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data);
-        handleServerMessage(data);
-      } catch (e) {
-        // Non-JSON message (like pong)
-      }
-    };
-
-    wsConnection.onclose = () => {
-      console.log('🔌 WebSocket disconnected');
-      wsConnection = null;
-      // Auto-reconnect if session still active
-      if (examSession.active) {
-        wsReconnectTimer = setTimeout(connectWebSocket, 3000);
-      }
-    };
-
-    wsConnection.onerror = (error) => {
-      console.warn('🔌 WebSocket error:', error);
-    };
-  } catch (e) {
-    console.warn('🔌 WebSocket connection failed:', e);
+    const response = await fetch(`${BACKEND_URL}/ws/stats`, {
+      method: 'GET',
+      cache: 'no-store',
+    });
+    return response.ok;
+  } catch {
+    return false;
   }
+}
+
+function connectWebSocket() {
+  if (!examSession.active || !examSession.sessionId) return;
+
+  if (
+    wsConnection &&
+    (wsConnection.readyState === WebSocket.OPEN ||
+      wsConnection.readyState === WebSocket.CONNECTING)
+  ) {
+    return;
+  }
+  if (wsConnecting) return;
+
+  wsConnecting = true;
+
+  isBackendReachable()
+    .then((reachable) => {
+      wsConnecting = false;
+      if (!examSession.active) return;
+
+      if (!reachable) {
+        console.warn(`🔌 Backend unreachable at ${BACKEND_URL}, retrying WebSocket in ${wsReconnectDelayMs}ms`);
+        if (wsReconnectTimer) clearTimeout(wsReconnectTimer);
+        wsReconnectTimer = setTimeout(connectWebSocket, wsReconnectDelayMs);
+        wsReconnectDelayMs = Math.min(wsReconnectDelayMs * 2, 30000);
+        return;
+      }
+
+      wsReconnectDelayMs = 3000;
+
+      const studentId = examSession.studentId || examSession.sessionId || 'unknown';
+      const wsUrl = `${CONFIG.WS_URL}/${encodeURIComponent(studentId)}?session_id=${encodeURIComponent(examSession.sessionId)}`;
+
+      try {
+        wsConnection = new WebSocket(wsUrl);
+
+        wsConnection.onopen = () => {
+          console.log('🔌 WebSocket connected to backend');
+          wsReconnectDelayMs = 3000;
+          wsConnection.send(JSON.stringify({
+            type: 'session_info',
+            session_id: examSession.sessionId,
+            student_id: studentId,
+          }));
+        };
+
+        wsConnection.onmessage = (event) => {
+          try {
+            const data = JSON.parse(event.data);
+            handleServerMessage(data);
+          } catch (e) {
+            // Non-JSON message (like pong)
+          }
+        };
+
+        wsConnection.onclose = () => {
+          console.log('🔌 WebSocket disconnected');
+          wsConnection = null;
+          if (examSession.active) {
+            if (wsReconnectTimer) clearTimeout(wsReconnectTimer);
+            wsReconnectTimer = setTimeout(connectWebSocket, wsReconnectDelayMs);
+          }
+        };
+
+        wsConnection.onerror = () => {
+          // onclose handles reconnect; avoid noisy duplicate logs
+        };
+      } catch (e) {
+        console.warn('🔌 WebSocket connection failed:', e.message || e);
+        wsConnection = null;
+        if (examSession.active) {
+          if (wsReconnectTimer) clearTimeout(wsReconnectTimer);
+          wsReconnectTimer = setTimeout(connectWebSocket, wsReconnectDelayMs);
+        }
+      }
+    })
+    .catch(() => {
+      wsConnecting = false;
+    });
 }
 
 function disconnectWebSocket() {
@@ -1490,6 +1896,8 @@ function disconnectWebSocket() {
     clearTimeout(wsReconnectTimer);
     wsReconnectTimer = null;
   }
+  wsConnecting = false;
+  wsReconnectDelayMs = 3000;
   if (wsConnection) {
     wsConnection.close();
     wsConnection = null;
@@ -1626,6 +2034,99 @@ function sendViaWebSocket(eventData) {
   return false;
 }
 
+async function analyzePageContext(pageContext) {
+  if (!examSession.active) {
+    return { success: false, reason: 'session_inactive' };
+  }
+
+  const domain = pageContext.domain || (() => {
+    try {
+      return new URL(pageContext.url || '').hostname.replace(/^www\./, '').toLowerCase();
+    } catch {
+      return '';
+    }
+  })();
+
+  const path = pageContext.path || (() => {
+    try {
+      return new URL(pageContext.url || '').pathname || '';
+    } catch {
+      return '';
+    }
+  })();
+
+  const payload = {
+    session_id: examSession.sessionId,
+    student_id: examSession.studentId || examSession.sessionId || '',
+    url: pageContext.url || '',
+    domain,
+    path,
+    title: pageContext.title || '',
+    content: pageContext.content || '',
+    clipboard_text: pageContext.clipboard_text || '',
+    youtube_title: pageContext.youtube_title || '',
+    youtube_channel: pageContext.youtube_channel || '',
+    exam_subject: examSession.examId || pageContext.exam_subject || '',
+    referrer: pageContext.referrer || '',
+    tab_duration_seconds: pageContext.tab_duration_seconds || 0,
+    tab_switch_count: examSession.tabSwitchCount || 0,
+    copy_count: examSession.copyCount || 0,
+    paste_count: pageContext.paste_count || 0,
+    focus_lost_count: pageContext.focus_lost_count || 0,
+    hidden_count: pageContext.hidden_count || 0,
+    recent_domains: Array.isArray(pageContext.recent_domains) ? pageContext.recent_domains : [],
+    page_context: pageContext,
+    signals: {
+      ...(pageContext.signals || {}),
+      source: 'content_agent_patch',
+      session_active: examSession.active,
+    },
+  };
+
+  try {
+    const response = await fetch(`${CONFIG.API_BASE}/v2/analyze-site`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.warn('🧠 v2 analysis failed:', response.status, errorText.slice(0, 120));
+      return { success: false, error: errorText };
+    }
+
+    const verdict = await response.json();
+    const broadcast = {
+      type: 'SITE_VERDICT',
+      ...verdict,
+      session_id: verdict.session_id || payload.session_id,
+      student_id: verdict.student_id || payload.student_id,
+      generated_at: verdict.generated_at || new Date().toISOString(),
+      page_context: pageContext,
+    };
+
+    sendViaWebSocket(broadcast);
+    await chrome.storage.local.set({ lastSiteVerdict: broadcast }).catch(() => {});
+
+    // Update browsing scores from full page content analysis
+    const modelClassification = await classifyPageWithModel({
+      url: pageContext.url,
+      title: pageContext.title,
+      content: pageContext.content,
+      signals: pageContext.signals || {},
+    });
+    if (modelClassification) {
+      browsingTracker.applyModelClassification(pageContext.url, modelClassification);
+    }
+
+    return { success: true, verdict: broadcast };
+  } catch (error) {
+    console.warn('🧠 v2 analysis error:', error.message);
+    return { success: false, error: error.message };
+  }
+}
+
 // ==================== TRANSFORMER ANALYSIS ====================
 
 async function analyzeTextWithTransformer(text) {
@@ -1679,48 +2180,55 @@ async function analyzeTextWithTransformer(text) {
 
 async function enforceLockdown() {
   try {
-    // 1. Get all windows
-    const windows = await chrome.windows.getAll();
-    // Use captureWindowId as the primary, fallback to active window
-    const keepId = captureWindowId || (await chrome.windows.getCurrent()).id;
+    const windows = await chrome.windows.getAll({ windowTypes: ['normal', 'popup'] });
 
-    // 2. Close all other windows (Extreme Kiosk Mode) - DISABLED for better UX
-    /*
-    for (const w of windows) {
-      if (w.id !== keepId) {
-        await chrome.windows.remove(w.id).catch(() => {});
-      }
+    // Fullscreen the student's exam window — not the capture popup
+    const examWindow = windows.find(
+      (window) => window.id !== captureWindowId && window.type === 'normal'
+    );
+
+    if (examWindow?.id) {
+      await chrome.windows.update(examWindow.id, {
+        state: 'fullscreen',
+        focused: true,
+      }).catch(async () => {
+        await chrome.windows.update(examWindow.id, {
+          state: 'maximized',
+          focused: true,
+        }).catch(() => {});
+      });
     }
-    */
-
-    // 3. Force Fullscreen and Focus
-    await chrome.windows.update(keepId, {
-      state: 'fullscreen',
-      focused: true,
-    });
 
     logEvent({
       type: 'KIOSK_MODE_ENFORCED',
       timestamp: Date.now(),
-      data: { message: 'Kiosk mode active: other windows closed, fullscreen forced.' }
+      data: { message: 'Exam window fullscreen enforced.' },
     });
 
-    // 4. Device Binding
     const fingerprint = await getDeviceFingerprint();
     examSession.deviceFingerprint = fingerprint;
-
   } catch (err) {
-    console.error('Failed to enforce lockdown:', err);
+    console.warn('Lockdown skipped:', err?.message || err);
   }
 }
 
 async function getDeviceFingerprint() {
-  const displayInfo = await new Promise(r => chrome.system.display.getInfo(r));
-  const pb = displayInfo[0]?.bounds || { width: 0, height: 0 };
-  const res = `${pb.width}x${pb.height}-${displayInfo.length}`;
-  const userAgent = navigator.userAgent;
-  // Simple hardware fingerprint combine with timezone
-  return btoa(`${res}-${userAgent}-${Intl.DateTimeFormat().resolvedOptions().timeZone}`);
+  let displayLabel = 'unknown-display';
+
+  try {
+    if (chrome.system?.display?.getInfo) {
+      const displayInfo = await new Promise((resolve) => {
+        chrome.system.display.getInfo(resolve);
+      });
+      const bounds = displayInfo?.[0]?.bounds || { width: 0, height: 0 };
+      displayLabel = `${bounds.width}x${bounds.height}-${displayInfo?.length || 0}`;
+    }
+  } catch {
+    // Optional permission or API unavailable
+  }
+
+  const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+  return btoa(`${displayLabel}-${navigator.userAgent}-${timezone}`);
 }
 
 async function runBatchTransformerAnalysis() {
@@ -1804,26 +2312,45 @@ function notifyAllTabs(messageType) {
 // Detects Interview Coder / Cluely / Free-Cluely and similar AI overlay tools
 
 let cheatingDetectionInterval = null;
+let lastCheatingReportAt = 0;
+let lastCheatingReportKey = '';
+const CHEAT_REPORT_COOLDOWN_MS = 5 * 60 * 1000;
 
 const CHEATING_TOOL_SIGNATURES = {
-  // Port-based detection (Cluely runs Vite dev server on these ports)
-  ports: [5180, 5173, 5174],
-
-  // Known cheating tool window title patterns
+  // Known cheating tool window title patterns (specific tool names only)
   titlePatterns: [
-    'interview coder', 'cluely', 'free-cluely', 'free cluely',
-    'interviewcoder', 'ai overlay', 'screen overlay',
-    'cheat sheet', 'exam helper', 'answer overlay',
-    'ghostwriter', 'exam.ai',
+    'interview coder',
+    'interviewcoder',
+    'cluely',
+    'free-cluely',
+    'free cluely',
   ],
 
-  // Known cheating tool URLs
+  // Known cheating tool URLs (exclude dev ports used by ExamGuard/Vite)
   urlPatterns: [
-    'cluely.com', 'interviewcoder.co', 'free-cluely',
-    'localhost:5180', '127.0.0.1:5180',
-    'localhost:5173', '127.0.0.1:5173',
+    'cluely.com',
+    'interviewcoder.co',
+    'free-cluely',
   ],
 };
+
+const EXAMGUARD_ALLOWED_TAB_PATTERNS = [
+  'localhost:3000',
+  '127.0.0.1:3000',
+  'localhost:8000',
+  '127.0.0.1:8000',
+  'examguard',
+  'capture-page.html',
+  'chrome-extension://',
+];
+
+function isAllowedExamTab(tab) {
+  const url = (tab.url || '').toLowerCase();
+  if (!url || url.startsWith('chrome://') || url.startsWith('chrome-extension://')) {
+    return true;
+  }
+  return EXAMGUARD_ALLOWED_TAB_PATTERNS.some((pattern) => url.includes(pattern));
+}
 
 function startCheatingToolDetection() {
   if (cheatingDetectionInterval) clearInterval(cheatingDetectionInterval);
@@ -1847,39 +2374,15 @@ async function scanForCheatingTools() {
 
   const detections = [];
 
-  // 1. Port scan — check if Cluely/Interview Coder's local server is running
-  for (const port of CHEATING_TOOL_SIGNATURES.ports) {
-    try {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 1500);
-
-      const res = await fetch(`http://localhost:${port}`, {
-        method: 'HEAD',
-        mode: 'no-cors',
-        signal: controller.signal,
-      });
-
-      clearTimeout(timeout);
-
-      // If we get ANY response (even opaque), something is running on that port
-      detections.push({
-        method: 'port_scan',
-        port: port,
-        message: `Suspicious local server detected on port ${port} (possible cheating tool)`,
-      });
-    } catch {
-      // Connection refused = nothing running = good
-    }
-  }
-
-  // 2. Window/Tab title scan — check open tabs for cheating tool names
+  // Tab title/URL scan — skip ExamGuard dashboard, backend, and extension pages
   try {
     const tabs = await chrome.tabs.query({});
     for (const tab of tabs) {
+      if (isAllowedExamTab(tab)) continue;
+
       const title = (tab.title || '').toLowerCase();
       const url = (tab.url || '').toLowerCase();
 
-      // Check title patterns
       for (const pattern of CHEATING_TOOL_SIGNATURES.titlePatterns) {
         if (title.includes(pattern)) {
           detections.push({
@@ -1894,7 +2397,6 @@ async function scanForCheatingTools() {
         }
       }
 
-      // Check URL patterns
       for (const pattern of CHEATING_TOOL_SIGNATURES.urlPatterns) {
         if (url.includes(pattern)) {
           detections.push({
@@ -1912,7 +2414,20 @@ async function scanForCheatingTools() {
     console.warn('Tab scan error:', err);
   }
 
-  // 3. Report detections
+  if (detections.length === 0) return;
+
+  const reportKey = detections
+    .map((d) => `${d.method}:${d.pattern || d.url || d.title || ''}`)
+    .sort()
+    .join('|');
+  const now = Date.now();
+  if (reportKey === lastCheatingReportKey && now - lastCheatingReportAt < CHEAT_REPORT_COOLDOWN_MS) {
+    return;
+  }
+  lastCheatingReportKey = reportKey;
+  lastCheatingReportAt = now;
+
+  // Report detections
   if (detections.length > 0) {
     console.warn('🚨 CHEATING TOOL DETECTED:', detections);
 

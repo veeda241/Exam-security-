@@ -23,9 +23,35 @@ import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "motion/react";
 import { config } from '../config';
 import { useWebSocket } from '../hooks/useWebSocket';
+import type { WsMessage } from '../hooks/useWebSocket';
+import { AgentVerdictCard } from './AgentVerdictCard';
 
 const initialAlerts: any[] = [];
 const data: any[] = [];
+
+function getRiskTheme(level?: string) {
+  if (level === 'suspicious') {
+    return {
+      box: 'bg-rose-50 border-rose-100',
+      icon: 'text-rose-600',
+      label: 'text-rose-700 bg-rose-50',
+    };
+  }
+
+  if (level === 'review') {
+    return {
+      box: 'bg-amber-50 border-amber-100',
+      icon: 'text-amber-600',
+      label: 'text-amber-700 bg-amber-50',
+    };
+  }
+
+  return {
+    box: 'bg-emerald-50 border-emerald-100',
+    icon: 'text-emerald-600',
+    label: 'text-emerald-700 bg-emerald-50',
+  };
+}
 
 export function Dashboard() {
   const navigate = useNavigate();
@@ -36,6 +62,26 @@ export function Dashboard() {
   const [studentCount, setStudentCount] = useState("");
    const [examCode, setExamCode] = useState("");
   const [isCreating, setIsCreating] = useState(false);
+  const siteVerdicts = liveAlerts
+    .map((message: WsMessage) => {
+      const messageType = String(message?.type || message?.event_type || message?.data?.type || message?.data?.event_type || '').toUpperCase();
+      if (!messageType.includes('SITE_VERDICT')) {
+        return null;
+      }
+
+      const payload = (message?.data && typeof message.data === 'object' ? message.data : message) as WsMessage;
+      return {
+        ...payload,
+        session_id: String(payload?.session_id || message?.session_id || ''),
+        student_id: String(payload?.student_id || message?.student_id || ''),
+        url: String(payload?.url || message?.url || ''),
+        generated_at: String(payload?.generated_at || message?.generated_at || message?.timestamp || new Date().toISOString()),
+      };
+    })
+    .filter(Boolean)
+    .slice(0, 4) as any[];
+  const latestVerdict = siteVerdicts[0] || null;
+  const riskTheme = getRiskTheme(latestVerdict?.risk_level);
   
   useEffect(() => {
     const fetchStats = async () => {
@@ -61,6 +107,7 @@ export function Dashboard() {
       code += chars.charAt(Math.floor(Math.random() * chars.length));
     }
     setExamCode(code);
+    return code;
   };
 
   const handleOpenModal = () => {
@@ -80,13 +127,14 @@ export function Dashboard() {
     
     setIsCreating(true);
     try {
+      const joinCode = examCode || generateExamCode();
       const response = await fetch(`${config.apiUrl}/sessions/create`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           student_id: `PROCTOR-${Math.floor(Math.random() * 9999)}`,
           student_name: "Session Monitor",
-          exam_id: sessionName || examCode
+          exam_id: joinCode
         })
       });
       if (response.ok) {
@@ -207,17 +255,26 @@ export function Dashboard() {
           <div className="flex items-center justify-between relative z-10">
             <div>
               <p className="text-sm font-medium text-slate-500">Safe Status</p>
-              <p className="text-3xl font-bold text-slate-900 mt-2">--%</p>
+              <p className="text-3xl font-bold text-slate-900 mt-2">
+                {latestVerdict ? `${Math.round(Number(latestVerdict.risk_score || 0))}%` : '--%'}
+              </p>
             </div>
-            <div className="p-3 bg-emerald-50 border border-emerald-100 rounded-xl shadow-sm">
-              <CheckCircle2 className="w-6 h-6 text-emerald-600" />
+            <div className={`p-3 border rounded-xl shadow-sm ${riskTheme.box}`}>
+              {latestVerdict?.risk_level === 'suspicious' ? (
+                <AlertTriangle className={`w-6 h-6 ${riskTheme.icon}`} />
+              ) : (
+                <CheckCircle2 className={`w-6 h-6 ${riskTheme.icon}`} />
+              )}
             </div>
           </div>
           <div className="mt-5 flex items-center text-sm relative z-10">
-            <span className="text-emerald-600 font-medium flex items-center bg-emerald-50 px-2 py-0.5 rounded-md">
-              <Activity className="w-3.5 h-3.5 mr-1" /> High
+            <span className={`font-medium flex items-center px-2 py-0.5 rounded-md ${riskTheme.label}`}>
+              <Activity className="w-3.5 h-3.5 mr-1" />
+              {latestVerdict ? String(latestVerdict.recommended_action || 'allow').replace(/_/g, ' ') : 'High'}
             </span>
-            <span className="text-slate-500 ml-2 text-xs">average integrity</span>
+            <span className="text-slate-500 ml-2 text-xs">
+              {latestVerdict ? String(latestVerdict.primary_agent || 'agent consensus').replace(/_/g, ' ') : 'average integrity'}
+            </span>
           </div>
         </motion.div>
 
@@ -316,6 +373,38 @@ export function Dashboard() {
         </motion.div>
       </div>
 
+      <motion.div 
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.55 }}
+        className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm"
+      >
+        <div className="flex items-center justify-between gap-4 mb-6">
+          <div>
+            <h2 className="text-base font-semibold text-slate-900">Agent Verdicts</h2>
+            <p className="text-sm text-slate-500 mt-1">Live consensus from the URL, content, and YouTube analyzers.</p>
+          </div>
+          <span className="inline-flex items-center rounded-full bg-indigo-50 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-indigo-600">
+            v2 live stream
+          </span>
+        </div>
+
+        {siteVerdicts.length > 0 ? (
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+            {siteVerdicts.map((verdict, idx) => (
+              <AgentVerdictCard
+                key={`${verdict.session_id || verdict.url || verdict.generated_at || idx}`}
+                verdict={verdict}
+              />
+            ))}
+          </div>
+        ) : (
+          <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-5 py-8 text-sm text-slate-500">
+            Waiting for the extension to send page context into the v2 scoring pipeline.
+          </div>
+        )}
+      </motion.div>
+
       {/* New Session Modal */}
       <AnimatePresence>
         {isNewSessionModalOpen && (
@@ -338,15 +427,15 @@ export function Dashboard() {
               
               <form onSubmit={handleCreateSession} className="p-6 space-y-6">
                 <div className="space-y-2">
-                  <label className="text-sm font-medium text-slate-700">Session Name</label>
+                  <label className="text-sm font-medium text-slate-700">Session Label <span className="text-slate-400">(optional)</span></label>
                   <input 
                     type="text" 
-                    required
                     value={sessionName}
                     onChange={(e) => setSessionName(e.target.value)}
                     className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all bg-white text-slate-900 placeholder:text-slate-400" 
-                    placeholder="e.g. CS101 Midterm Exam" 
+                    placeholder="e.g. CS101 Midterm Exam"
                   />
+                  <p className="text-xs text-slate-500">This is only a note for you. Students join with the generated exam code below.</p>
                 </div>
 
                 <div className="space-y-2">

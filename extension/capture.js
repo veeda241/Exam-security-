@@ -17,10 +17,11 @@ class ExamCapture {
 
         // Adaptive configuration
         this.config = {
-            maxWidth: 854,
-            maxHeight: 480,
+            maxWidth: 960,
+            maxHeight: 540,
             webcamWidth: 320,
             webcamHeight: 240,
+            jpegQuality: 0.42,
             maxErrors: 5,
         };
     }
@@ -145,31 +146,69 @@ class ExamCapture {
     }
 
     /**
-     * Capture a single frame from the active webcam stream
-     * @returns {string|null} Base64 JPEG data URL
+     * Wait until the video element has a drawable frame.
      */
-    captureWebcamFrame() {
+    _waitForVideoFrame(video, timeoutMs = 1500) {
+        return new Promise((resolve) => {
+            if (video.videoWidth && video.videoHeight) {
+                resolve(true);
+                return;
+            }
+
+            let settled = false;
+            const finish = (ready) => {
+                if (settled) return;
+                settled = true;
+                resolve(ready);
+            };
+
+            const deadline = Date.now() + timeoutMs;
+            const tick = () => {
+                if (video.videoWidth && video.videoHeight) {
+                    finish(true);
+                    return;
+                }
+                if (Date.now() >= deadline) {
+                    finish(false);
+                    return;
+                }
+                requestAnimationFrame(tick);
+            };
+
+            video.onloadeddata = () => finish(Boolean(video.videoWidth && video.videoHeight));
+            tick();
+        });
+    }
+
+    /**
+     * Capture a single frame from the active webcam stream
+     * @returns {Promise<string|null>} Base64 JPEG data URL
+     */
+    async captureWebcamFrame() {
         if (!this.webcamStream || !this.webcamStream.active) return null;
 
         try {
-            // Create a temporary video element to play the stream if not already playing
             if (!this._captureVideo) {
                 this._captureVideo = document.createElement('video');
                 this._captureVideo.srcObject = this.webcamStream;
                 this._captureVideo.muted = true;
-                this._captureVideo.play();
+                this._captureVideo.playsInline = true;
+                await this._captureVideo.play();
+            }
+
+            await this._waitForVideoFrame(this._captureVideo);
+            if (!this._captureVideo.videoWidth || !this._captureVideo.videoHeight) {
+                return null;
             }
 
             const canvas = document.createElement('canvas');
             canvas.width = this.config.webcamWidth;
             canvas.height = this.config.webcamHeight;
             const ctx = canvas.getContext('2d');
+            if (!ctx) return null;
             
-            // Draw current video frame to canvas
             ctx.drawImage(this._captureVideo, 0, 0, canvas.width, canvas.height);
-            
-            // Return as compressed JPEG
-            return canvas.toDataURL('image/jpeg', 0.6);
+            return canvas.toDataURL('image/jpeg', this.config.jpegQuality);
         } catch (error) {
             console.warn('Webcam frame capture failed:', error);
             return null;
@@ -178,9 +217,9 @@ class ExamCapture {
 
     /**
      * Capture a single frame from the active screen stream
-     * @returns {string|null} Base64 JPEG data URL
+     * @returns {Promise<string|null>} Base64 JPEG data URL
      */
-    captureScreenFrame() {
+    async captureScreenFrame() {
         if (!this.screenStream || !this.screenStream.active) return null;
 
         try {
@@ -189,25 +228,29 @@ class ExamCapture {
                 this._screenCaptureVideo.srcObject = this.screenStream;
                 this._screenCaptureVideo.muted = true;
                 this._screenCaptureVideo.playsInline = true;
-                this._screenCaptureVideo.play();
+                await this._screenCaptureVideo.play();
             }
 
             const video = this._screenCaptureVideo;
+            await this._waitForVideoFrame(video);
             if (!video.videoWidth || !video.videoHeight) {
                 return null;
             }
+
             const width = video.videoWidth || this.config.maxWidth;
             const height = video.videoHeight || this.config.maxHeight;
+            const scale = Math.min(1, this.config.maxWidth / width, this.config.maxHeight / height);
+            const targetWidth = Math.max(1, Math.round(width * scale));
+            const targetHeight = Math.max(1, Math.round(height * scale));
 
             const canvas = document.createElement('canvas');
-            canvas.width = width;
-            canvas.height = height;
+            canvas.width = targetWidth;
+            canvas.height = targetHeight;
             const ctx = canvas.getContext('2d');
             if (!ctx) return null;
 
-            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-            return canvas.toDataURL('image/jpeg', 0.6);
+            ctx.drawImage(video, 0, 0, targetWidth, targetHeight);
+            return canvas.toDataURL('image/jpeg', this.config.jpegQuality);
         } catch (error) {
             console.warn('Screen frame capture failed:', error);
             return null;

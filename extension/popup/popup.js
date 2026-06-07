@@ -46,6 +46,38 @@ let statsInterval = null;
 let startTime = null;
 let isBackendConnected = false;
 
+function isProductiveCategory(category) {
+    return ['exam', 'quiz', 'education', 'learning'].includes(String(category || '').toLowerCase());
+}
+
+function getExamFocusPercent(browsing) {
+    if (!browsing) return 0;
+    if (typeof browsing.examFocusPercent === 'number') {
+        return browsing.examFocusPercent;
+    }
+    if (typeof browsing.examTimePercent === 'number') {
+        return browsing.examTimePercent;
+    }
+
+    const categories = browsing.timeByCategory || {};
+    const productiveTime =
+        (categories.exam || 0) +
+        (categories.quiz || 0) +
+        (categories.education || 0) +
+        (categories.learning || 0);
+    const totalTime = browsing.totalTime || 0;
+
+    if (totalTime > 0) {
+        return Math.min(100, Math.round((productiveTime / totalTime) * 100));
+    }
+
+    if (browsing.activeSite && isProductiveCategory(browsing.activeSite.category)) {
+        return 100;
+    }
+
+    return 0;
+}
+
 // ==================== INITIALIZATION ====================
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -193,9 +225,10 @@ function updateStats(status) {
 /** Update the browsing monitor section in the popup */
 function updateBrowsingStats(browsing, globalRisk, globalEffort) {
     if (!browsing) return;
-    
-    const actualRisk = globalRisk !== undefined ? globalRisk : browsing.browsingRiskScore;
-    const actualEffort = globalEffort !== undefined ? globalEffort : browsing.effortScore;
+
+    // Prefer live browsing tracker scores; global scores are merged from server/vision
+    const actualRisk = Math.max(browsing.browsingRiskScore || 0, globalRisk || 0);
+    const actualEffort = browsing.effortScore ?? globalEffort ?? 100;
     
     // Risk score
     const riskEl = document.getElementById('browsing-risk');
@@ -251,9 +284,8 @@ function updateBrowsingStats(browsing, globalRisk, globalEffort) {
     
     // Exam focus percentage
     const focusEl = document.getElementById('exam-focus');
-    if (focusEl && browsing.totalTime > 0) {
-        const productiveTime = (browsing.timeByCategory?.exam || 0) + (browsing.timeByCategory?.learning || 0);
-        const pct = Math.round((productiveTime / browsing.totalTime) * 100);
+    if (focusEl) {
+        const pct = getExamFocusPercent(browsing);
         focusEl.textContent = `${pct}%`;
         focusEl.style.color = pct > 70 ? '#10b981' : pct > 40 ? '#f59e0b' : '#ef4444';
     }

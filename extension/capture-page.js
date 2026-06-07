@@ -150,14 +150,16 @@ document.head.appendChild(style);
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     switch (message.type) {
         case 'CAPTURE_WEBCAM_FRAME':
-            const webcamFrame = capture.captureWebcamFrame();
-            sendResponse({ image: webcamFrame });
-            break;
+            capture.captureWebcamFrame()
+                .then((image) => sendResponse({ image }))
+                .catch(() => sendResponse({ image: null }));
+            return true;
 
         case 'CAPTURE_SCREEN_FRAME':
-            const screenFrame = capture.captureScreenFrame();
-            sendResponse({ image: screenFrame });
-            break;
+            capture.captureScreenFrame()
+                .then((image) => sendResponse({ image }))
+                .catch(() => sendResponse({ image: null }));
+            return true;
             
         case 'STOP_EXAM':
              capture.stopAll();

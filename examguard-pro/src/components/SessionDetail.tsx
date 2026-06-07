@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from "motion/react";
 import { ArrowLeft, Camera, ShieldAlert, Activity, Download, Loader2, Users, AlertTriangle, CheckCircle2, RefreshCw, Eye, Monitor } from "lucide-react";
 import { config } from "../config";
 import { useWebSocket } from "../hooks/useWebSocket";
+import { BrowsingHealthCard } from "./BrowsingHealthCard";
 
 interface StudentSession {
   id: string;
@@ -19,11 +20,41 @@ interface StudentSession {
   started_at: string;
 }
 
+function normalizeStudentId(studentId?: string) {
+  return (studentId || '').trim().toLowerCase();
+}
+
+function dedupeActiveStudents(sessions: StudentSession[], isLiveStudent: (student: StudentSession) => boolean) {
+  const byStudentId = new Map<string, StudentSession>();
+
+  for (const session of sessions) {
+    if (!session?.id || session.student_id?.startsWith('PROCTOR-') || !isLiveStudent(session)) {
+      continue;
+    }
+
+    const key = normalizeStudentId(session.student_id) || session.id;
+    const existing = byStudentId.get(key);
+    if (!existing) {
+      byStudentId.set(key, session);
+      continue;
+    }
+
+    const existingStarted = Date.parse(existing.started_at || '') || 0;
+    const candidateStarted = Date.parse(session.started_at || '') || 0;
+    if (candidateStarted >= existingStarted) {
+      byStudentId.set(key, session);
+    }
+  }
+
+  return Array.from(byStudentId.values());
+}
+
 export function SessionDetail() {
   const { sessionId } = useParams();
   const navigate = useNavigate();
   
   const [students, setStudents] = useState<StudentSession[]>([]);
+  const [sessionSummary, setSessionSummary] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [isEnded, setIsEnded] = useState(false);
   const [examId, setExamId] = useState<string | null>(null);
@@ -32,10 +63,16 @@ export function SessionDetail() {
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [isPdfGenerated, setIsPdfGenerated] = useState(false);
 
-  // Object storing the latest base64 data URL for each student/mode (fallback)
+  // Object storing the latest base64 data URL for each session UUID (not student_id)
   const [liveFrames, setLiveFrames] = useState<Record<string, { webcam?: string, screenshot?: string }>>({});
 
   const subscribedSessionsRef = useRef<Set<string>>(new Set());
+
+  const isLiveStudent = (student: StudentSession) => {
+    const status = (student.status || '').toLowerCase();
+    if (status === 'ended' || status === 'completed') return false;
+    return student.is_active === true || status === 'active' || status === 'recording';
+  };
 
   const handleWebSocketMessage = useCallback((lastEvent: any) => {
     const eventType = lastEvent.type || lastEvent.event_type;
@@ -44,17 +81,26 @@ export function SessionDetail() {
       const newStudent = lastEvent.data;
       if (newStudent) {
         setStudents(prev => {
-          const exists = prev.find(s => s.id === newStudent.id);
+          const normalizedId = normalizeStudentId(newStudent.student_id);
+          const withoutStale = prev.filter((session) => {
+            if (session.id === newStudent.id) return true;
+            if (!normalizedId) return true;
+            return normalizeStudentId(session.student_id) !== normalizedId;
+          });
+
+          const exists = withoutStale.find(s => s.id === newStudent.id);
           if (exists) {
-             return prev.map(s => s.id === newStudent.id ? { ...s, status: 'active' } : s);
+            return withoutStale.map(s => s.id === newStudent.id ? { ...s, status: 'active', is_active: true } : s);
           }
-          return [...prev, {
+
+          return [...withoutStale, {
             ...newStudent,
             risk_score: newStudent.risk_score || 0,
             engagement_score: newStudent.engagement_score || 100,
             effort_alignment: newStudent.effort_alignment || 100,
             risk_level: newStudent.risk_level || 'safe',
             status: 'active',
+            is_active: true,
             started_at: newStudent.started_at || new Date().toISOString(),
           }];
         });
@@ -68,16 +114,49 @@ export function SessionDetail() {
             : s
         ));
       }
+    } else if (eventType === 'risk_score_update') {
+      const targetSessionId = lastEvent.session_id;
+      const targetStudentId = lastEvent.student_id;
+      const riskScore = Number(lastEvent.risk_score ?? lastEvent.data?.risk_score ?? 0);
+      const effortScore = Number(
+        lastEvent.effort_score ??
+        lastEvent.engagement_score ??
+        lastEvent.data?.effort_score ??
+        lastEvent.data?.engagement_score ??
+        100
+      );
+      const riskLevel = lastEvent.risk_level || lastEvent.data?.risk_level || 'safe';
+
+      setStudents(prev => prev.map(student => {
+        const matchesSession = targetSessionId && student.id === targetSessionId;
+        const matchesStudent = targetStudentId && student.student_id === targetStudentId;
+        if (!matchesSession && !matchesStudent) return student;
+        return {
+          ...student,
+          risk_score: riskScore,
+          engagement_score: effortScore,
+          effort_alignment: effortScore,
+          risk_level: riskLevel,
+        };
+      }));
+
+      if (lastEvent.browsing || lastEvent.data?.browsing) {
+        setSessionSummary((prev: any) => ({
+          ...(prev || {}),
+          browsing: lastEvent.browsing || lastEvent.data?.browsing,
+        }));
+      }
     } else if (eventType === 'live_frame') {
-      const { student_id, frame_type, data } = lastEvent;
-      if (student_id && frame_type && data) {
+      const { session_id, frame_type, data } = lastEvent;
+      if (session_id && frame_type && data) {
         setLiveFrames(prev => ({
           ...prev,
-          [student_id]: {
-            ...(prev[student_id] || {}),
-            [frame_type]: data
-          }
+          [session_id]: {
+            ...(prev[session_id] || {}),
+            [frame_type]: data,
+          },
         }));
+        setRefreshKey(Date.now());
       }
     }
   }, []);
@@ -103,6 +182,16 @@ export function SessionDetail() {
     }
   }, [isConnected, examId, sendMessage]);
 
+  useEffect(() => {
+    if (!students.some(isLiveStudent)) return;
+
+    const intervalId = window.setInterval(() => {
+      setRefreshKey(Date.now());
+    }, 1000);
+
+    return () => window.clearInterval(intervalId);
+  }, [students]);
+
   // Fetch all sessions for this exam
   const fetchSessions = useCallback(async () => {
     try {
@@ -127,9 +216,13 @@ export function SessionDetail() {
           const currentExamId = currentSession.exam_id;
           setExamId(currentExamId);
           
-          // Get all student sessions for this exam (exclude PROCTOR sessions)
+          // Active student sessions only (exclude PROCTOR sessions)
           const studentSessions = data.filter(
-            (s: any) => s.exam_id === currentExamId && !s.student_id?.startsWith('PROCTOR-')
+            (s: any) =>
+              s.exam_id === currentExamId &&
+              !s.student_id?.startsWith('PROCTOR-') &&
+              s.is_active !== false &&
+              !['ended', 'completed'].includes(String(s.status || '').toLowerCase())
           );
           
           setStudents(studentSessions);
@@ -137,6 +230,21 @@ export function SessionDetail() {
           // Sessions can have status 'recording' or 'active' when live
           const isSessionActive = currentSession.status === 'active' || currentSession.status === 'recording' || currentSession.is_active === true;
           setIsEnded(!isSessionActive);
+        }
+
+        if (sessionId) {
+          try {
+            const detailRes = await fetch(`${config.apiUrl}/sessions/${sessionId}`);
+            if (detailRes.ok) {
+              setSessionSummary(await detailRes.json());
+            } else if (currentSession) {
+              setSessionSummary(currentSession);
+            }
+          } catch {
+            if (currentSession) {
+              setSessionSummary(currentSession);
+            }
+          }
         }
       }
     } catch (e) {
@@ -211,11 +319,10 @@ export function SessionDetail() {
     ? Math.round(students.reduce((acc, s) => acc + (s.engagement_score || s.effort_alignment || 0), 0) / students.length)
     : 0;
   const flaggedCount = students.filter(s => s.risk_level === 'review' || s.risk_level === 'suspicious').length;
-  const isLiveStudent = (student: StudentSession) => {
-    const status = (student.status || '').toLowerCase();
-    return student.is_active === true || status === 'active' || status === 'recording';
-  };
-  const resolveSessionFeedId = (student: StudentSession) => student.id || student.student_id;
+
+  const liveStudentsForFeeds = dedupeActiveStudents(students, isLiveStudent);
+
+  const resolveSessionFeedId = (student: StudentSession) => student.id;
 
   if (loading) {
     return (
@@ -248,7 +355,7 @@ export function SessionDetail() {
               </span>
             </div>
             <p className="text-sm text-slate-500 mt-1">
-              {students.length} student{students.length !== 1 ? 's' : ''} connected
+              {liveStudentsForFeeds.length} active student{liveStudentsForFeeds.length !== 1 ? 's' : ''} connected
             </p>
           </div>
         </div>
@@ -321,6 +428,75 @@ export function SessionDetail() {
         </div>
       )}
 
+      {sessionSummary?.browsing && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.35 }}
+          className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_380px] gap-4"
+        >
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
+            <div className="flex items-center justify-between gap-3 mb-4">
+              <div>
+                <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                  <Eye className="w-5 h-5 text-indigo-500" />
+                  Browsing Overview
+                </h2>
+                <p className="text-sm text-slate-500 mt-1">This is the same browsing-health summary emitted by the extension popup.</p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Risk</p>
+                <p className="mt-1 text-3xl font-bold text-slate-900">{Math.round(sessionSummary.browsing.browsingRiskScore || 0)}</p>
+              </div>
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Effort</p>
+                <p className="mt-1 text-3xl font-bold text-slate-900">{Math.round(sessionSummary.browsing.effortScore || 0)}</p>
+              </div>
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Exam Focus</p>
+                <p className="mt-1 text-3xl font-bold text-slate-900">
+                  {(() => {
+                    const focus = typeof sessionSummary.browsing.examFocusPercent === 'number'
+                      ? sessionSummary.browsing.examFocusPercent
+                      : typeof sessionSummary.browsing.examTimePercent === 'number'
+                        ? sessionSummary.browsing.examTimePercent
+                        : (() => {
+                            const totalTime = sessionSummary.browsing.totalTime || 0;
+                            const productiveTime =
+                              (sessionSummary.browsing.timeByCategory?.exam || 0) +
+                              (sessionSummary.browsing.timeByCategory?.quiz || 0) +
+                              (sessionSummary.browsing.timeByCategory?.education || 0) +
+                              (sessionSummary.browsing.timeByCategory?.learning || 0);
+                            return totalTime > 0 ? Math.round((productiveTime / totalTime) * 100) : 0;
+                          })();
+                    return focus > 0 || (sessionSummary.browsing.totalTime || 0) > 0 ? `${Math.round(focus)}%` : '-';
+                  })()}
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm text-slate-600">
+              <div className="rounded-xl border border-slate-200 p-4 flex items-center justify-between">
+                <span>Open Tabs</span>
+                <strong>{sessionSummary.browsing.openTabsCount || 0}</strong>
+              </div>
+              <div className="rounded-xl border border-slate-200 p-4 flex items-center justify-between">
+                <span>Sites Visited</span>
+                <strong>
+                  {sessionSummary.browsing.totalSitesVisited || sessionSummary.browsing.uniqueSitesVisited || 0}
+                  {sessionSummary.browsing.flaggedSitesCount > 0 ? ` (${sessionSummary.browsing.flaggedSitesCount} flagged)` : ''}
+                </strong>
+              </div>
+            </div>
+          </div>
+
+          <BrowsingHealthCard browsing={sessionSummary.browsing} />
+        </motion.div>
+      )}
+
       {/* MAIN CONTENT: Live student feed grid */}
       <AnimatePresence mode="wait">
         {students.length > 0 ? (
@@ -349,22 +525,35 @@ export function SessionDetail() {
               
               <div className="p-5">
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-                  {students.filter(s => s?.id).map((student) => {
-                    const studentId = resolveSessionFeedId(student) || student.id;  // Use consistent ID
+                  {liveStudentsForFeeds.length === 0 && (
+                    <div className="col-span-full rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-10 text-center text-sm text-slate-500">
+                      No active student feeds yet. Students appear here after they join the exam and start monitoring.
+                    </div>
+                  )}
+                  {liveStudentsForFeeds.map((student) => {
+                    const feedSessionId = resolveSessionFeedId(student);
                     const name = getStudentName(student);
                     const riskScore = student.risk_score || 0;
                     const effortScore = student.engagement_score || student.effort_alignment || 0;
                     const isFlagged = student.risk_level === 'review' || student.risk_level === 'suspicious';
-                    const isSelected = selectedStudent === studentId;
+                    const isSelected = selectedStudent === feedSessionId;
 
-                    const webcamFrame = liveFrames[studentId]?.webcam || liveFrames[student.student_id]?.webcam;
-                    const screenFrame = liveFrames[studentId]?.screenshot || liveFrames[student.student_id]?.screenshot;
-                    const webcamFeedUrl = webcamFrame || (isLiveStudent(student) && studentId ? `${config.apiUrl}/uploads/latest/${studentId}?type=webcam&t=${refreshKey}` : null);
-                    const screenFeedUrl = screenFrame || (isLiveStudent(student) && studentId ? `${config.apiUrl}/uploads/latest/${studentId}?type=screenshot&t=${refreshKey}` : null);
+                    const webcamFrame = liveFrames[feedSessionId]?.webcam;
+                    const screenFrame = liveFrames[feedSessionId]?.screenshot;
+                    const webcamFeedUrl =
+                      webcamFrame ||
+                      (isLiveStudent(student) && feedSessionId
+                        ? `${config.apiUrl}/uploads/latest/${feedSessionId}?type=webcam&t=${refreshKey}`
+                        : null);
+                    const screenFeedUrl =
+                      screenFrame ||
+                      (isLiveStudent(student) && feedSessionId
+                        ? `${config.apiUrl}/uploads/latest/${feedSessionId}?type=screenshot&t=${refreshKey}`
+                        : null);
 
                     return (
                       <motion.div
-                        key={studentId}
+                        key={feedSessionId}
                         initial={{ opacity: 0, scale: 0.95 }}
                         animate={{ opacity: 1, scale: 1 }}
                         className={`relative rounded-2xl overflow-hidden shadow-md border-2 transition-all ${
@@ -373,27 +562,30 @@ export function SessionDetail() {
                         }`}
                       >
                         {/* Feed Display */}
-                        <div className="p-3 bg-slate-950/95 space-y-3">
-                          <div className="relative bg-slate-900 aspect-video overflow-hidden rounded-xl">
+                        <div className="p-3 bg-white space-y-3 border-b border-slate-100">
+                          <div className="relative bg-slate-100 aspect-video overflow-hidden rounded-xl border border-slate-200">
                             {webcamFeedUrl ? (
                               <img
                                 src={webcamFeedUrl}
                                 alt={`${name} webcam snapshot`}
                                 className="w-full h-full object-cover"
+                                onError={(event) => {
+                                  event.currentTarget.style.display = 'none';
+                                }}
                               />
                             ) : (
-                              <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-800 text-slate-400">
+                              <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-50 text-slate-500">
                                 <Camera className="w-10 h-10 mb-2 opacity-30" />
-                                <span className="text-xs opacity-50">
+                                <span className="text-xs opacity-70">
                                   {isLiveStudent(student) ? 'Waiting for webcam feed...' : 'No live webcam available'}
                                 </span>
                               </div>
                             )}
 
-                            <div className="absolute inset-0 bg-gradient-to-t from-slate-900/80 via-transparent to-slate-900/30 pointer-events-none" />
+                            <div className="absolute inset-0 bg-gradient-to-t from-slate-900/12 via-transparent to-white/0 pointer-events-none" />
 
                             <div className="absolute top-3 left-3 flex items-center gap-2">
-                              <div className="bg-slate-900/60 backdrop-blur-md text-white text-xs px-2.5 py-1 rounded-lg font-medium flex items-center gap-1.5 border border-white/10">
+                              <div className="bg-white/90 backdrop-blur-md text-slate-700 text-xs px-2.5 py-1 rounded-lg font-medium flex items-center gap-1.5 border border-slate-200 shadow-sm">
                                 <Camera className="w-3 h-3" />
                                 Webcam
                               </div>
@@ -413,7 +605,7 @@ export function SessionDetail() {
                               }`}>
                                 Risk: {riskScore}
                               </div>
-                              <div className="bg-slate-900/60 backdrop-blur-md text-white text-[10px] px-2 py-1 rounded-lg font-mono flex items-center gap-1.5 border border-white/10">
+                              <div className="bg-white/90 backdrop-blur-md text-slate-700 text-[10px] px-2 py-1 rounded-lg font-mono flex items-center gap-1.5 border border-slate-200 shadow-sm">
                                 {student.status === 'active' ? (
                                   <>
                                     <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse"></span>
@@ -429,26 +621,29 @@ export function SessionDetail() {
                             </div>
                           </div>
 
-                          <div className="relative bg-slate-900 aspect-video overflow-hidden rounded-xl border border-slate-800">
+                          <div className="relative bg-slate-100 aspect-video overflow-hidden rounded-xl border border-slate-200">
                             {screenFeedUrl ? (
                               <img
                                 src={screenFeedUrl}
                                 alt={`${name} screen snapshot`}
                                 className="w-full h-full object-cover"
+                                onError={(event) => {
+                                  event.currentTarget.style.display = 'none';
+                                }}
                               />
                             ) : (
-                              <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-800 text-slate-400">
+                              <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-50 text-slate-500">
                                 <Monitor className="w-10 h-10 mb-2 opacity-30" />
-                                <span className="text-xs opacity-50">
+                                <span className="text-xs opacity-70">
                                   {isLiveStudent(student) ? 'Waiting for screen share...' : 'No live screen available'}
                                 </span>
                               </div>
                             )}
 
-                            <div className="absolute inset-0 bg-gradient-to-t from-slate-900/80 via-transparent to-slate-900/30 pointer-events-none" />
+                            <div className="absolute inset-0 bg-gradient-to-t from-slate-900/12 via-transparent to-white/0 pointer-events-none" />
 
                             <div className="absolute top-3 left-3 flex items-center gap-2">
-                              <div className="bg-slate-900/60 backdrop-blur-md text-white text-xs px-2.5 py-1 rounded-lg font-medium flex items-center gap-1.5 border border-white/10">
+                              <div className="bg-white/90 backdrop-blur-md text-slate-700 text-xs px-2.5 py-1 rounded-lg font-medium flex items-center gap-1.5 border border-slate-200 shadow-sm">
                                 <Monitor className="w-3 h-3" />
                                 Screen
                               </div>

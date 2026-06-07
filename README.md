@@ -35,7 +35,7 @@ ExamGuard Pro is an advanced, real-time exam monitoring and proctoring system th
 │   ├── services/            # AI Pipeline (Face, OCR, NLP, Vision)
 │   ├── main.py              # Application entry point
 │   └── supabase_client.py    # Supabase connection manager
-├── react-frontend/          # React Dashboard (Vite)
+├── examguard-pro/           # React Dashboard (Vite)
 │   ├── src/components/      # Analytics, Dashboard, Alerts, Reports
 │   └── src/context/         # Global AppState & Real-time context
 ├── extension/               # Chrome Extension (Manifest V3)
@@ -65,9 +65,11 @@ python main.py
 
 ### 3. Frontend Setup
 ```bash
-cd react-frontend
+cd examguard-pro
 npm install
-npm run dev
+npm run build   # served by backend at http://localhost:8000
+# OR for hot reload during development:
+npm run dev     # http://localhost:3000 (proxies API to :8000)
 ```
 
 ### 4. Chrome Extension

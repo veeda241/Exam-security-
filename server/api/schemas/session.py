@@ -51,6 +51,7 @@ class SessionSummary(BaseModel):
     student_name: str
     student_id: str
     exam_id: str
+    proctor_session_id: Optional[str] = None
     started_at: str
     ended_at: Optional[str] = None
     risk_score: Optional[float] = 0.0
@@ -60,6 +61,7 @@ class SessionSummary(BaseModel):
     effort_alignment: Optional[float] = 100.0
     status: Optional[str] = "active"
     stats: Optional[Dict[str, Any]] = {}
+    browsing: Optional[Dict[str, Any]] = None
     
     class Config:
         json_schema_extra = {
@@ -68,6 +70,7 @@ class SessionSummary(BaseModel):
                 "student_name": "John Doe",
                 "student_id": "student-123",
                 "exam_id": "midterm-2026",
+                "proctor_session_id": "session-proctor-123",
                 "started_at": "2026-02-03T10:00:00",
                 "ended_at": None,
                 "risk_score": 15.5,
@@ -82,6 +85,19 @@ class SessionSummary(BaseModel):
                     "face_absences": 1,
                     "forbidden_sites": 0,
                     "total": 3
+                },
+                "browsing": {
+                    "browsingRiskScore": 22.0,
+                    "effortScore": 88.0,
+                    "openTabsCount": 2,
+                    "flaggedOpenTabs": 0,
+                    "totalSitesVisited": 5,
+                    "flaggedSitesCount": 1,
+                    "activeSite": {
+                        "url": "https://canvas.university.edu/exam",
+                        "category": "exam",
+                        "riskLevel": "none"
+                    }
                 }
             }
         }

@@ -8,6 +8,7 @@ from typing import Any
 from supabase_client import get_supabase
 from api.schemas import ImageUpload, UploadResponse
 from config import SCREENSHOTS_DIR, WEBCAM_DIR
+from api.endpoints.analysis import broadcast_live_frame, set_latest_feed
 
 router = APIRouter()
 supabase = get_supabase()
@@ -34,6 +35,34 @@ def _as_str(value: Any, default: str = "") -> str:
     text = str(value)
     return text if text else default
 
+
+def _resolve_session_context(session_id: str) -> tuple[str, str]:
+    """Return (broadcast_room, student_id) for a session upload."""
+    if supabase is not None:
+        try:
+            session_res = supabase.table("exam_sessions").select("exam_id, student_id").eq("id", session_id).execute()
+            session_row = _first_record(session_res.data)
+            if session_row:
+                return (
+                    _as_str(session_row.get("exam_id"), session_id),
+                    _as_str(session_row.get("student_id"), session_id),
+                )
+        except Exception as e:
+            print(f"[Uploads] Supabase session lookup failed, using local fallback: {e}")
+
+    from api.endpoints import sessions as session_store
+
+    with session_store._LOCAL_STORE_LOCK:
+        session = session_store._LOCAL_SESSIONS.get(session_id)
+
+    if session:
+        return (
+            _as_str(session.get("exam_id"), session_id),
+            _as_str(session.get("student_id"), session_id),
+        )
+
+    return session_id, session_id
+
 async def analyze_screenshot(
     session_id: str,
     file_id: str,
@@ -57,7 +86,11 @@ async def analyze_screenshot(
             "timestamp": datetime.utcnow().isoformat()
         }
         
-        supabase.table("analysis_results").insert(analysis_data).execute()
+        if supabase is not None:
+            try:
+                supabase.table("analysis_results").insert(analysis_data).execute()
+            except Exception as db_err:
+                print(f"[Uploads] analysis_results insert failed (non-fatal): {db_err}")
         
         # Update session if forbidden content found
         if ocr_result.get("forbidden_detected"):
@@ -96,7 +129,11 @@ async def analyze_webcam_frame(
             "timestamp": datetime.utcnow().isoformat()
         }
         
-        supabase.table("analysis_results").insert(analysis_data).execute()
+        if supabase is not None:
+            try:
+                supabase.table("analysis_results").insert(analysis_data).execute()
+            except Exception as db_err:
+                print(f"[Uploads] analysis_results insert failed (non-fatal): {db_err}")
         
         # Update session if face not detected
         if not face_result.get("face_detected"):
@@ -133,36 +170,17 @@ async def upload_screenshot(
         
         with open(file_path, "wb") as f:
             f.write(image_bytes)
-        
-        # Broadcast live frame to dashboard via WebSocket
+
+        target_room, student_id = _resolve_session_context(upload.session_id)
+        set_latest_feed(upload.session_id, "screenshot", f"/uploads/screenshots/{file_id}.jpg")
+
         try:
-            from services.realtime import get_realtime_manager
-            mgr = get_realtime_manager()
-            import asyncio
-            
-            # Extract clean base64 string
-            clean_b64 = upload.image_data
-            if "," in clean_b64:
-                clean_b64 = clean_b64.split(",")[1]
-            
-            # Format as valid Data URL for the <img> tag
-            data_url = f"data:image/jpeg;base64,{clean_b64}"
-            
-            # Find the exam_id to broadcast to the proctor dashboard
-            session_res = supabase.table("exam_sessions").select("exam_id").eq("id", upload.session_id).execute()
-            session_row = _first_record(session_res.data)
-            target_room = _as_str(session_row.get("exam_id") if session_row else None, upload.session_id)
-            
-            # Use background_tasks so we don't block the upload response
-            background_tasks.add_task(
-                mgr.broadcast_to_session,
+            await broadcast_live_frame(
                 target_room,
-                {
-                    "type": "live_frame",
-                    "student_id": upload.session_id,
-                    "frame_type": "screenshot",
-                    "data": data_url
-                }
+                upload.session_id,
+                student_id,
+                "screenshot",
+                upload.image_data,
             )
         except Exception as ws_err:
             print(f"[WS] Failed to broadcast screenshot frame: {ws_err}")
@@ -206,35 +224,17 @@ async def upload_webcam_frame(
         
         with open(file_path, "wb") as f:
             f.write(image_bytes)
-        
-        # Broadcast live frame to dashboard via WebSocket
+
+        target_room, student_id = _resolve_session_context(upload.session_id)
+        set_latest_feed(upload.session_id, "webcam", f"/uploads/webcam/{file_id}.jpg")
+
         try:
-            from services.realtime import get_realtime_manager
-            mgr = get_realtime_manager()
-            import asyncio
-            
-            # Extract clean base64 string
-            clean_b64 = upload.image_data
-            if "," in clean_b64:
-                clean_b64 = clean_b64.split(",")[1]
-            
-            # Format as valid Data URL for the <img> tag
-            data_url = f"data:image/jpeg;base64,{clean_b64}"
-            
-            # Find the exam_id to broadcast to the proctor dashboard
-            session_res = supabase.table("exam_sessions").select("exam_id").eq("id", upload.session_id).execute()
-            session_row = _first_record(session_res.data)
-            target_room = _as_str(session_row.get("exam_id") if session_row else None, upload.session_id)
-            
-            background_tasks.add_task(
-                mgr.broadcast_to_session,
+            await broadcast_live_frame(
                 target_room,
-                {
-                    "type": "live_frame",
-                    "student_id": upload.session_id,
-                    "frame_type": "webcam",
-                    "data": data_url
-                }
+                upload.session_id,
+                student_id,
+                "webcam",
+                upload.image_data,
             )
         except Exception as ws_err:
             print(f"[WS] Failed to broadcast webcam frame: {ws_err}")

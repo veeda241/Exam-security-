@@ -96,4 +96,12 @@ classifier = WebsiteClassifier()
 
 def get_website_category(url: str, title: str = "") -> str:
     """Helper to get website category from global classifier"""
-    return classifier.classify(url, title)
+    from services.site_classifier import classify_site
+
+    result = classify_site(url, title)
+    if not result:
+        return "General"
+    category = result["category"]
+    if category == "LEARNING":
+        return "Education"
+    return category

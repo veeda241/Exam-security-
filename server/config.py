@@ -142,28 +142,18 @@ EDUCATIONAL_SITES = [
     "wikipedia.org",
 ]
 
-def classify_url(url: str) -> dict | None:
-    """Classify a URL into a risk category. Returns dict with category/site/riskLevel or None."""
-    if not url:
-        return None
-    url_lower = url.lower()
-    try:
-        from urllib.parse import urlparse
-        hostname = urlparse(url_lower).hostname or ""
-        hostname = hostname.replace("www.", "")
-    except Exception:
-        hostname = url_lower
+def classify_url(url: str, title: str = "") -> dict | None:
+    """Classify a URL using content-aware page classifier (no static domain lists)."""
+    from services.page_classifier import classify_page
 
-    for site in AI_SITES:
-        if site in hostname or site in url_lower:
-            return {"category": "AI", "site": site, "risk_level": "high"}
-    for site in CHEATING_SITES:
-        if site in hostname or site in url_lower:
-            return {"category": "CHEATING", "site": site, "risk_level": "critical"}
-    for site in ENTERTAINMENT_SITES:
-        if site in hostname or site in url_lower:
-            return {"category": "ENTERTAINMENT", "site": site, "risk_level": "medium"}
-    return None
+    result = classify_page(url=url, title=title)
+    if result.tracker_category == "other" and result.confidence < 0.35:
+        return None
+    return {
+        "category": result.category,
+        "site": (title or url)[:80],
+        "risk_level": result.risk_level,
+    }
 
 # Risk score weights
 RISK_WEIGHTS = {

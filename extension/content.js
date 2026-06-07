@@ -323,6 +323,18 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 // Detects AI answer overlays injected into the DOM (Cluely, Interview Coder, etc.)
 
 let overlayObserver = null;
+let lastOverlayAlertAt = 0;
+const OVERLAY_ALERT_COOLDOWN_MS = 2 * 60 * 1000;
+
+function reportOverlayAlert(data) {
+    const now = Date.now();
+    if (now - lastOverlayAlertAt < OVERLAY_ALERT_COOLDOWN_MS) return;
+    lastOverlayAlertAt = now;
+    safeSendMessage({
+        type: 'BEHAVIOR_ALERT',
+        data,
+    });
+}
 
 function startOverlayDetection() {
     if (overlayObserver) return;
@@ -361,47 +373,42 @@ function checkElementForOverlay(el) {
         const zIndex = parseInt(style.zIndex) || 0;
         const position = style.position;
         const pointerEvents = style.pointerEvents;
+        const elementSignature = `${el.id || ''} ${el.className?.toString() || ''}`.toLowerCase();
+        const hasKnownCheatSignature = /cluely|interviewcoder|free-cluely|ghostwriter|cheat.?overlay/.test(elementSignature);
+        const textContent = (el.textContent || '').trim();
+        const hasText = textContent.length > 20;
 
-        // Cluely signature: fixed/absolute positioned, very high z-index, pointer-events: none
-        const isSuspiciousOverlay = (
-            zIndex > 9000 &&
+        // Require known cheat signatures, or an extreme overlay pattern unlikely for normal UI
+        const isSuspiciousOverlay = hasKnownCheatSignature || (
+            zIndex > 999999 &&
             (position === 'fixed' || position === 'absolute') &&
-            pointerEvents === 'none'
+            pointerEvents === 'none' &&
+            hasText
         );
 
         if (isSuspiciousOverlay) {
-            const hasText = (el.textContent || '').trim().length > 20;
-            if (hasText) {
-                safeSendMessage({
-                    type: 'BEHAVIOR_ALERT',
-                    data: {
-                        type: 'AI_OVERLAY_DETECTED',
-                        message: 'Suspicious transparent overlay with text detected (possible Cluely/Interview Coder)',
-                        zIndex,
-                        textPreview: (el.textContent || '').slice(0, 100),
-                        tagName: el.tagName,
-                        className: el.className?.toString().slice(0, 100),
-                        severity: 'CRITICAL',
-                        timestamp: Date.now(),
-                        url: window.location.href,
-                    }
-                });
-            }
+            reportOverlayAlert({
+                type: 'AI_OVERLAY_DETECTED',
+                message: 'Suspicious transparent overlay with text detected (possible Cluely/Interview Coder)',
+                zIndex,
+                textPreview: textContent.slice(0, 100),
+                tagName: el.tagName,
+                className: el.className?.toString().slice(0, 100),
+                severity: 'CRITICAL',
+                timestamp: Date.now(),
+                url: window.location.href,
+            });
         }
 
-        // Also check for iframes pointing to localhost:5180
         if (el.tagName === 'IFRAME') {
             const src = (el.src || '').toLowerCase();
-            if (src.includes('localhost:5180') || src.includes('127.0.0.1:5180') || src.includes('cluely')) {
-                safeSendMessage({
-                    type: 'BEHAVIOR_ALERT',
-                    data: {
-                        type: 'CHEATING_IFRAME_DETECTED',
-                        message: `Cheating tool iframe detected: ${src}`,
-                        severity: 'CRITICAL',
-                        timestamp: Date.now(),
-                        url: window.location.href,
-                    }
+            if (src.includes('cluely.com') || src.includes('interviewcoder.co') || src.includes('free-cluely')) {
+                reportOverlayAlert({
+                    type: 'CHEATING_IFRAME_DETECTED',
+                    message: `Cheating tool iframe detected: ${src}`,
+                    severity: 'CRITICAL',
+                    timestamp: Date.now(),
+                    url: window.location.href,
                 });
             }
         }

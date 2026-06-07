@@ -100,7 +100,7 @@ export function StudentRegistration() {
               <p className="text-sm text-slate-500 mt-1">Capture a live reference image with the webcam.</p>
             </div>
             <div className="p-6 flex-1 flex flex-col gap-4">
-              <div className="rounded-2xl border border-slate-200 bg-slate-950 p-3 shadow-inner">
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 shadow-sm">
                 <WebcamCapture
                   width={320}
                   height={240}

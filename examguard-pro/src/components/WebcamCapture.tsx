@@ -113,11 +113,9 @@ export function WebcamCapture({
     try {
       const stream = await navigator.mediaDevices.getDisplayMedia({
         video: {
-          cursor: "always",
-          displaySurface: "monitor",
           width: { ideal: width },
           height: { ideal: height },
-        },
+        } as DisplayMediaStreamOptions['video'],
         audio: false,
       });
 
@@ -200,13 +198,13 @@ export function WebcamCapture({
 
   return (
     <div className="relative w-full">
-      <div className="relative overflow-hidden rounded-lg bg-slate-900">
+      <div className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
         <video
           ref={videoRef}
           autoPlay
           muted
           playsInline
-          className="block w-full bg-slate-900"
+          className="block w-full bg-slate-100"
           style={{
             width,
             height,
@@ -216,11 +214,11 @@ export function WebcamCapture({
         />
 
         {!isReady && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-slate-950/80 text-slate-200">
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-slate-50/95 text-slate-600">
             <div className="text-sm font-medium">
               {isRequesting ? "Starting camera..." : "Waiting for camera access"}
             </div>
-            <div className="text-xs text-slate-400">
+            <div className="text-xs text-slate-500">
               {errorMessage || "Allow access to continue"}
             </div>
           </div>
@@ -230,7 +228,7 @@ export function WebcamCapture({
           <button
             type="button"
             onClick={handleCapture}
-            className="absolute bottom-2 left-1/2 -translate-x-1/2 rounded-full bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700"
+            className="absolute bottom-3 left-1/2 -translate-x-1/2 rounded-full bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-indigo-700"
           >
             Capture
           </button>
@@ -244,7 +242,7 @@ export function WebcamCapture({
             onClick={() => void startWebcamCapture()}
             className={`rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${
               activeMode === "webcam"
-                ? "bg-blue-600 text-white"
+                ? "bg-indigo-600 text-white"
                 : "bg-slate-100 text-slate-700 hover:bg-slate-200"
             }`}
           >
@@ -255,7 +253,7 @@ export function WebcamCapture({
             onClick={() => void startScreenShare()}
             className={`rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${
               activeMode === "screen"
-                ? "bg-blue-600 text-white"
+                ? "bg-indigo-600 text-white"
                 : "bg-slate-100 text-slate-700 hover:bg-slate-200"
             }`}
           >
