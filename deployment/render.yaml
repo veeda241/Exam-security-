@@ -1,0 +1,87 @@
+services:
+  - type: web
+    name: examguard-api
+    runtime: docker
+    dockerfilePath: ./server/Dockerfile
+    dockerContext: .
+    plan: starter
+    envVars:
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: examguard-redis
+          property: connectionString
+      - key: CELERY_BROKER_URL
+        fromService:
+          type: redis
+          name: examguard-redis
+          property: connectionString
+      - key: CELERY_RESULT_BACKEND
+        fromService:
+          type: redis
+          name: examguard-redis
+          property: connectionString
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_KEY
+        sync: false
+      - key: SECRET_KEY
+        generateValue: true
+    healthCheckPath: /health
+
+  - type: worker
+    name: examguard-worker
+    runtime: docker
+    dockerfilePath: ./server/Dockerfile
+    dockerContext: .
+    plan: starter
+    dockerCommand: celery -A workers.celery_app worker --loglevel=info -Q face,object,gaze,ocr,nlp,report,default -c 2
+    envVars:
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: examguard-redis
+          property: connectionString
+      - key: CELERY_BROKER_URL
+        fromService:
+          type: redis
+          name: examguard-redis
+          property: connectionString
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_KEY
+        sync: false
+
+  - type: worker
+    name: examguard-beat
+    runtime: docker
+    dockerfilePath: ./server/Dockerfile
+    dockerContext: .
+    plan: starter
+    dockerCommand: celery -A workers.celery_app beat --loglevel=info
+    envVars:
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: examguard-redis
+          property: connectionString
+      - key: CELERY_BROKER_URL
+        fromService:
+          type: redis
+          name: examguard-redis
+          property: connectionString
+
+  - type: redis
+    name: examguard-redis
+    plan: starter
+    ipAllowList: []
+
+  - type: web
+    name: examguard-dashboard
+    runtime: static
+    buildCommand: cd examguard-pro && npm ci && npm run build
+    staticPublishPath: examguard-pro/dist
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html

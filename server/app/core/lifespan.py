@@ -1,41 +1,31 @@
 from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from loguru import logger
+
 from app.core.config import settings
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # STARTUP
-    logger.info("Starting ExamGuard Pro API...")
-    
-    # Load AI models here
+    logger.info("Starting ExamGuard Pro V2 API...")
+
     try:
-        from app.services.ml.face_detection import get_face_service
-        from app.services.ml.object_detection import get_object_service
-        
-        # Trigger initialization
-        get_face_service()
-        get_object_service()
-        
-        logger.info("AI models preloaded successfully")
+        from core.event_bus import get_event_bus
+        from app.api.v1.routes.ws import setup_ws_bus_listener
+
+        bus = get_event_bus()
+        setup_ws_bus_listener()
+        await bus.start_listener()
+        app.state.event_bus = bus
+        logger.info("Event bus listener started")
     except Exception as e:
-        logger.error(f"Failed to preload AI models: {e}")
-    
-    # Initialize services
-    from app.services.realtime import get_realtime_manager
-    app.state.realtime = get_realtime_manager()
-    
-    # Start analysis pipeline if needed
-    # from server.app.services.pipeline import get_pipeline
-    # app.state.pipeline = get_pipeline()
-    # await app.state.pipeline.start()
-    
-    logger.info("Application startup complete")
-    
+        logger.warning(f"Event bus unavailable (Redis may be down): {e}")
+        app.state.event_bus = None
+
     yield
-    
-    # SHUTDOWN
-    logger.info("Shutting down ExamGuard Pro API...")
-    # Clean up resources
-    # await app.state.pipeline.stop()
-    logger.info("Application shutdown complete")
+
+    logger.info("Shutting down ExamGuard Pro V2 API...")
+    bus = getattr(app.state, "event_bus", None)
+    if bus:
+        await bus.disconnect()

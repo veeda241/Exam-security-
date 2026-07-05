@@ -3,20 +3,53 @@
  * Enhanced session management, robust error handling, and retry logic
  */
 
+try { importScripts('lib/protocol.js'); } catch (e) { console.warn('Protocol load failed', e); }
+
 // ==================== CONFIGURATION ====================
-// Change BACKEND_URL to your deployed server URL
-// For local dev: 'http://localhost:8000'
-// For cloud:     'https://exam-security.onrender.com'
 const BACKEND_URL = 'http://127.0.0.1:8000';
 
 const CONFIG = {
-  API_BASE: `${BACKEND_URL}/api`,
-  WS_URL: `${BACKEND_URL.replace('http://', 'ws://').replace('https://', 'wss://')}/ws/student`,
-  SYNC_INTERVAL: 3000,          // Sync scores/events every 3s
-  TRANSFORMER_INTERVAL: 15000,  // Run transformer analysis every 15s
+  API_BASE: `${BACKEND_URL}/api/v1`,
+  API_LEGACY: `${BACKEND_URL}/api`,
+  WS_URL: `${BACKEND_URL.replace('http://', 'ws://').replace('https://', 'wss://')}/api/v1/ws`,
+  SYNC_INTERVAL: 3000,
+  TRANSFORMER_INTERVAL: 15000,
   MAX_RETRY_ATTEMPTS: 3,
   RETRY_DELAY: 2000,
 };
+
+async function getAccessToken() {
+  return new Promise((resolve) => {
+    chrome.storage.session.get(['access_token'], (r) => resolve(r.access_token || null));
+  });
+}
+
+async function setAccessToken(token) {
+  return chrome.storage.session.set({ access_token: token });
+}
+
+async function postV2Event(sessionId, type, payload) {
+  const token = await getAccessToken();
+  const proto = self.EXAMGUARD_PROTOCOL;
+  const body = proto
+    ? proto.buildMessage(type, sessionId, payload)
+    : { session_id: sessionId, type, payload, ts: new Date().toISOString() };
+
+  const headers = { 'Content-Type': 'application/json' };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+
+  try {
+    const res = await fetch(`${CONFIG.API_BASE}/events/`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(body),
+    });
+    return res.ok ? await res.json() : null;
+  } catch (err) {
+    console.warn('[V2] Event post failed:', err);
+    return null;
+  }
+}
 
 // ==================== SESSION STATE ====================
 let examSession = {
@@ -1484,6 +1517,24 @@ function logEvent(event) {
 
   // Send via WebSocket for immediate proctor update
   sendViaWebSocket(event);
+
+  // V2: post client-side events to queue-based API (hybrid inference)
+  if (examSession.active && examSession.sessionId) {
+    const v2TypeMap = {
+      TAB_SWITCH: 'tab_switch',
+      TAB_CREATED: 'tab_switch',
+      WINDOW_BLUR: 'window_blur',
+      COPY: 'copy_paste',
+      PASTE: 'copy_paste',
+      CLIPBOARD_PASTE: 'copy_paste',
+      PAGE_HIDDEN: 'page_hidden',
+      VISIBILITY_CHANGE: 'page_hidden',
+    };
+    const v2Type = v2TypeMap[type];
+    if (v2Type) {
+      postV2Event(examSession.sessionId, v2Type, event.data || {});
+    }
+  }
 
   console.log(`📝 [${event.type}]`, event.data?.url || event.data?.message || '');
 }

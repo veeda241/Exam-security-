@@ -1,10 +1,18 @@
-import { createContext, useContext, useState, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { config } from '../config';
+import { authApi } from '../api/client';
+
+interface User {
+  id?: string;
+  username?: string;
+  email?: string;
+  role?: string;
+  full_name?: string;
+}
 
 interface AuthContextType {
   isAuthenticated: boolean;
-  user: { username: string } | null;
+  user: User | null;
   login: (u: string, p: string) => Promise<boolean>;
   logout: () => void;
 }
@@ -13,55 +21,54 @@ const AuthContext = createContext<AuthContextType | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [user, setUser] = useState<{ username: string } | null>(null);
+  const [user, setUser] = useState<User | null>(null);
   const navigate = useNavigate();
-  const isDevFallbackEnabled = import.meta.env.DEV || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+
+  useEffect(() => {
+    const token = localStorage.getItem('access_token') || localStorage.getItem('token');
+    if (!token) return;
+
+    authApi
+      .me()
+      .then((res) => {
+        setUser(res.data);
+        setIsAuthenticated(true);
+      })
+      .catch(() => {
+        localStorage.removeItem('access_token');
+        localStorage.removeItem('refresh_token');
+        localStorage.removeItem('token');
+      });
+  }, []);
 
   const login = async (u: string, p: string) => {
     try {
-      // Create FormData-like body if backend expects password/username
-      const response = await fetch(`${config.apiUrl}/auth/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: u, password: p })
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        localStorage.setItem('token', data.access_token);
-        setUser({ username: u });
-        setIsAuthenticated(true);
-        navigate('/');
-        return true;
-      }
+      const response = await authApi.login(u, p);
+      const data = response.data;
+      const tokens = data.tokens || data;
+      const accessToken = tokens.access_token || data.access_token;
+      const refreshToken = tokens.refresh_token;
 
-      if (response.status >= 500 && isDevFallbackEnabled) {
-        console.warn('[Auth] Backend auth unavailable, using local dev session fallback');
+      if (accessToken) {
+        localStorage.setItem('access_token', accessToken);
         localStorage.removeItem('token');
-        setUser({ username: u || 'Admin' });
+        if (refreshToken) localStorage.setItem('refresh_token', refreshToken);
+        setUser(data.user || { username: u });
         setIsAuthenticated(true);
         navigate('/');
         return true;
       }
-
       return false;
     } catch (error) {
-       console.error("Login failed:", error);
-
-       if (isDevFallbackEnabled) {
-         console.warn('[Auth] Falling back to local dev session after login failure');
-         localStorage.removeItem('token');
-         setUser({ username: u || 'Admin' });
-         setIsAuthenticated(true);
-         navigate('/');
-         return true;
-       }
-
-       return false;
+      console.error('Login failed:', error);
+      return false;
     }
   };
 
   const logout = () => {
+    localStorage.removeItem('access_token');
+    localStorage.removeItem('refresh_token');
+    localStorage.removeItem('token');
     setIsAuthenticated(false);
     setUser(null);
     navigate('/login');
@@ -74,9 +81,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 }
 
-
 export const useAuth = () => {
   const context = useContext(AuthContext);
-  if (!context) throw new Error("useAuth must be used within AuthProvider");
+  if (!context) throw new Error('useAuth must be used within AuthProvider');
   return context;
 };

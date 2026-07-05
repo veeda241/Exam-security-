@@ -31,7 +31,25 @@
         <span>Backend Connected</span>
       </div>
 
-      <!-- Student Info Form (hidden until status known) -->
+    <!-- Consent (required before capture) -->
+      <section id="consent-section" class="section">
+        <h2 class="section-title">Monitoring Consent</h2>
+        <p class="text-sm" style="margin-bottom: 12px; line-height: 1.5;">
+          ExamGuard monitors tab activity, window focus, and (with consent) webcam frames.
+          Only derived events and flagged screenshots are stored — not continuous video.
+        </p>
+        <p id="retention-mode-label" class="text-sm" style="margin-bottom: 12px; color: #64748b;">
+          Standard retention (30 days for flagged screenshots)
+        </p>
+        <button type="button" id="consent-accept" class="btn btn-primary" style="width:100%;margin-bottom:8px;">
+          I consent to monitoring
+        </button>
+        <button type="button" id="consent-decline-biometric" class="btn" style="width:100%;display:none;">
+          Continue without biometric monitoring
+        </button>
+      </section>
+
+      <!-- Student Info Form (hidden until consent given) -->
       <section id="setup-section" class="section hidden">
         <h2 class="section-title">Start Exam Session</h2>
         <form id="setup-form" class="form">
@@ -186,6 +204,7 @@
     </footer>
   </div>
 
+  <script src="consent.js"></script>
   <script src="popup.js"></script>
 </body>
 

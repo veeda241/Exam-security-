@@ -5,13 +5,14 @@
 
 import React from "react";
 import { BrowserRouter, Routes, Route, Navigate, Outlet, useLocation } from "react-router-dom";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { AuthProvider, useAuth } from "./context/AuthContext";
+import { SocketProvider } from "./context/SocketContext";
 import { AppProvider } from "./context/AppContext";
 import { Sidebar } from "./components/Sidebar";
 import { Header } from "./components/Header";
 import { Dashboard } from "./components/Dashboard";
 import { Sessions } from "./components/Sessions";
-import { SessionDetail } from "./components/SessionDetail";
 import { Alerts } from "./components/Alerts";
 import { Analytics } from "./components/Analytics";
 import { Reports } from "./components/Reports";
@@ -22,8 +23,17 @@ import { StudentDetail } from "./components/StudentDetail";
 import { Settings } from "./components/Settings";
 import { ToastContainer } from "./components/ToastContainer";
 import { BottomNav } from "./components/BottomNav";
+import { AlertToast } from "./components/alerts/AlertToast";
+import { ProctorDashboard } from "./pages/ProctorDashboard";
+import { ExamListPage } from "./pages/ExamListPage";
+import { SessionDetailPage } from "./pages/SessionDetailPage";
+import { ReportPage } from "./pages/ReportPage";
 import { motion, AnimatePresence } from "motion/react";
 import "./App.css";
+
+const queryClient = new QueryClient({
+  defaultOptions: { queries: { staleTime: 30_000, retry: 1 } },
+});
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated } = useAuth();
@@ -66,26 +76,34 @@ function AppLayout() {
 
 export default function App() {
   return (
-    <BrowserRouter>
-      <AppProvider>
-        <AuthProvider>
-          <Routes>
-            <Route path="/login" element={<Login />} />
-            <Route path="/register" element={<StudentRegistration />} />
-            <Route path="/" element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
-              <Route index element={<Dashboard />} />
-              <Route path="sessions" element={<Sessions />} />
-              <Route path="sessions/:sessionId" element={<SessionDetail />} />
-              <Route path="students" element={<Students />} />
-              <Route path="student/:studentId" element={<StudentDetail />} />
-              <Route path="alerts" element={<Alerts />} />
-              <Route path="analytics" element={<Analytics />} />
-              <Route path="reports" element={<Reports />} />
-              <Route path="settings" element={<Settings />} />
-            </Route>
-          </Routes>
-        </AuthProvider>
-      </AppProvider>
-    </BrowserRouter>
+    <QueryClientProvider client={queryClient}>
+      <BrowserRouter>
+        <AppProvider>
+          <AuthProvider>
+            <SocketProvider>
+              <Routes>
+                <Route path="/login" element={<Login />} />
+                <Route path="/register" element={<StudentRegistration />} />
+                <Route path="/" element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
+                  <Route index element={<ProctorDashboard />} />
+                  <Route path="dashboard" element={<Dashboard />} />
+                  <Route path="exams" element={<ExamListPage />} />
+                  <Route path="sessions" element={<Sessions />} />
+                  <Route path="sessions/:sessionId" element={<SessionDetailPage />} />
+                  <Route path="reports/:sessionId" element={<ReportPage />} />
+                  <Route path="students" element={<Students />} />
+                  <Route path="student/:studentId" element={<StudentDetail />} />
+                  <Route path="alerts" element={<Alerts />} />
+                  <Route path="analytics" element={<Analytics />} />
+                  <Route path="reports" element={<Reports />} />
+                  <Route path="settings" element={<Settings />} />
+                </Route>
+              </Routes>
+              <AlertToast />
+            </SocketProvider>
+          </AuthProvider>
+        </AppProvider>
+      </BrowserRouter>
+    </QueryClientProvider>
   );
 }

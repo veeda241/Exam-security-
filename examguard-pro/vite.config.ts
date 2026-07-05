@@ -17,13 +17,20 @@ export default defineConfig(({mode}) => {
     },
     server: {
       proxy: {
+        // Use 127.0.0.1 — localhost:8000 may hit Docker (e.g. Chroma) instead of ExamGuard API
+        '/api/v1': {
+          target: env.VITE_API_PROXY_TARGET || 'http://127.0.0.1:8000',
+          changeOrigin: true,
+          secure: false,
+          ws: true,
+        },
         '/api': {
-          target: 'http://localhost:8000',
+          target: env.VITE_API_PROXY_TARGET || 'http://127.0.0.1:8000',
           changeOrigin: true,
           secure: false,
         },
         '/ws': {
-          target: 'http://localhost:8000',
+          target: env.VITE_API_PROXY_TARGET || 'http://127.0.0.1:8000',
           ws: true,
           changeOrigin: true,
         },

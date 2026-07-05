@@ -22,3 +22,7 @@ celery
 httpx
 pytest
 pytest-asyncio
+fakeredis
+weasyprint
+Pillow
+ruff

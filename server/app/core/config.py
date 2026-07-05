@@ -50,7 +50,7 @@ class Settings(BaseSettings):
     # Security
     SECRET_KEY: str = Field(default="secret-key-keep-it-safe", env="SECRET_KEY")
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7  # 7 days
-    CORS_ORIGINS: List[str] = ["*"]
+    CORS_ORIGINS: Union[str, List[str]] = "*"
 
     # AI / ML Settings
     ENABLE_OBJECT_DETECTION: bool = True
@@ -108,6 +108,24 @@ class Settings(BaseSettings):
     # Tools
     FFMPEG_PATH: Optional[str] = Field(default=None, env="FFMPEG_PATH")
 
+    # Redis / Celery
+    REDIS_URL: str = Field(default="redis://localhost:6379/0", env="REDIS_URL")
+    CELERY_BROKER_URL: str = Field(default="redis://localhost:6379/0", env="CELERY_BROKER_URL")
+    CELERY_RESULT_BACKEND: str = Field(default="redis://localhost:6379/0", env="CELERY_RESULT_BACKEND")
+    EVENTS_RATE_LIMIT_PER_SECOND: int = Field(default=10, env="EVENTS_RATE_LIMIT_PER_SECOND")
+
+    # Storage
+    REPORTS_BUCKET: str = Field(default="reports", env="REPORTS_BUCKET")
+    SCREENSHOTS_BUCKET: str = Field(default="screenshots", env="SCREENSHOTS_BUCKET")
+
     model_config = SettingsConfigDict(env_file=".env", case_sensitive=True, extra="ignore")
+
+    @property
+    def cors_origins_list(self) -> List[str]:
+        if self.CORS_ORIGINS == "*":
+            return ["*"]
+        if isinstance(self.CORS_ORIGINS, str):
+            return [o.strip() for o in self.CORS_ORIGINS.split(",") if o.strip()]
+        return list(self.CORS_ORIGINS)
 
 settings = Settings()

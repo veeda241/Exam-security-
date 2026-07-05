@@ -26,12 +26,8 @@ export interface WsMessage {
   [key: string]: unknown;
 }
 
-function buildWsUrl(channel?: string): string {
-  const base = config.wsUrl.replace(/\/$/, '');
-  if (!channel || channel === '/dashboard' || channel === 'dashboard') {
-    return `${base}/dashboard`;
-  }
-  return `${base}/dashboard`;
+function buildWsUrl(): string {
+  return config.wsUrl.replace(/\/$/, '');
 }
 
 export const useWebSocket = (
@@ -49,12 +45,16 @@ export const useWebSocket = (
   const connect = useCallback(() => {
     if (ws.current?.readyState === WebSocket.OPEN) return;
 
-    const url = buildWsUrl(channel);
+    const url = buildWsUrl();
     ws.current = new WebSocket(url);
 
     ws.current.onopen = () => {
       setIsConnected(true);
-      console.log('Dashboard WebSocket connected:', url);
+      const sessionId =
+        channel && channel !== '/dashboard' && channel !== 'dashboard' ? channel : null;
+      if (sessionId) {
+        ws.current?.send(JSON.stringify({ type: 'subscribe', session_id: sessionId }));
+      }
     };
 
     ws.current.onmessage = (event) => {

@@ -1,198 +1,143 @@
-"""
-ExamGuard Pro - Configuration
-Application settings and environment variables
-"""
-
-import os
+"""Application settings (Pydantic)."""
 from pathlib import Path
+from typing import Dict, List, Optional, Union
 from urllib.parse import quote_plus
 
-# Base paths
-BASE_DIR = Path(__file__).parent
-UPLOAD_DIR = BASE_DIR / "uploads"
-SCREENSHOTS_DIR = UPLOAD_DIR / "screenshots"
-WEBCAM_DIR = UPLOAD_DIR / "webcam"
+from pydantic import Field
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
-# Database configuration - Supabase PostgreSQL
-# Set these via environment variables (never hardcode secrets)
-SUPABASE_URL = os.getenv("SUPABASE_URL", "")
-SUPABASE_KEY = os.getenv("SUPABASE_KEY", "")
-SUPABASE_DB_PASSWORD = os.getenv("SUPABASE_DB_PASSWORD", "")
 
-# Supabase PostgreSQL connection (Direct connection - port 5432)
-PG_USER = os.getenv("PG_USER", "postgres")
-PG_PASSWORD = os.getenv("PG_PASSWORD", SUPABASE_DB_PASSWORD)
-PG_HOST = os.getenv("PG_HOST", "")
-PG_PORT = os.getenv("PG_PORT", "5432")
-PG_DB = os.getenv("PG_DB", "postgres")
+class Settings(BaseSettings):
+    PROJECT_NAME: str = "ExamGuard Pro"
+    VERSION: str = "2.0.0"
+    API_V1_STR: str = "/api/v1"
 
-# Database mode: use DATABASE_URL if set, else Supabase config, else SQLite
-if os.getenv("DATABASE_URL"):
-    db_url = os.getenv("DATABASE_URL")
-    # Render uses postgres:// but SQLAlchemy needs postgresql+asyncpg://
-    if db_url.startswith("postgres://"):
-        DATABASE_URL = db_url.replace("postgres://", "postgresql+asyncpg://", 1)
-    elif db_url.startswith("postgresql://"):
-        DATABASE_URL = db_url.replace("postgresql://", "postgresql+asyncpg://", 1)
-    else:
-        DATABASE_URL = db_url
-elif PG_HOST:
-    DATABASE_URL = f"postgresql+asyncpg://{PG_USER}:{quote_plus(PG_PASSWORD)}@{PG_HOST}:{PG_PORT}/{PG_DB}"
-else:
-    DATABASE_URL = f"sqlite+aiosqlite:///{BASE_DIR}/examguard.db"
+    BASE_DIR: Path = Path(__file__).parent
+    UPLOAD_DIR: Path = BASE_DIR / "uploads"
+    SCREENSHOTS_DIR: Path = UPLOAD_DIR / "screenshots"
+    WEBCAM_DIR: Path = UPLOAD_DIR / "webcam"
+    REPORTS_DIR: Path = UPLOAD_DIR / "reports"
 
-# API Configuration
-API_HOST = os.getenv("API_HOST", "0.0.0.0")
-API_PORT = int(os.getenv("API_PORT", "8000"))
+    SUPABASE_URL: str = Field(default="", env="SUPABASE_URL")
+    SUPABASE_KEY: str = Field(default="", env="SUPABASE_KEY")
+    SUPABASE_DB_PASSWORD: str = Field(default="", env="SUPABASE_DB_PASSWORD")
 
-# CORS - allow all origins for robust local development & extension connection
-CORS_ORIGINS = ["*"]
+    PG_USER: str = Field(default="postgres", env="PG_USER")
+    PG_PASSWORD: str = Field(default="", env="PG_PASSWORD")
+    PG_HOST: str = Field(default="", env="PG_HOST")
+    PG_PORT: str = Field(default="5432", env="PG_PORT")
+    PG_DB: str = Field(default="postgres", env="PG_DB")
+    DATABASE_URL: Optional[str] = Field(default=None, env="DATABASE_URL")
 
-# Capture settings
-SCREENSHOT_INTERVAL_SECONDS = 3
-WEBCAM_INTERVAL_SECONDS = 5
-IMAGE_QUALITY = 0.7
-MAX_IMAGE_WIDTH = 1280
-MAX_IMAGE_HEIGHT = 720
-ENABLE_OBJECT_DETECTION = os.getenv(
-    "ENABLE_OBJECT_DETECTION",
-    "1" if os.name != "nt" else "0"
-).strip().lower() in {"1", "true", "yes", "on"}
+    SECRET_KEY: str = Field(default="secret-key-keep-it-safe", env="SECRET_KEY")
+    CORS_ORIGINS: Union[str, List[str]] = "*"
 
-# Forbidden keywords for OCR detection
-FORBIDDEN_KEYWORDS = [
-    "chatgpt",
-    "chat.openai",
-    "openai.com",
-    "bard.google",
-    "gemini.google",
-    "stackoverflow.com",
-    "stack overflow",
-    "chegg.com",
-    "chegg",
-    "quizlet.com",
-    "quizlet",
-    "coursehero",
-    "course hero",
-    "brainly.com",
-    "brainly",
-    "claude.ai",
-    "anthropic",
-    "perplexity.ai",
-    "wolframalpha",
-    "symbolab",
-    "photomath",
-]
+    ENABLE_OBJECT_DETECTION: bool = True
+    OCR_LANGUAGE: str = "eng"
+    WEBCAM_INTERVAL_SECONDS: int = 5
 
-# ==================== URL CLASSIFICATION LISTS ====================
+    REDIS_URL: str = Field(default="redis://localhost:6379/0", env="REDIS_URL")
+    CELERY_BROKER_URL: str = Field(default="redis://localhost:6379/0", env="CELERY_BROKER_URL")
+    CELERY_RESULT_BACKEND: str = Field(default="redis://localhost:6379/0", env="CELERY_RESULT_BACKEND")
+    EVENTS_RATE_LIMIT_PER_SECOND: int = Field(default=10, env="EVENTS_RATE_LIMIT_PER_SECOND")
 
-# AI / LLM sites - high risk
-AI_SITES = [
-    "chat.openai.com", "chatgpt.com", "openai.com",
-    "gemini.google.com", "bard.google.com",
-    "claude.ai", "anthropic.com",
-    "perplexity.ai",
-    "copilot.microsoft.com", "bing.com/chat",
-    "poe.com", "character.ai",
-    "huggingface.co/chat", "deepseek.com",
-    "you.com", "phind.com",
-    "wolframalpha.com", "symbolab.com",
-    "photomath.com", "mathway.com",
-]
+    REPORTS_BUCKET: str = Field(default="reports", env="REPORTS_BUCKET")
+    SCREENSHOTS_BUCKET: str = Field(default="screenshots", env="SCREENSHOTS_BUCKET")
 
-# Entertainment / distraction sites - medium risk
-ENTERTAINMENT_SITES = [
-    "youtube.com", "netflix.com", "hulu.com",
-    "disneyplus.com", "primevideo.com",
-    "twitch.tv", "kick.com",
-    "tiktok.com", "instagram.com", "facebook.com", "twitter.com", "x.com",
-    "reddit.com", "tumblr.com", "pinterest.com",
-    "snapchat.com", "discord.com",
-    "spotify.com", "music.youtube.com", "soundcloud.com",
-    "store.steampowered.com", "epicgames.com",
-    "crunchyroll.com", "roblox.com",
-]
-
-# Academic cheating sites - critical risk
-CHEATING_SITES = [
-    "chegg.com", "coursehero.com", "studocu.com",
-    "quizlet.com", "brainly.com", "bartleby.com",
-    "numerade.com", "slader.com", "litanswers.org",
-    "stackoverflow.com", "stackexchange.com",
-    "pastebin.com", "github.com", "gitlab.com",
-]
-
-# Social media sites - medium-high risk
-SOCIAL_SITES = [
-    "facebook.com", "twitter.com", "x.com",
-    "instagram.com", "snapchat.com", "tiktok.com",
-    "linkedin.com", "reddit.com", "tumblr.com",
-    "pinterest.com", "threads.net", "mastodon.social",
-    "discord.com", "whatsapp.com", "web.telegram.org",
-    "messenger.com",
-]
-
-# Educational / productive sites - no risk
-EDUCATIONAL_SITES = [
-    "udemy.com", "coursera.org", "edx.org",
-    "khanacademy.org", "codecademy.com", "freecodecamp.org",
-    "w3schools.com", "mdn.io", "geeksforgeeks.org",
-    "docs.python.org", "developer.mozilla.org",
-    "google.com/search", "bing.com/search",
-    "wikipedia.org",
-]
-
-def classify_url(url: str, title: str = "") -> dict | None:
-    """Classify a URL using content-aware page classifier (no static domain lists)."""
-    from services.page_classifier import classify_page
-
-    result = classify_page(url=url, title=title)
-    if result.tracker_category == "other" and result.confidence < 0.35:
-        return None
-    return {
-        "category": result.category,
-        "site": (title or url)[:80],
-        "risk_level": result.risk_level,
+    RISK_WEIGHTS: Dict[str, float] = {
+        "tab_switch": 10,
+        "window_blur": 5,
+        "copy_paste": 15,
+        "face_missing": 20,
+        "multiple_faces": 25,
+        "gaze_away": 15,
+        "ocr_flag": 40,
+        "object_flag": 25,
+        "text_similarity": 35,
+        "forbidden_site": 40,
+        "page_hidden": 8,
+        "TAB_SWITCH": 10,
+        "WINDOW_BLUR": 5,
+        "FORBIDDEN_CONTENT": 40,
+        "FACE_ABSENT": 20,
+        "COPY": 15,
+        "PASTE": 10,
     }
 
-# Risk score weights
-RISK_WEIGHTS = {
-    "TAB_SWITCH": 10,
-    "WINDOW_BLUR": 5,
-    "FORBIDDEN_SITE": 40,
-    "FORBIDDEN_CONTENT": 40,
-    "AI_USAGE": 45,
-    "ENTERTAINMENT": 25,
-    "CHEATING_SITE": 50,
-    "FACE_ABSENT": 20,
-    "COPY": 15,
-    "PASTE": 10,
-    "SUSPICIOUS_SHORTCUT": 15,
-    "CONTEXT_MENU": 5,
-    "PAGE_HIDDEN": 8,
-    "SCREEN_SHARE_STOPPED": 50,
-    "CLICK": 1,
-    "TYPING": 1,
-    "VISIBILITY_CHANGE": 5,
-    "BROWSER_FOCUS_LOST": 5,
-    "WINDOW_RESIZE": 5,
-    "BROWSING_SUMMARY": 0,
-    "TAB_AUDIT": 0,
-    "VISUAL_FORBIDDEN_CONTENT": 45,
-    "OTHER": 0,
-}
+    RISK_THRESHOLDS: Dict[str, float] = {"review": 30, "suspicious": 60}
 
-# Risk score thresholds
-RISK_THRESHOLDS = {
-    "SAFE": 30,
-    "REVIEW": 60,
-    "SUSPICIOUS": 100,
-}
+    FORBIDDEN_KEYWORDS: List[str] = [
+        "chatgpt", "chegg", "stackoverflow", "quizlet", "brainly",
+    ]
 
-# Face detection settings
-FACE_ABSENCE_THRESHOLD_SECONDS = 10
-MIN_FACE_CONFIDENCE = 0.7
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        case_sensitive=True,
+        extra="ignore",
+    )
 
-# AI Module settings
-OCR_LANGUAGE = "eng"
-TEXT_SIMILARITY_THRESHOLD = 0.75
+    @property
+    def ASYNC_DATABASE_URL(self) -> str:
+        if self.DATABASE_URL:
+            url = self.DATABASE_URL
+            if url.startswith("postgres://"):
+                return url.replace("postgres://", "postgresql+asyncpg://", 1)
+            if url.startswith("postgresql://"):
+                return url.replace("postgresql://", "postgresql+asyncpg://", 1)
+            return url
+        if self.PG_HOST:
+            password = self.PG_PASSWORD or self.SUPABASE_DB_PASSWORD
+            return f"postgresql+asyncpg://{self.PG_USER}:{quote_plus(password)}@{self.PG_HOST}:{self.PG_PORT}/{self.PG_DB}"
+        return f"sqlite+aiosqlite:///{self.BASE_DIR}/examguard.db"
+
+    @property
+    def cors_origins_list(self) -> List[str]:
+        if self.CORS_ORIGINS == "*":
+            return ["*"]
+        if isinstance(self.CORS_ORIGINS, str):
+            return [o.strip() for o in self.CORS_ORIGINS.split(",") if o.strip()]
+        return list(self.CORS_ORIGINS)
+
+
+settings = Settings()
+
+# Legacy V1 service compatibility
+SUPABASE_URL = settings.SUPABASE_URL
+SUPABASE_KEY = settings.SUPABASE_KEY
+SUPABASE_DB_PASSWORD = settings.SUPABASE_DB_PASSWORD
+DATABASE_URL = settings.ASYNC_DATABASE_URL
+RISK_WEIGHTS = settings.RISK_WEIGHTS
+RISK_THRESHOLDS = settings.RISK_THRESHOLDS
+FORBIDDEN_KEYWORDS = settings.FORBIDDEN_KEYWORDS
+OCR_LANGUAGE = settings.OCR_LANGUAGE
+ENABLE_OBJECT_DETECTION = settings.ENABLE_OBJECT_DETECTION
+WEBCAM_INTERVAL_SECONDS = settings.WEBCAM_INTERVAL_SECONDS
+SCREENSHOTS_DIR = settings.SCREENSHOTS_DIR
+WEBCAM_DIR = settings.WEBCAM_DIR
+UPLOAD_DIR = settings.UPLOAD_DIR
+REPORTS_DIR = settings.REPORTS_DIR
+API_HOST = "0.0.0.0"
+API_PORT = 8000
+
+AI_SITES = settings.AI_SITES if hasattr(settings, "AI_SITES") else []
+CHEATING_SITES = settings.CHEATING_SITES if hasattr(settings, "CHEATING_SITES") else []
+ENTERTAINMENT_SITES = []
+SOCIAL_SITES = []
+EDUCATIONAL_SITES = []
+
+
+def classify_url(url: str, title: str = "") -> dict | None:
+    """Legacy URL classifier shim for V1 services."""
+    try:
+        from services.page_classifier import classify_page
+        result = classify_page(url=url, title=title)
+        if result.tracker_category == "other" and result.confidence < 0.35:
+            return None
+        return {
+            "category": result.category,
+            "site": (title or url)[:80],
+            "risk_level": result.risk_level,
+        }
+    except Exception:
+        return None

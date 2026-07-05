@@ -59,8 +59,9 @@ cd server
 python -m venv .venv
 source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 pip install -r requirements.txt
-# Create a .env file with your SUPABASE_URL and SUPABASE_KEY
-python main.py
+# Configure server/.env with SUPABASE_URL, SUPABASE_KEY (service_role), PG_* pooler credentials
+python setup_database.py --seed-admin   # or paste migrations/supabase_schema.sql in Supabase SQL Editor
+python -m uvicorn main:app --host 127.0.0.1 --port 8000 --reload
 ```
 
 ### 3. Frontend Setup
