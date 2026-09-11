@@ -28,9 +28,9 @@ env/
 *.db
 
 # Screenshots/Temp
-server/uploads/
-server/uploads/screenshots/
-server/uploads/webcam/
+uploads/
+uploads/screenshots/
+uploads/webcam/
 *.log
 output.log
 report_gen.log
@@ -39,3 +39,6 @@ delete_log.txt
 # OS
 .DS_Store
 Thumbs.db
+
+# Codebuff agent state
+.freebuff/

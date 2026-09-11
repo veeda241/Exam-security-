@@ -11,8 +11,8 @@ $VenvPython = Join-Path $VenvDir "Scripts\python.exe"
 Write-Host "=== ExamGuard Pro V2 — Dev Startup ===" -ForegroundColor Cyan
 
 if (-not (Test-Path (Join-Path $Root ".env"))) {
-    Copy-Item (Join-Path $Root "deployment\env.example") (Join-Path $Root ".env")
-    Write-Host "Created .env from deployment/env.example" -ForegroundColor Yellow
+    Copy-Item (Join-Path $Root "server\.env.example") (Join-Path $Root ".env")
+    Write-Host "Created .env from server/.env.example" -ForegroundColor Yellow
 }
 
 if (-not (Test-Path $VenvPython)) {
