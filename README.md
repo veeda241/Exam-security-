@@ -122,6 +122,20 @@ npm run build    # outputs examguard-pro/dist/ (serve as a static site)
 ```
 Other scripts: `npm run test` (Vitest), `npm run lint` (TypeScript check).
 
+### One-command development startup
+From the repository root, install frontend dependencies once and run the complete
+local stack with:
+```bash
+npm install --prefix examguard-pro
+npm run dev
+```
+The root command starts local Redis through Docker when the configured Redis URL
+points to `localhost`, verifies Redis with `PING`, and then starts the FastAPI
+server, Celery worker, and Vite frontend. Managed Redis URLs are never replaced
+or started locally. On Windows, the worker uses Celery's `solo` pool to avoid
+the multiprocessing permission issue. The Chrome extension is loaded separately
+from `chrome://extensions`.
+
 ### 5. Chrome Extension
 1. Open `chrome://extensions` in your browser.
 2. Enable **Developer mode**.
