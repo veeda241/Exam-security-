@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>ExamGuard Pro - Session Report</title>
+    <style>
+      body { font-family: sans-serif; margin: 2rem; color: #1e293b; }
+      h1 { color: #1e3a5f; }
+      table { border-collapse: collapse; width: 100%; }
+      th, td { border: 1px solid #cbd5e1; padding: 8px; text-align: left; }
+      th { background: #f1f5f9; }
+    </style>
+  </head>
+  <body>
+    <h1>ExamGuard Pro - Session Report</h1>
+    <p><strong>Session ID:</strong> {{ session.id }}</p>
+    <p><strong>Risk Score:</strong> {{ session.risk_score|default(0) }} ({{ session.risk_level|default("safe") }})</p>
+    <p><strong>Generated:</strong> {{ generated_at }}</p>
+    <h2>Events</h2>
+    <table>
+      <thead><tr><th>Time</th><th>Type</th><th>Weight</th></tr></thead>
+      <tbody>
+      {% for event in events %}
+        <tr><td>{{ event.created_at|default("") }}</td><td>{{ event.type|default("") }}</td><td>{{ event.weight|default(0) }}</td></tr>
+      {% else %}
+        <tr><td colspan="3">No recorded events.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </body>
+</html>

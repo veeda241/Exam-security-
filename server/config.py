@@ -19,6 +19,11 @@ class Settings(BaseSettings):
     REPORTS_DIR: Path = UPLOAD_DIR / "reports"
 
     SUPABASE_URL: str = Field(default="", env="SUPABASE_URL")
+    # Prefer Supabase's current key names. SUPABASE_KEY remains supported for
+    # older deployments and local environments.
+    SUPABASE_PUBLISHABLE_KEY: str = Field(default="", env="SUPABASE_PUBLISHABLE_KEY")
+    SUPABASE_SECRET_KEY: str = Field(default="", env="SUPABASE_SECRET_KEY")
+    SUPABASE_JWKS_URL: str = Field(default="", env="SUPABASE_JWKS_URL")
     SUPABASE_KEY: str = Field(default="", env="SUPABASE_KEY")
     SUPABASE_DB_PASSWORD: str = Field(default="", env="SUPABASE_DB_PASSWORD")
 
@@ -104,7 +109,11 @@ settings = Settings()
 
 # Legacy V1 service compatibility
 SUPABASE_URL = settings.SUPABASE_URL
-SUPABASE_KEY = settings.SUPABASE_KEY
+SUPABASE_PUBLISHABLE_KEY = settings.SUPABASE_PUBLISHABLE_KEY
+SUPABASE_SECRET_KEY = settings.SUPABASE_SECRET_KEY
+SUPABASE_JWKS_URL = settings.SUPABASE_JWKS_URL
+# The server uses the secret key for database/storage administration.
+SUPABASE_KEY = settings.SUPABASE_SECRET_KEY or settings.SUPABASE_KEY
 SUPABASE_DB_PASSWORD = settings.SUPABASE_DB_PASSWORD
 DATABASE_URL = settings.ASYNC_DATABASE_URL
 RISK_WEIGHTS = settings.RISK_WEIGHTS

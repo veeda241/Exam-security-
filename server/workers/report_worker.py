@@ -5,6 +5,7 @@ import os
 import sys
 import tempfile
 from datetime import datetime, timezone
+from pathlib import Path
 
 _server_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if _server_dir not in sys.path:
@@ -16,29 +17,27 @@ from supabase_client import get_supabase
 
 
 def _render_html(session: dict, events: list[dict]) -> str:
-    rows = "".join(
-        f"<tr><td>{e.get('created_at', '')}</td><td>{e.get('type', '')}</td>"
-        f"<td>{e.get('weight', 0)}</td></tr>"
-        for e in events
-    )
-    return f"""
-    <!DOCTYPE html>
-    <html><head><meta charset="utf-8"><title>ExamGuard Report</title>
-    <style>
-      body {{ font-family: sans-serif; margin: 2rem; }}
-      h1 {{ color: #1e3a5f; }}
-      table {{ border-collapse: collapse; width: 100%; }}
-      th, td {{ border: 1px solid #ccc; padding: 8px; text-align: left; }}
-      th {{ background: #f0f4f8; }}
-    </style></head><body>
-    <h1>ExamGuard Pro — Session Report</h1>
-    <p><strong>Session ID:</strong> {session.get('id')}</p>
-    <p><strong>Risk Score:</strong> {session.get('risk_score', 0)} ({session.get('risk_level', 'safe')})</p>
-    <p><strong>Generated:</strong> {datetime.now(timezone.utc).isoformat()}</p>
-    <h2>Events</h2>
-    <table><tr><th>Time</th><th>Type</th><th>Weight</th></tr>{rows}</table>
-    </body></html>
-    """
+    template_path = Path(_server_dir) / "reports" / "templates" / "session_report.html"
+    generated_at = datetime.now(timezone.utc).isoformat()
+    try:
+        from jinja2 import Environment, FileSystemLoader, select_autoescape
+
+        environment = Environment(
+            loader=FileSystemLoader(template_path.parent),
+            autoescape=select_autoescape(("html", "xml")),
+        )
+        return environment.get_template(template_path.name).render(
+            session=session,
+            events=events,
+            generated_at=generated_at,
+        )
+    except ImportError:
+        # Keep report generation usable in minimal installations.
+        return (
+            "<html><body><h1>ExamGuard Pro - Session Report</h1>"
+            f"<p>Session ID: {session.get('id')}</p>"
+            f"<p>Generated: {generated_at}</p></body></html>"
+        )
 
 
 @celery_app.task(name="workers.report_worker.generate_report", bind=True, max_retries=2)

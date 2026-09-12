@@ -3,12 +3,12 @@ ExamGuard Pro - Supabase Client
 Direct connection to Supabase using supabase-py
 """
 
-import os
 from supabase import create_client, Client
 from config import SUPABASE_URL, SUPABASE_KEY
 
 # Initialize Supabase client
-# Ensure SUPABASE_URL and SUPABASE_KEY are provided in environment
+# Ensure SUPABASE_URL and the server-only secret key are provided in the
+# environment. The secret key must never be sent to the browser or extension.
 if not SUPABASE_URL or not SUPABASE_KEY:
     print("[WARN] Supabase credentials missing from environment!")
     supabase: Client = None

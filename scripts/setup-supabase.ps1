@@ -34,4 +34,4 @@ try {
 }
 
 Write-Host ""
-Write-Host "Done. Set SUPABASE_KEY to service_role key in server\.env for full API access." -ForegroundColor Green
+Write-Host "Done. Set SUPABASE_SECRET_KEY to the server-only Supabase secret key in server\.env." -ForegroundColor Green

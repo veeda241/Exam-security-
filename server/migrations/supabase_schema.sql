@@ -4,7 +4,8 @@
 -- Run once in: Supabase Dashboard → SQL Editor → New query → Run
 -- Or locally:  python setup_database.py
 --
--- Backend tip: set SUPABASE_KEY to the **service_role** key (Settings → API)
+-- Backend tip: set SUPABASE_SECRET_KEY to the server-only Supabase secret key
+-- (Project Settings → API).
 -- so the FastAPI server can read/write all tables (custom JWT auth, not Supabase Auth).
 -- =============================================================================
 

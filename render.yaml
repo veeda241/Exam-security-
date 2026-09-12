@@ -1,5 +1,4 @@
 services:
-  # ========== Unified Backend + Frontend (Monolithic) ==========
   - type: web
     name: examguard-api
     runtime: python
@@ -10,18 +9,22 @@ services:
     envVars:
       - key: MPLBACKEND
         value: "Agg"
-      # Supabase Configuration
+      # Supabase configuration. Set secret values in Render's dashboard.
       - key: SUPABASE_URL
-        value: "https://fpnopsvzvfqwvyqmhgei.supabase.co"
-      - key: SUPABASE_KEY
-        value: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZwbm9wc3Z6dmZxd3Z5cW1oZ2VpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI1NDc4ODUsImV4cCI6MjA4ODEyMzg4NX0.OxJ9mXUJndY3QCjG_nYN5tLdEnyigJ265IrpxQB0dsU"
-      # PostgreSQL Configuration (Supabase Pooler)
+        value: "https://uymouuusicnnzhzdwznt.supabase.co"
+      - key: SUPABASE_PUBLISHABLE_KEY
+        sync: false
+      - key: SUPABASE_SECRET_KEY
+        sync: false
+      - key: SUPABASE_JWKS_URL
+        value: "https://uymouuusicnnzhzdwznt.supabase.co/auth/v1/.well-known/jwks.json"
+      # PostgreSQL configuration (Supabase pooler)
       - key: PG_HOST
-        value: "aws-1-ap-northeast-1.pooler.supabase.com"
+        sync: false
       - key: PG_PORT
         value: "6543"
       - key: PG_USER
-        value: "postgres.fpnopsvzvfqwvyqmhgei"
+        sync: false
       - key: PG_DB
         value: "postgres"
       - key: PG_PASSWORD

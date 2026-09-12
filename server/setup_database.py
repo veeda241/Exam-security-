@@ -74,7 +74,7 @@ def seed_admin() -> None:
 
     sb = get_supabase()
     if sb is None:
-        print("Supabase client not configured. Set SUPABASE_URL and SUPABASE_KEY in .env")
+        print("Supabase client not configured. Set SUPABASE_URL and SUPABASE_SECRET_KEY in .env")
         sys.exit(1)
 
     res = sb.table("users").select("id").eq("username", "admin").execute()

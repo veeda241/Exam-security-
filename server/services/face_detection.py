@@ -110,7 +110,7 @@ class SecureVision:
                 results['violations'].append('MULTIPLE_FACES_DETECTED')
                 results['integrity_score_impact'] += 50
             
-            for face_landmarks in detection_result.face_landmarks:
+            for face_index, face_landmarks in enumerate(detection_result.face_landmarks):
                 # Get bounding box for detection
                 x_coords = [lm.x for lm in face_landmarks]
                 y_coords = [lm.y for lm in face_landmarks]
@@ -121,6 +121,17 @@ class SecureVision:
                     'w': int((max(x_coords) - min(x_coords)) * w),
                     'h': int((max(y_coords) - min(y_coords)) * h)
                 })
+                if face_index == 0:
+                    try:
+                        from services.gaze_tracking import estimate_gaze, estimate_head_pose
+
+                        results["pose"] = estimate_head_pose(face_landmarks, w, h)
+                        gaze = estimate_gaze(face_landmarks)
+                        results["gaze_direction"] = gaze["direction"]
+                        results["gaze_ratio"] = gaze["ratio"]
+                        results["gaze_off_screen"] = gaze["off_screen"]
+                    except (ValueError, cv2.error):
+                        results["pose"] = None
         else:
             elapsed = time.time() - self._last_face_time
             if elapsed > self.FACE_ABSENT_THRESHOLD_SEC:

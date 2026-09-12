@@ -24,5 +24,6 @@ pytest
 pytest-asyncio
 fakeredis
 weasyprint
+Jinja2
 Pillow
 ruff
