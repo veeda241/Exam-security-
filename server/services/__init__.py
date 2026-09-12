@@ -15,6 +15,8 @@ __all__ = [
     "get_transformer_analyzer",
     "classify_page",
     "classify_for_tracker",
+    "estimate_head_pose",
+    "estimate_gaze",
 ]
 
 # Mapping of public name -> (submodule, attribute)
@@ -26,6 +28,8 @@ _LAZY_MAP = {
     "get_transformer_analyzer": ("transformer_analysis", "get_transformer_analyzer"),
     "classify_page":            ("page_classifier",      "classify_page"),
     "classify_for_tracker":     ("page_classifier",      "classify_for_tracker"),
+    "estimate_head_pose":       ("gaze_tracking",        "estimate_head_pose"),
+    "estimate_gaze":            ("gaze_tracking",        "estimate_gaze"),
 }
 
 

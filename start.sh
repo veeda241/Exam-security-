@@ -16,6 +16,7 @@ export PYTHONPATH=$PYTHONPATH:.
 mkdir -p /tmp/matplotlib_cache
 mkdir -p server/uploads/screenshots
 mkdir -p server/uploads/webcam
+mkdir -p server/uploads/reports
 
 echo "=== Starting Uvicorn ==="
 # Using 'main:app' from root which redirects to 'server.main:app'

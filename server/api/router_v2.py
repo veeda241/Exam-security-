@@ -1,7 +1,7 @@
 """ExamGuard Pro V2 — API router assembly."""
 from fastapi import APIRouter
 
-from api import auth, exams, sessions, events, reports, ws
+from api import auth, exams, sessions, events, reports, uploads, ws
 
 api_router = APIRouter()
 
@@ -10,6 +10,8 @@ api_router.include_router(exams.router, prefix="/exams", tags=["exams"])
 api_router.include_router(sessions.router, prefix="/sessions", tags=["sessions"])
 api_router.include_router(events.router, prefix="/events", tags=["events"])
 api_router.include_router(reports.router, prefix="/reports", tags=["reports"])
+api_router.include_router(uploads.router, prefix="/uploads", tags=["uploads"])
+api_router.include_router(uploads.analysis_router, prefix="/analysis", tags=["analysis"])
 api_router.include_router(ws.router, tags=["websocket"])
 
 __all__ = ["api_router"]
