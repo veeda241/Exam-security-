@@ -35,7 +35,7 @@ function loadEnvFile() {
 const env = loadEnvFile();
 let redisUrl =
   env.CELERY_BROKER_URL || env.REDIS_URL || 'redis://localhost:6379/0';
-if (env.REDIS_PASSWORD && !redisUrl.includes('@')) {
+if (env.REDIS_PASSWORD) {
   const parsed = new URL(redisUrl);
   parsed.username = env.REDIS_USERNAME || 'default';
   parsed.password = env.REDIS_PASSWORD;
